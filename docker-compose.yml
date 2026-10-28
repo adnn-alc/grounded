@@ -1,0 +1,17 @@
+services:
+  grounded:
+    build: .
+    container_name: grounded
+    ports:
+      - 5555:3001 # change left side for a different host port
+    volumes:
+      - ./data:/app/data # SQLite DB lives in the data/ folder next to this file
+    environment:
+      - NODE_ENV=production
+      - DB_PATH=/app/data/grounded.db
+    restart: unless-stopped
+    networks:
+      - media_net
+networks:
+  media_net:
+    external: true

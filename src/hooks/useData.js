@@ -1,0 +1,222 @@
+import { useState, useEffect, useCallback } from 'react'
+import { api } from '../api/client.js'
+
+/**
+ * Central data hook. Loads shots, beans, gear, recipes
+ * from the SQLite API on mount and exposes mutation helpers that keep
+ * local state in sync without a full refetch.
+ */
+export function useData() {
+  const [shots,         setShots]         = useState([])
+  const [brews,         setBrews]         = useState([])
+  const [beans,         setBeans]         = useState([])
+  const [archivedBeans, setArchivedBeans] = useState([])
+  const [gear,          setGear]          = useState([])
+  const [recipes,       setRecipes]       = useState([])
+  const [tips,          setTips]          = useState([])
+  const [loading,       setLoading]       = useState(true)
+  const [error,         setError]         = useState(null)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const [s, bw, b, ab, g, r, ti] = await Promise.all([
+        api.getShots(),
+        api.getBrews(),
+        api.getBeans(),
+        api.getArchivedBeans(),
+        api.getGear(),
+        api.getRecipes(),
+        api.getTips(),
+      ])
+      setShots(s)
+      setBrews(bw)
+      setBeans(b)
+      setArchivedBeans(ab)
+      setGear(g)
+      setRecipes(r)
+      setTips(ti)
+    } catch (e) {
+      setError(e.message)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { load() }, [load])
+
+  // ── Shot mutations ──────────────────────────────────────────────
+  const adjustBeanRemaining = async (beanName, delta) => {
+    const bean = beans.find(b => b.name === beanName)
+    if (!bean || !delta) return
+    const newRemaining = Math.min(bean.weight || Infinity, Math.max(0, (bean.remaining || 0) + delta))
+    const pct = bean.weight > 0 ? newRemaining / bean.weight : 1
+    const stock = pct > 0.25 ? 'good' : pct > 0.1 ? 'low' : 'critical'
+    const updated = await api.updateBean(bean.id, { ...bean, remaining: newRemaining, stock })
+    setBeans(prev => prev.map(b => b.id === bean.id ? updated : b))
+  }
+
+  const saveShot = async (shot) => {
+    const saved = await api.createShot(shot)
+    setShots(prev => [saved, ...prev])
+    await adjustBeanRemaining(shot.bean, -shot.dose)
+    return saved
+  }
+
+  const updateShot = async (id, data) => {
+    const updated = await api.updateShot(id, data)
+    setShots(prev => prev.map(s => s.id === id ? updated : s))
+    return updated
+  }
+
+  const deleteShot = async (id) => {
+    const shot = shots.find(s => s.id === id)
+    await api.deleteShot(id)
+    setShots(prev => prev.filter(s => s.id !== id))
+    if (shot?.bean && shot?.dose) await adjustBeanRemaining(shot.bean, shot.dose)
+  }
+
+  const favoriteShot = async (id, val) => {
+    setShots(prev => prev.map(s => s.id === id ? { ...s, favorited: val } : s))
+    const updated = await api.favoriteShot(id, val)
+    setShots(prev => prev.map(s => s.id === id ? updated : s))
+    return updated
+  }
+
+  // ── Brew mutations ──────────────────────────────────────────────
+  const saveBrew = async (brew) => {
+    const saved = await api.createBrew(brew)
+    setBrews(prev => [saved, ...prev])
+    await adjustBeanRemaining(brew.bean, -brew.dose)
+    return saved
+  }
+
+  const updateBrew = async (id, data) => {
+    const updated = await api.updateBrew(id, data)
+    setBrews(prev => prev.map(b => b.id === id ? updated : b))
+    return updated
+  }
+
+  const deleteBrew = async (id) => {
+    const brew = brews.find(b => b.id === id)
+    await api.deleteBrew(id)
+    setBrews(prev => prev.filter(b => b.id !== id))
+    if (brew?.bean && brew?.dose) await adjustBeanRemaining(brew.bean, brew.dose)
+  }
+
+  const favoriteBrew = async (id, val) => {
+    setBrews(prev => prev.map(b => b.id === id ? { ...b, favorited: val } : b))
+    const updated = await api.favoriteBrew(id, val)
+    setBrews(prev => prev.map(b => b.id === id ? updated : b))
+    return updated
+  }
+
+  // ── Bean mutations ──────────────────────────────────────────────
+  const saveBean = async (bean) => {
+    const saved = await api.createBean(bean)
+    setBeans(prev => [saved, ...prev])
+    return saved
+  }
+
+  const updateBean = async (id, data) => {
+    const updated = await api.updateBean(id, data)
+    setBeans(prev => prev.map(b => b.id === id ? updated : b))
+    return updated
+  }
+
+  const archiveBean = async (id) => {
+    const bean = beans.find(b => b.id === id)
+    const updated = await api.updateBean(id, { ...bean, archived: true })
+    setBeans(prev => prev.filter(b => b.id !== id))
+    setArchivedBeans(prev => [updated, ...prev])
+    return updated
+  }
+
+  const unarchiveBean = async (id) => {
+    const bean = archivedBeans.find(b => b.id === id)
+    const updated = await api.updateBean(id, { ...bean, archived: false, archived_at: null })
+    setArchivedBeans(prev => prev.filter(b => b.id !== id))
+    setBeans(prev => [updated, ...prev])
+    return updated
+  }
+
+  const deleteBean = async (id) => {
+    await api.deleteBean(id)
+    setBeans(prev => prev.filter(b => b.id !== id))
+    setArchivedBeans(prev => prev.filter(b => b.id !== id))
+  }
+
+  // ── Gear mutations ──────────────────────────────────────────────
+  const saveGear = async (g) => {
+    const saved = await api.createGear(g)
+    setGear(prev => [...prev, saved])
+    return saved
+  }
+
+  const updateGear = async (id, g) => {
+    const updated = await api.updateGear(id, g)
+    setGear(prev => prev.map(item => {
+      if (item.id === id) return updated
+      if (g.status === 'Primary' && item.kind === g.kind && item.status === 'Primary') return { ...item, status: 'Active' }
+      return item
+    }))
+    return updated
+  }
+
+  const deleteGear = async (id) => {
+    await api.deleteGear(id)
+    setGear(prev => prev.filter(g => g.id !== id))
+  }
+
+  // ── Recipe mutations ────────────────────────────────────────────
+  const saveRecipe = async (recipe) => {
+    const saved = await api.createRecipe(recipe)
+    setRecipes(prev => [...prev, saved])
+    return saved
+  }
+
+  const updateRecipe = async (id, recipe) => {
+    const updated = await api.updateRecipe(id, recipe)
+    setRecipes(prev => prev.map(r => r.id === id ? updated : r))
+    return updated
+  }
+
+  const deleteRecipe = async (id) => {
+    await api.deleteRecipe(id)
+    setRecipes(prev => prev.filter(r => r.id !== id))
+  }
+
+  // ── Tips mutations ──────────────────────────────────────────────
+  const saveTip = async (tip) => {
+    const saved = await api.createTip(tip)
+    setTips(prev => [...prev, saved])
+    return saved
+  }
+
+  const updateTip = async (id, data) => {
+    const updated = await api.updateTip(id, data)
+    setTips(prev => prev.map(t => t.id === id ? updated : t))
+    return updated
+  }
+
+  const deleteTip = async (id) => {
+    await api.deleteTip(id)
+    setTips(prev => prev.filter(t => t.id !== id))
+  }
+
+  return {
+    // Data
+    shots, brews, beans, archivedBeans, gear, recipes, tips,
+    loading, error,
+    reload: load,
+
+    // Mutations
+    saveShot, updateShot, deleteShot, favoriteShot,
+    saveBrew, updateBrew, deleteBrew, favoriteBrew,
+    saveBean, updateBean, deleteBean, archiveBean, unarchiveBean,
+    saveGear, updateGear, deleteGear,
+    saveRecipe, updateRecipe, deleteRecipe,
+    saveTip, updateTip, deleteTip,
+  }
+}

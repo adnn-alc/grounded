@@ -1,0 +1,14 @@
+node_modules/
+dist/
+.DS_Store
+*.local
+
+# SQLite database (your personal data) — never commit
+/data/
+*.db
+*.db-shm
+*.db-wal
+
+# Env files
+.env
+.env.*
