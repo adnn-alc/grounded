@@ -23,7 +23,7 @@ React + Express + SQLite in a single Docker container. No accounts, no cloud, no
 ## Quick start (Docker)
 
 ```bash
-git clone https://github.com/<you>/grounded.git
+git clone https://github.com/adnn-alc/grounded.git
 cd grounded
 docker compose up -d --build
 ```
