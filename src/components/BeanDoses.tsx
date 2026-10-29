@@ -34,7 +34,8 @@ export function BeanDosesCard({ bean, basketOpts, currentBasket, U, onUpdateBean
 
   const selectBasket = (b: string) => {
     const saved = doses.find(d => d.basket === b)
-    saved ? onApply(saved) : onSelectBasket(b)
+    if (saved) onApply(saved)
+    else onSelectBasket(b)
   }
 
   const save = async (next: BeanDose[]) => {

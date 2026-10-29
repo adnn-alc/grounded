@@ -8,3 +8,7 @@ data
 *.db-wal
 .env
 .env.*
+
+# Tests and their helpers are not needed in the image
+server/*.test.ts
+server/test-helpers.ts

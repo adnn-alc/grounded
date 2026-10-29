@@ -17,9 +17,15 @@ npm run dev:api      # Express only → http://localhost:3001 (uses node --watch
 npm run build        # build React → dist/
 npm start            # production: serve built frontend + API from port 3001
 npm run typecheck    # tsc --noEmit for the UI (tsconfig.json) and the API (server/tsconfig.json)
+npm run lint         # oxlint (config: .oxlintrc.json)
+npm test             # node --test server/*.test.ts — needs Node 24 (runs .ts directly)
 ```
 
-There is no test runner and no linter. CI (`.github/workflows/ci.yml`) runs `npm ci`, `npm run typecheck` and `npm run build`, then starts the server on an **empty** database and hits every endpoint, and separately builds and runs the Docker image. Dependabot (`.github/dependabot.yml`) opens weekly update PRs.
+Linting is oxlint, not ESLint, because typescript-eslint doesn't support TypeScript 7. The React Compiler style rules (`set-state-in-effect`, `static-components`, `purity`, `refs`) are warnings for existing code; `rules-of-hooks` is an error.
+
+Tests use Node's built-in runner, no framework: `server/api.test.ts` (routes, stock, errors, headers on a fresh seeded DB), `server/migrations.test.ts` (upgrading a 1.0-layout DB) and `server/hosts.test.ts` (`ALLOWED_HOSTS`). Each file runs in its own process with a temp database from `createTempDatabase()` in `server/test-helpers.ts`; set `DB_PATH` before importing `app.ts`/`db.ts`. Test files are excluded from the Docker image (`.dockerignore`).
+
+CI (`.github/workflows/ci.yml`) runs `npm ci`, `npm run lint`, `npm run typecheck`, `npm test` and `npm run build`, then starts the server on an **empty** database and hits every endpoint, and separately builds and runs the Docker image. Dependabot (`.github/dependabot.yml`) opens weekly update PRs.
 
 ## Architecture
 
@@ -37,7 +43,7 @@ One file per page in `src/pages/` (`Home.tsx`, `Dialin.tsx`, `ShotHistory.tsx`, 
 
 ### Backend
 
-`server/index.ts` — all Express routes in one file. `server/db.ts` — schema, migrations, seed data. `server/validation.ts` — a zod schema per request body, checked with `parseBody()`. `server/errors.ts` — `HttpError`, `found()` (404 when a lookup by id finds nothing) and the error handler. `better-sqlite3` is synchronous; all DB calls are blocking (intentional for simplicity). `GET /api/health` is used by the Docker `HEALTHCHECK` and CI.
+`server/app.ts` — the Express app: security headers, the optional `ALLOWED_HOSTS` check and all routes. `server/index.ts` — starts it and shuts down cleanly on SIGTERM/SIGINT (closes the DB). `server/db.ts` — schema, migrations, seed data. `server/validation.ts` — a zod schema per request body, checked with `parseBody()`. `server/errors.ts` — `HttpError`, `found()` (404 when a lookup by id finds nothing) and the error handler. `better-sqlite3` is synchronous; all DB calls are blocking (intentional for simplicity). `GET /api/health` is used by the Docker `HEALTHCHECK` and CI.
 
 Errors: every route answers errors as JSON `{ "error": "…" }` — 400 for invalid bodies (validation is lenient: it drops unknown fields and allows null numbers), 404 for unknown ids or `/api/*` paths, 409 for a duplicate id, 500 (details only in the server log) for bugs. The UI shows that message in its toast.
 
@@ -67,6 +73,9 @@ Theme (`moody` by default) is applied as a `data-theme` attribute on `<html>`. F
 
 - `PORT` — API port (default `3001`; host port is `5555` per `docker-compose.yml`)
 - `DB_PATH` — SQLite file path (default `data/grounded.db`; in Docker the volume `./data` is mounted at `/app/data`)
+- `ALLOWED_HOSTS` — optional, comma-separated host names/IPs. When set, requests for any other `Host` get 403 (DNS-rebinding protection); `localhost`/`127.0.0.1` always work for the health check. Unset = off.
+- No `X-Frame-Options`/`frame-ancestors` header on purpose: the author embeds Grounded in a home dashboard.
+- The Dockerfile pins `node:24-alpine` by digest; Dependabot bumps it.
 - In production (`NODE_ENV=production`) the Express server serves `dist/` as static files and handles `*` with the SPA index.
 - Vite proxies `/api/*` → `http://localhost:3001` in dev so there are no CORS issues locally.
 - The Dockerfile builds everything in the first stage, prunes dev dependencies there, and copies `node_modules` into a runtime stage that has no compilers. Both stages must use the same base image, because `better-sqlite3` is a native module.

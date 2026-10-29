@@ -16,7 +16,6 @@ function dd(defaults: DialinDefaults, mode: 'espresso' | 'filter', key: string, 
 }
 
 const DRIPPERS           = ['V60', 'Chemex', 'Kalita Wave', 'AeroPress', 'Clever Dripper', 'Origami', 'Melitta']
-const FILTER_TYPES       = ['Paper (bleached)', 'Paper (natural)', 'Metal', 'Cloth']
 const ESPRESSO_MACHINES  = ['Bianca', 'Lelit Mara X', 'ECM Synchronika', 'Rocket Appartamento', 'La Marzocco Linea Mini', 'Gaggia Classic', 'Breville Barista Express']
 const ESPRESSO_GRINDERS  = ['DF64 Gen 2', 'Niche Zero', 'Lagom P64', 'Fellow Ode', 'Baratza Vario', 'Comandante C40']
 

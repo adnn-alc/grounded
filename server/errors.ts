@@ -1,8 +1,9 @@
 // Errors the API answers with on purpose (bad input, unknown id). Anything else that
-// reaches the error handler in index.ts is a bug and answers 500 without details.
+// reaches the error handler in app.ts is a bug and answers 500 without details.
 import type { NextFunction, Request, Response } from 'express'
 
 export const BAD_REQUEST  = 400
+export const FORBIDDEN    = 403
 export const NOT_FOUND    = 404
 export const CONFLICT     = 409
 export const SERVER_ERROR = 500

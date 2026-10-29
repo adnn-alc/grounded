@@ -212,7 +212,7 @@ export interface Settings {
 export type SettingKey = keyof Settings
 
 // ── Database rows (server only) ─────────────────────────────────────
-// What `SELECT *` returns before the rowTo*() helpers in server/index.ts
+// What `SELECT *` returns before the rowTo*() helpers in server/app.ts
 // turn JSON strings into arrays and taste columns into a nested object.
 
 type TasteColumns = { [K in TasteAxis as `taste_${K}`]: number }

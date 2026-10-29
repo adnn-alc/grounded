@@ -1,5 +1,5 @@
 import { useState, useRef, useLayoutEffect } from 'react'
-import { StatCard, Meta } from '../components/ui.tsx'
+import { StatCard } from '../components/ui.tsx'
 import { WeekTrend } from '../components/charts.tsx'
 import { useUnits } from '../hooks/useUnits.ts'
 import Ico from '../components/Ico.tsx'

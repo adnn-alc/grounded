@@ -8,6 +8,13 @@ All notable changes to Grounded are listed here. Versions follow [Semantic Versi
 
 ## [Unreleased]
 
+- Optional `ALLOWED_HOSTS` setting to protect against DNS-rebinding attacks (off by default)
+- Security headers on every response; the server no longer announces that it runs Express. Embedding in a dashboard still works
+- Clean shutdown: `docker compose stop` now finishes open requests and closes the database properly
+- API tests (`npm test`) and linting (`npm run lint`, oxlint), both run in CI
+- Docker base image pinned to an exact version; the dev server only listens on localhost
+- Added CODE_OF_CONDUCT.md
+- Removed the unused `cors` package
 - Shots and brews now link to their bean by id: renaming a bean keeps its history, two bags with the same name stay apart, and editing a shot's dose or bean now corrects the stock. Existing shots are matched to their bean automatically
 - Bean stock is now updated by the server, in the same step as saving the shot or brew
 - Brew modes are now set in Settings → Dial-in defaults (optional). With none set, the field is hidden. Modes already used in your shots are kept

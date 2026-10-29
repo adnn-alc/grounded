@@ -11,8 +11,7 @@ export default defineConfig({
     __APP_VERSION__: JSON.stringify(pkg.version),
   },
   server: {
-    port: 5173,
-    host: true,
+    port: 5173,   // localhost only; run `npm run dev:ui -- --host` to open it to your network
     proxy: {
       '/api': {
         target: 'http://localhost:3001',
@@ -22,7 +21,6 @@ export default defineConfig({
   },
   preview: {
     port: 4173,
-    host: true,
   },
   build: {
     outDir: 'dist',

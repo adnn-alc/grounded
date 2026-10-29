@@ -46,7 +46,7 @@ export default function Settings({ open, onClose, theme, setTheme, fonts, setFon
     return () => clearTimeout(t)
   }, [defs]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const updateDef = (mode: 'espresso' | 'filter', key: keyof EspressoDefaults | keyof FilterDefaults, val: string) => setDefs(prev => ({ ...prev, [mode]: { ...(prev[mode] || {}), [key]: val } }))
+  const updateDef = (mode: 'espresso' | 'filter', key: keyof EspressoDefaults | keyof FilterDefaults, val: string) => setDefs(prev => ({ ...prev, [mode]: { ...prev[mode], [key]: val } }))
 
   const addWaterRecipe = () => {
     const name = newRecipe.trim()
@@ -70,8 +70,8 @@ export default function Settings({ open, onClose, theme, setTheme, fonts, setFon
 
   if (!open) return null
 
-  const esp = { ...ESP_FALLBACK, ...(defs.espresso || {}) }
-  const fil = { ...FIL_FALLBACK, ...(defs.filter   || {}) }
+  const esp = { ...ESP_FALLBACK, ...defs.espresso }
+  const fil = { ...FIL_FALLBACK, ...defs.filter }
   const mU  = units.mass === 'oz' ? 'oz' : 'g'
   const tU  = units.temp === 'F'  ? '°F' : '°C'
 

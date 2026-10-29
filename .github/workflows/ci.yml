@@ -20,7 +20,9 @@ jobs:
           cache: npm
 
       - run: npm ci
+      - run: npm run lint
       - run: npm run typecheck
+      - run: npm test
       - run: npm run build
 
       # Starts the real server on an empty database, like a brand-new install,

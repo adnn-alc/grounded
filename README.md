@@ -73,6 +73,9 @@ Vite proxies `/api/*` to Express, so there's no CORS setup needed. The dev datab
 | `npm run dev:api` | Express only (restarts on file changes)             |
 | `npm run build`   | Build the frontend into `dist/`                     |
 | `npm start`       | Run the API; with `NODE_ENV=production` it also serves `dist/` |
+| `npm run lint`    | Lint with oxlint                                    |
+| `npm run typecheck` | Type-check the UI and the API                     |
+| `npm test`        | Run the API tests (Node 24)                         |
 | `npm run typecheck` | Type-check the UI and the API with `tsc`          |
 
 ### Running without Docker
@@ -94,6 +97,7 @@ Everything is served from one port (3001 by default).
 | `PORT`     | `3001`              | Port the server listens on                           |
 | `DB_PATH`  | `data/grounded.db`  | Path to the SQLite database file                     |
 | `NODE_ENV` | —                   | Set to `production` to serve the built frontend      |
+| `ALLOWED_HOSTS` | — (off)        | Optional. Comma-separated host names/IPs Grounded answers to, e.g. `LegoNAS,192.168.1.20,grounded.example.com`. Blocks DNS-rebinding attacks from malicious websites. `localhost` always works. |
 
 ---
 
@@ -117,6 +121,10 @@ To restore, stop the container, put the backup back at `data/grounded.db` (and r
 
 Grounded has **no login or authentication** — anyone who can reach the port can view and edit all data. It's meant for a home network. If you expose it to the internet, put it behind a reverse proxy with authentication (e.g. Nginx Proxy Manager access lists, Authelia, or a VPN like Tailscale).
 
+For extra protection on a home network, set `ALLOWED_HOSTS` (see [Configuration](#configuration)) to every address you open Grounded with. Then a malicious website can't use your browser to reach it.
+
+Grounded doesn't block being shown inside a frame, so you can embed it in a home dashboard.
+
 Found a security problem? Please report it privately — see [SECURITY.md](SECURITY.md).
 
 ---
@@ -130,8 +138,12 @@ grounded/
 ├── .github/                # CI workflow and Dependabot config
 ├── tsconfig.json           # Type-checking for the UI (strict)
 ├── server/
-│   ├── index.ts            # Express API — all routes
+│   ├── index.ts            # Starts the server, clean shutdown
+│   ├── app.ts              # Express API — all routes
 │   ├── db.ts               # SQLite schema, migrations, seed data
+│   ├── validation.ts       # Request checks (zod)
+│   ├── errors.ts           # Error handling
+│   ├── *.test.ts           # API and migration tests (npm test)
 │   └── tsconfig.json       # Type-checking for the API
 ├── src/
 │   ├── types.ts            # Types shared by the API and the UI
