@@ -8,6 +8,10 @@ All notable changes to Grounded are listed here. Versions follow [Semantic Versi
 
 ## [Unreleased]
 
+## [1.1.0] — 2026-10-30
+
+Settings that follow you across devices, a font picker, shots linked to their bean bags, clearer errors, and a TypeScript rewrite under the hood. Your database is upgraded automatically on the first start, after a backup copy is saved next to it.
+
 - Optional `ALLOWED_HOSTS` setting to protect against DNS-rebinding attacks (off by default)
 - Security headers on every response; the server no longer announces that it runs Express. Embedding in a dashboard still works
 - Clean shutdown: `docker compose stop` now finishes open requests and closes the database properly
