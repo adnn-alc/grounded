@@ -717,3 +717,15 @@ select {
   position: relative;
 }
 .ring::after { content: ""; position: absolute; inset: 3px; border-radius: 50%; background: var(--surface); }
+
+/* ── Toasts (failed saves) ── */
+.toasts { position: fixed; right: 16px; bottom: 16px; z-index: 1000; display: flex; flex-direction: column; gap: 8px; max-width: min(420px, calc(100vw - 32px)); }
+.toast {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 10px 10px 10px 14px;
+  background: var(--surface-2); color: var(--text);
+  border: 1px solid var(--border-strong); border-left: 3px solid var(--bitter);
+  border-radius: 8px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+  font-size: 13px; line-height: 1.4;
+}
+.toast > span { flex: 1; padding-top: 4px; }

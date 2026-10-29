@@ -25,7 +25,7 @@ There is no test runner and no linter. CI (`.github/workflows/ci.yml`) runs `npm
 
 ### Data flow
 
-`useData()` ([src/hooks/useData.ts](src/hooks/useData.ts)) is the single source of truth. It fetches all data on mount (shots, brews, beans, archived beans, gear, recipes, tips, settings) and exposes mutation helpers that update local state from the API response without refetching. Only favourites and settings update optimistically, before the API answers. It is instantiated once in `App.tsx` and props-drilled to all pages — there is no context, no global store.
+`useData()` ([src/hooks/useData.ts](src/hooks/useData.ts)) is the single source of truth. It fetches all data on mount (shots, brews, beans, archived beans, gear, recipes, tips, settings) and exposes mutation helpers that update local state from the API response without refetching. Only favourites and settings update optimistically, before the API answers. Exceptions: after a shot/brew is saved, edited or deleted it reloads the beans (the server moved their stock), and after a bean rename it reloads shots and brews. Every mutation is wrapped in `reportErrors()`: a failure shows an error toast (`src/components/Toast.tsx`) and then rejects, so the calling form stays open. It is instantiated once in `App.tsx` and props-drilled to all pages — there is no context, no global store.
 
 All `fetch()` calls are centralised in [src/api/client.ts](src/api/client.ts). Pages never call `fetch` directly.
 
@@ -37,17 +37,23 @@ One file per page in `src/pages/` (`Home.tsx`, `Dialin.tsx`, `ShotHistory.tsx`, 
 
 ### Backend
 
-`server/index.ts` — all Express routes in one file. `server/db.ts` — schema, migrations, seed data. `better-sqlite3` is synchronous; all DB calls are blocking (intentional for simplicity). `GET /api/health` is used by the Docker `HEALTHCHECK` and CI.
+`server/index.ts` — all Express routes in one file. `server/db.ts` — schema, migrations, seed data. `server/validation.ts` — a zod schema per request body, checked with `parseBody()`. `server/errors.ts` — `HttpError`, `found()` (404 when a lookup by id finds nothing) and the error handler. `better-sqlite3` is synchronous; all DB calls are blocking (intentional for simplicity). `GET /api/health` is used by the Docker `HEALTHCHECK` and CI.
+
+Errors: every route answers errors as JSON `{ "error": "…" }` — 400 for invalid bodies (validation is lenient: it drops unknown fields and allows null numbers), 404 for unknown ids or `/api/*` paths, 409 for a duplicate id, 500 (details only in the server log) for bugs. The UI shows that message in its toast.
+
+Beans ↔ shots/brews: `shots.bean_id` / `brews.bean_id` link to `beans.id` (no foreign key, so history survives a deleted bean; deleting a bean sets them to NULL). `bean` and `roaster` are kept on the row as display names: the server fills them from `bean_id` (`resolveBean()`), and renaming a bean updates them. The server also moves the bean's `remaining` stock in the same transaction when a shot/brew is created, edited (old dose back, new dose off) or deleted (`adjustStock()`), so the UI never computes stock itself.
 
 DB shape note: `shots` and `brews` store taste as flat columns (`taste_acidity`, etc.) but the API surfaces them nested as `taste: { acidity, ... }` via `rowToShot()` / `rowToBrew()`. Similarly `beans.notes`, `beans.doses`, `brews.pours`, `recipes.tags` and `recipes.steps` are JSON strings in SQLite, parsed in the `rowTo*()` helpers.
 
-Schema migrations are try/catch `ALTER TABLE` lines in `db.ts`. They must come **after** the `CREATE TABLE IF NOT EXISTS` block, otherwise a fresh database never gets those columns. Any new columns or tables should be added there.
+Schema: the `CREATE TABLE IF NOT EXISTS` block in `db.ts` is the full current schema, so a fresh database is complete at once (and is stamped with the latest version). Existing databases are upgraded by the numbered `MIGRATIONS` list: `PRAGMA user_version` stores how many have run, each pending one runs once in its own transaction, and a failure stops startup. Before migrating an existing database, the server writes a snapshot next to it (`grounded.db.backup-v<old version>-<timestamp>`, via `VACUUM INTO`). To change the schema: update the `CREATE TABLE` block **and** append a migration (use `addColumn()`, which checks first); never edit or reorder a released migration. Also update the row and API types in `src/types.ts`.
 
 The author's live database has a few leftovers that the code doesn't create or use (`brews.filter_type`, `brews.time_target`, a `grinder_log` table). Fresh installs don't have them; don't rely on them.
 
 ### Settings
 
-App-wide preferences live in the `settings` table (one row per key, JSON value), so every browser sees the same ones: `theme`, `fonts`, `units`, `waterRecipes`, `dialinDefaults`. API: `GET /api/settings` returns one object; `PUT /api/settings` takes a partial object and only accepts those keys (`SETTING_KEYS` in `server/index.ts`). In the UI, `App.tsx` derives each value with a default and passes it down as props; changes go through `updateSettings()` in `useData`.
+App-wide preferences live in the `settings` table (one row per key, JSON value), so every browser sees the same ones: `theme`, `fonts`, `units`, `waterRecipes`, `dialinDefaults`, `brewModes`. API: `GET /api/settings` returns one object; `PUT /api/settings` takes a partial object and only accepts those keys (`settingsSchema` in `server/validation.ts`).
+
+`brewModes` (espresso machine buttons/programs) is optional: when it's empty or missing, Dial-in and the shot editor don't show a brew mode field at all. In the UI, `App.tsx` derives each value with a default and passes it down as props; changes go through `updateSettings()` in `useData`.
 
 Older versions kept theme, water recipes and dial-in defaults in `localStorage`. On first load, `useData` moves any of those the database doesn't have yet into it, then deletes the old keys.
 

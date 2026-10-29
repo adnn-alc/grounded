@@ -1,9 +1,22 @@
 import { useState, useEffect, useCallback } from 'react'
 import { api } from '../api/client.ts'
+import { showError, markShown } from '../components/Toast.tsx'
 import type {
   Shot, ShotInput, Brew, BrewInput, Bean, BeanInput, Gear, GearInput,
-  Recipe, RecipeInput, Tip, TipInput, Settings, StockLevel,
+  Recipe, RecipeInput, Tip, TipInput, Settings,
 } from '../types.ts'
+
+/** Shows a toast when a mutation fails, then rethrows so the caller stops (e.g. keeps its form open) */
+function reportErrors<A extends unknown[], R>(label: string, fn: (...args: A) => Promise<R>): (...args: A) => Promise<R> {
+  return async (...args: A): Promise<R> => {
+    try {
+      return await fn(...args)
+    } catch (e) {
+      showError(`${label}: ${(e as Error).message}`)
+      throw markShown(e)
+    }
+  }
+}
 
 // Older versions kept these preferences in this browser's localStorage.
 // Returns the ones the database doesn't have yet, so they can be moved over once.
@@ -81,70 +94,78 @@ export function useData() {
 
   useEffect(() => { load() }, [load])
 
-  // ── Shot mutations ──────────────────────────────────────────────
-  const adjustBeanRemaining = async (beanName: string, delta: number) => {
-    const bean = beans.find(b => b.name === beanName)
-    if (!bean || !delta) return
-    const newRemaining = Math.min(bean.weight || Infinity, Math.max(0, (bean.remaining || 0) + delta))
-    const pct = bean.weight > 0 ? newRemaining / bean.weight : 1
-    const stock: StockLevel = pct > 0.25 ? 'good' : pct > 0.1 ? 'low' : 'critical'
-    const updated = await api.updateBean(bean.id, { ...bean, remaining: newRemaining, stock })
-    setBeans(prev => prev.map(b => b.id === bean.id ? updated : b))
+  // The server adjusts a bean's remaining stock when a shot or brew is saved,
+  // edited or deleted, so reload the beans afterwards to show the new amounts
+  const refreshBeans = async () => {
+    const [b, ab] = await Promise.all([api.getBeans(), api.getArchivedBeans()])
+    setBeans(b)
+    setArchivedBeans(ab)
   }
 
+  // ── Shot mutations ──────────────────────────────────────────────
   const saveShot = async (shot: ShotInput) => {
     const saved = await api.createShot(shot)
     setShots(prev => [saved, ...prev])
-    await adjustBeanRemaining(shot.bean, -shot.dose)
+    await refreshBeans()
     return saved
   }
 
   const updateShot = async (id: string, data: ShotInput) => {
     const updated = await api.updateShot(id, data)
     setShots(prev => prev.map(s => s.id === id ? updated : s))
+    await refreshBeans()
     return updated
   }
 
   const deleteShot = async (id: string) => {
-    const shot = shots.find(s => s.id === id)
     await api.deleteShot(id)
     setShots(prev => prev.filter(s => s.id !== id))
-    if (shot?.bean && shot?.dose) await adjustBeanRemaining(shot.bean, shot.dose)
+    await refreshBeans()
   }
 
   const favoriteShot = async (id: string, val: boolean) => {
     setShots(prev => prev.map(s => s.id === id ? { ...s, favorited: val } : s))
-    const updated = await api.favoriteShot(id, val)
-    setShots(prev => prev.map(s => s.id === id ? updated : s))
-    return updated
+    try {
+      const updated = await api.favoriteShot(id, val)
+      setShots(prev => prev.map(s => s.id === id ? updated : s))
+      return updated
+    } catch (e) {
+      setShots(prev => prev.map(s => s.id === id ? { ...s, favorited: !val } : s))
+      throw e
+    }
   }
 
   // ── Brew mutations ──────────────────────────────────────────────
   const saveBrew = async (brew: BrewInput) => {
     const saved = await api.createBrew(brew)
     setBrews(prev => [saved, ...prev])
-    await adjustBeanRemaining(brew.bean, -brew.dose)
+    await refreshBeans()
     return saved
   }
 
   const updateBrew = async (id: string, data: BrewInput) => {
     const updated = await api.updateBrew(id, data)
     setBrews(prev => prev.map(b => b.id === id ? updated : b))
+    await refreshBeans()
     return updated
   }
 
   const deleteBrew = async (id: string) => {
-    const brew = brews.find(b => b.id === id)
     await api.deleteBrew(id)
     setBrews(prev => prev.filter(b => b.id !== id))
-    if (brew?.bean && brew?.dose) await adjustBeanRemaining(brew.bean, brew.dose)
+    await refreshBeans()
   }
 
   const favoriteBrew = async (id: string, val: boolean) => {
     setBrews(prev => prev.map(b => b.id === id ? { ...b, favorited: val } : b))
-    const updated = await api.favoriteBrew(id, val)
-    setBrews(prev => prev.map(b => b.id === id ? updated : b))
-    return updated
+    try {
+      const updated = await api.favoriteBrew(id, val)
+      setBrews(prev => prev.map(b => b.id === id ? updated : b))
+      return updated
+    } catch (e) {
+      setBrews(prev => prev.map(b => b.id === id ? { ...b, favorited: !val } : b))
+      throw e
+    }
   }
 
   // ── Bean mutations ──────────────────────────────────────────────
@@ -155,8 +176,15 @@ export function useData() {
   }
 
   const updateBean = async (id: string, data: BeanInput) => {
+    const before = beans.find(b => b.id === id)
     const updated = await api.updateBean(id, data)
     setBeans(prev => prev.map(b => b.id === id ? updated : b))
+    // A rename also renames the bean on its shots and brews (done by the server)
+    if (before && (before.name !== updated.name || before.roaster !== updated.roaster)) {
+      const [s, bw] = await Promise.all([api.getShots(), api.getBrews()])
+      setShots(s)
+      setBrews(bw)
+    }
     return updated
   }
 
@@ -247,7 +275,7 @@ export function useData() {
     try {
       await api.updateSettings(partial)
     } catch (e) {
-      console.error('Saving settings failed', e)
+      showError(`Couldn't save settings: ${(e as Error).message}`)
       try { setSettings(await api.getSettings()) } catch {}
     }
   }
@@ -258,13 +286,29 @@ export function useData() {
     loading, error,
     reload: load,
 
-    // Mutations
-    saveShot, updateShot, deleteShot, favoriteShot,
-    saveBrew, updateBrew, deleteBrew, favoriteBrew,
-    saveBean, updateBean, deleteBean, archiveBean, unarchiveBean,
-    saveGear, updateGear, deleteGear,
-    saveRecipe, updateRecipe, deleteRecipe,
-    saveTip, updateTip, deleteTip,
+    // Mutations (a failure shows an error toast, then rejects)
+    saveShot:      reportErrors("Couldn't save the shot", saveShot),
+    updateShot:    reportErrors("Couldn't save the shot", updateShot),
+    deleteShot:    reportErrors("Couldn't delete the shot", deleteShot),
+    favoriteShot:  reportErrors("Couldn't update the favourite", favoriteShot),
+    saveBrew:      reportErrors("Couldn't save the brew", saveBrew),
+    updateBrew:    reportErrors("Couldn't save the brew", updateBrew),
+    deleteBrew:    reportErrors("Couldn't delete the brew", deleteBrew),
+    favoriteBrew:  reportErrors("Couldn't update the favourite", favoriteBrew),
+    saveBean:      reportErrors("Couldn't save the bean", saveBean),
+    updateBean:    reportErrors("Couldn't save the bean", updateBean),
+    deleteBean:    reportErrors("Couldn't delete the bean", deleteBean),
+    archiveBean:   reportErrors("Couldn't archive the bean", archiveBean),
+    unarchiveBean: reportErrors("Couldn't restore the bean", unarchiveBean),
+    saveGear:      reportErrors("Couldn't save the gear", saveGear),
+    updateGear:    reportErrors("Couldn't save the gear", updateGear),
+    deleteGear:    reportErrors("Couldn't delete the gear", deleteGear),
+    saveRecipe:    reportErrors("Couldn't save the recipe", saveRecipe),
+    updateRecipe:  reportErrors("Couldn't save the recipe", updateRecipe),
+    deleteRecipe:  reportErrors("Couldn't delete the recipe", deleteRecipe),
+    saveTip:       reportErrors("Couldn't save the note", saveTip),
+    updateTip:     reportErrors("Couldn't save the note", updateTip),
+    deleteTip:     reportErrors("Couldn't delete the note", deleteTip),
     updateSettings,
   }
 }

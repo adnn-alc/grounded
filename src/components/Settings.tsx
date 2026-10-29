@@ -29,12 +29,15 @@ interface SettingsProps {
   setWaterRecipes:   (recipes: string[]) => void
   dialinDefaults:    DialinDefaults
   setDialinDefaults: (defaults: DialinDefaults) => void
+  brewModes:         string[]
+  setBrewModes:      (modes: string[]) => void
 }
 
-export default function Settings({ open, onClose, theme, setTheme, fonts, setFonts, units, setUnits, waterRecipes, setWaterRecipes, dialinDefaults, setDialinDefaults }: SettingsProps) {
+export default function Settings({ open, onClose, theme, setTheme, fonts, setFonts, units, setUnits, waterRecipes, setWaterRecipes, dialinDefaults, setDialinDefaults, brewModes, setBrewModes }: SettingsProps) {
   const [tab, setTab]   = useState('preferences')
   const [defs, setDefs] = useState(dialinDefaults)
   const [newRecipe, setNewRecipe] = useState('')
+  const [newMode, setNewMode] = useState('')
 
   // Typing in the number fields saves after a short pause, not on every keystroke
   useEffect(() => {
@@ -55,6 +58,14 @@ export default function Settings({ open, onClose, theme, setTheme, fonts, setFon
   const removeWaterRecipe = (name: string) => {
     if (waterRecipes.length <= 1) return
     setWaterRecipes(waterRecipes.filter(r => r !== name))
+  }
+
+  // Brew modes are optional: with none, Dial-in doesn't show the field at all
+  const addBrewMode = () => {
+    const name = newMode.trim()
+    if (!name || brewModes.includes(name)) return
+    setBrewModes([...brewModes, name])
+    setNewMode('')
   }
 
   if (!open) return null
@@ -189,6 +200,31 @@ export default function Settings({ open, onClose, theme, setTheme, fonts, setFon
                     onChange={e => setNewRecipe(e.target.value)}
                     onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addWaterRecipe() } }} />
                   <button className="ghost-btn" onClick={addWaterRecipe}>Add</button>
+                </div>
+              </div>
+
+              <div className="settings-section">
+                <h3>Brew modes · optional</h3>
+                <div className="desc" style={{ marginBottom: 10 }}>
+                  Buttons or programs on your espresso machine (e.g. "Button 1", "Paddle") to pick from when dialing in. Leave empty to hide the field.
+                </div>
+                {brewModes.length > 0 && (
+                  <div className="stack" style={{ gap: 6, marginBottom: 10 }}>
+                    {brewModes.map(m => (
+                      <div key={m} className="settings-row" style={{ padding: '6px 0' }}>
+                        <div className="label">{m}</div>
+                        <button className="icon-btn" aria-label={`Remove ${m}`} onClick={() => setBrewModes(brewModes.filter(x => x !== m))}>
+                          <Ico name="x" size={12} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div className="row" style={{ gap: 8 }}>
+                  <input type="text" placeholder="Add brew mode…" value={newMode}
+                    onChange={e => setNewMode(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addBrewMode() } }} />
+                  <button className="ghost-btn" onClick={addBrewMode}>Add</button>
                 </div>
               </div>
 

@@ -16,7 +16,8 @@ export type Taste = Record<TasteAxis, number>
 export interface Shot {
   id:            string
   date:          string   // 'YYYY-MM-DD HH:MM', local time
-  bean:          string   // bean name, not id
+  bean_id:       string | null   // Bean.id; null for shots whose bean was deleted or never matched
+  bean:          string   // bean name, kept in sync with the bean (also shown if the bean is gone)
   roaster:       string
   dose:          number
   yield:         number
@@ -37,8 +38,11 @@ export interface Shot {
   favorited:     boolean
 }
 
-/** Body of POST /api/shots and PUT /api/shots/:id (the server makes up an id if none is sent) */
-export type ShotInput = Omit<Shot, 'id' | 'favorited'> & { id?: string; favorited?: boolean }
+/**
+ * Body of POST /api/shots and PUT /api/shots/:id (the server makes up an id if none is sent).
+ * The server fills bean/roaster from bean_id, and adjusts that bean's remaining stock.
+ */
+export type ShotInput = Omit<Shot, 'id' | 'favorited' | 'bean_id'> & { id?: string; favorited?: boolean; bean_id?: string | null }
 
 /** Older brews stored pours as objects; new ones are plain gram amounts */
 export type Pour = number | { water: number }
@@ -46,6 +50,7 @@ export type Pour = number | { water: number }
 export interface Brew {
   id:            string
   date:          string
+  bean_id:       string | null
   bean:          string
   roaster:       string
   dripper:       string
@@ -67,7 +72,7 @@ export interface Brew {
   favorited:     boolean
 }
 
-export type BrewInput = Omit<Brew, 'id' | 'favorited'> & { id?: string; favorited?: boolean }
+export type BrewInput = Omit<Brew, 'id' | 'favorited' | 'bean_id'> & { id?: string; favorited?: boolean; bean_id?: string | null }
 
 // ── Beans ───────────────────────────────────────────────────────────
 
@@ -201,6 +206,7 @@ export interface Settings {
   units?:          Partial<Units>
   waterRecipes?:   string[]
   dialinDefaults?: DialinDefaults
+  brewModes?:      string[]   // espresso machine buttons/programs; empty or missing = field hidden
 }
 
 export type SettingKey = keyof Settings

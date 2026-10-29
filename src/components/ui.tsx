@@ -56,7 +56,7 @@ export function ShotCard({ shot, index, total, active, onClick, units }: CardPro
         <div className="sub">{U.m(shot.dose)}{U.mU()} → {U.m(shot.yield)}{U.mU()} in {shot.time}s · {shot.date.slice(11)}</div>
       </div>
       <div style={{ textAlign: 'right' }}>
-        <div className="stat stat-sm text-crema">{shot.rating.toFixed(1)}</div>
+        <div className="stat stat-sm text-crema">{shot.rating?.toFixed(1)}</div>
         <div style={{ marginTop: 4 }}><span className={`badge ${shot.verdict}`}>{shot.verdict}</span></div>
       </div>
     </div>

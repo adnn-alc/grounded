@@ -107,6 +107,8 @@ cp data/grounded.db ~/grounded-backup-$(date +%F).db
 docker compose start
 ```
 
+When an update changes the database layout, Grounded first saves a copy next to it automatically (`data/grounded.db.backup-v…`). You can delete those once you're happy with the update.
+
 To restore, stop the container, put the backup back at `data/grounded.db` (and remove any `grounded.db-wal` / `grounded.db-shm` files next to it), then start it again.
 
 ---

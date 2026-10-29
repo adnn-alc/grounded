@@ -6,12 +6,21 @@ import type {
 const BASE = '/api'
 
 async function req<T>(method: string, path: string, body?: unknown): Promise<T> {
-  const res = await fetch(BASE + path, {
-    method,
-    headers: body ? { 'Content-Type': 'application/json' } : {},
-    body: body ? JSON.stringify(body) : undefined,
-  })
-  if (!res.ok) throw new Error(`API ${method} ${path} → ${res.status}`)
+  let res: Response
+  try {
+    res = await fetch(BASE + path, {
+      method,
+      headers: body ? { 'Content-Type': 'application/json' } : {},
+      body: body ? JSON.stringify(body) : undefined,
+    })
+  } catch {
+    throw new Error("can't reach the Grounded server")
+  }
+  if (!res.ok) {
+    // The API answers errors as { error: "…" }
+    const detail = await res.json().then((b: { error?: string }) => b.error).catch(() => undefined)
+    throw new Error(detail || `the server answered ${res.status}`)
+  }
   return res.json()
 }
 

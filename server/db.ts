@@ -16,9 +16,10 @@ db.pragma('journal_mode = WAL')
 db.pragma('foreign_keys = ON')
 
 // ── Schema ──────────────────────────────────────────────────────────
-// tips column renames (category→section, title→category)
-try { db.exec(`ALTER TABLE tips RENAME COLUMN category TO section`) } catch {}
-try { db.exec(`ALTER TABLE tips RENAME COLUMN title TO category`) } catch {}
+// The full current schema, so a fresh database is complete straight away.
+// Existing databases are brought up to date by the migrations below.
+const isNewDatabase = !db.prepare(`SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'shots'`).get()
+
 db.exec(`
   CREATE TABLE IF NOT EXISTS beans (
     id          TEXT PRIMARY KEY,
@@ -35,13 +36,17 @@ db.exec(`
     weight      REAL,
     remaining   REAL,
     stock       TEXT DEFAULT 'good',
+    doses       TEXT,          -- JSON array of { basket, dose, grind? }
+    archived    INTEGER DEFAULT 0,
+    archived_at TEXT,
     created_at  TEXT DEFAULT (datetime('now'))
   );
 
   CREATE TABLE IF NOT EXISTS shots (
     id          TEXT PRIMARY KEY,
     date        TEXT NOT NULL,
-    bean        TEXT,
+    bean_id     TEXT,          -- beans.id (no foreign key, so history survives a deleted bean)
+    bean        TEXT,          -- bean name, kept in sync by PUT /api/beans/:id
     roaster     TEXT,
     dose        REAL,
     yield       REAL,
@@ -59,6 +64,13 @@ db.exec(`
     taste_aftertaste REAL,
     notes       TEXT,
     verdict     TEXT,
+    machine       TEXT,
+    grinder_model TEXT,
+    grinder_rpm   TEXT,
+    water_recipe  TEXT,
+    basket        TEXT,
+    brew_mode     TEXT,
+    favorited     INTEGER DEFAULT 0,
     created_at  TEXT DEFAULT (datetime('now'))
   );
 
@@ -69,6 +81,7 @@ db.exec(`
     owned     TEXT,
     status    TEXT,
     meta      TEXT,
+    price     REAL,
     created_at TEXT DEFAULT (datetime('now'))
   );
 
@@ -100,9 +113,11 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS brews (
     id           TEXT PRIMARY KEY,
     date         TEXT NOT NULL,
+    bean_id      TEXT,
     bean         TEXT,
     roaster      TEXT,
     dripper      TEXT,
+    grinder_model TEXT,
     dose         REAL,
     water        REAL,
     temp         REAL,
@@ -120,10 +135,13 @@ db.exec(`
     taste_aftertaste REAL,
     notes        TEXT,
     verdict      TEXT,
+    grinder_rpm  TEXT,
+    water_recipe TEXT,
+    favorited    INTEGER DEFAULT 0,
     created_at   TEXT DEFAULT (datetime('now'))
   );
 
-  -- App-wide preferences (theme, fonts, units, water recipes, dial-in defaults)
+  -- App-wide preferences (theme, fonts, units, water recipes, dial-in defaults, brew modes)
   CREATE TABLE IF NOT EXISTS settings (
     key        TEXT PRIMARY KEY,
     value      TEXT NOT NULL,   -- JSON
@@ -131,29 +149,117 @@ db.exec(`
   );
 `)
 
-// Migrations — safe to run repeatedly. They must run after CREATE TABLE so they
-// also apply to a fresh database (on an existing one they fail harmlessly).
-try { db.exec(`ALTER TABLE beans ADD COLUMN archived INTEGER DEFAULT 0`) } catch {}
-try { db.exec(`ALTER TABLE beans ADD COLUMN archived_at TEXT`) } catch {}
-try { db.exec(`ALTER TABLE gear ADD COLUMN price REAL`) } catch {}
-try { db.exec(`ALTER TABLE brews ADD COLUMN grinder_model TEXT`) } catch {}
-try { db.exec(`ALTER TABLE shots ADD COLUMN machine TEXT`) } catch {}
-try { db.exec(`ALTER TABLE shots ADD COLUMN grinder_model TEXT`) } catch {}
-try { db.exec(`ALTER TABLE shots ADD COLUMN grinder_rpm TEXT`) } catch {}
-try { db.exec(`ALTER TABLE brews ADD COLUMN grinder_rpm TEXT`) } catch {}
-try { db.exec(`ALTER TABLE shots ADD COLUMN water_recipe TEXT`) } catch {}
-try { db.exec(`ALTER TABLE brews ADD COLUMN water_recipe TEXT`) } catch {}
-try { db.exec(`ALTER TABLE shots ADD COLUMN favorited INTEGER DEFAULT 0`) } catch {}
-try { db.exec(`ALTER TABLE brews ADD COLUMN favorited INTEGER DEFAULT 0`) } catch {}
-try { db.exec(`ALTER TABLE shots ADD COLUMN basket TEXT`) } catch {}
-try { db.exec(`ALTER TABLE beans ADD COLUMN doses TEXT`) } catch {}  // JSON array of { basket, dose }
-try { db.exec(`ALTER TABLE shots ADD COLUMN brew_mode TEXT`) } catch {}  // Pagaia / Button 1 / Button 2
+// ── Migrations ──────────────────────────────────────────────────────
+// Numbered: PRAGMA user_version stores how many have run. Each pending one runs
+// once, in order, in its own transaction. If one fails, startup stops with the
+// error instead of carrying on with a half-updated database.
+// Never edit or reorder a released migration; append a new one.
 
-// Retire legacy verdicts (great/sour/bitter) in favour of good/under/over/bad
-for (const t of ['shots', 'brews']) {
-  db.exec(`UPDATE ${t} SET verdict = CASE verdict WHEN 'great' THEN 'good' WHEN 'sour' THEN 'under' WHEN 'bitter' THEN 'over' END
-           WHERE verdict IN ('great', 'sour', 'bitter')`)
+const hasColumn = (table: string, column: string): boolean =>
+  !!db.prepare('SELECT 1 FROM pragma_table_info(?) WHERE name = ?').get(table, column)
+
+const addColumn = (table: string, column: string, definition: string): void => {
+  if (!hasColumn(table, column)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`)
 }
+
+const renameColumn = (table: string, from: string, to: string): void => {
+  if (hasColumn(table, from) && !hasColumn(table, to)) db.exec(`ALTER TABLE ${table} RENAME COLUMN ${from} TO ${to}`)
+}
+
+const MIGRATIONS: readonly { name: string, up: () => void }[] = [
+  {
+    // Databases from before numbered migrations can have any subset of these.
+    // Each step checks first, so it's safe on all of them.
+    name: 'columns added before numbered migrations',
+    up: () => {
+      renameColumn('tips', 'category', 'section')
+      renameColumn('tips', 'title', 'category')
+      addColumn('beans', 'archived', 'INTEGER DEFAULT 0')
+      addColumn('beans', 'archived_at', 'TEXT')
+      addColumn('beans', 'doses', 'TEXT')
+      addColumn('gear', 'price', 'REAL')
+      for (const t of ['shots', 'brews']) {
+        addColumn(t, 'grinder_model', 'TEXT')
+        addColumn(t, 'grinder_rpm', 'TEXT')
+        addColumn(t, 'water_recipe', 'TEXT')
+        addColumn(t, 'favorited', 'INTEGER DEFAULT 0')
+      }
+      addColumn('shots', 'machine', 'TEXT')
+      addColumn('shots', 'basket', 'TEXT')
+      addColumn('shots', 'brew_mode', 'TEXT')
+      // Retire legacy verdicts (great/sour/bitter) in favour of good/under/over/bad
+      for (const t of ['shots', 'brews']) {
+        db.exec(`UPDATE ${t} SET verdict = CASE verdict WHEN 'great' THEN 'good' WHEN 'sour' THEN 'under' WHEN 'bitter' THEN 'over' END
+                 WHERE verdict IN ('great', 'sour', 'bitter')`)
+      }
+    },
+  },
+  {
+    // Shots and brews used to point at their bean by name only. Match each one to
+    // a bean with that name, preferring the same roaster and a bag roasted before it.
+    name: 'link shots and brews to beans by id',
+    up: () => {
+      for (const t of ['shots', 'brews']) {
+        addColumn(t, 'bean_id', 'TEXT')
+        db.exec(`
+          UPDATE ${t} SET bean_id = (
+            SELECT b.id FROM beans b WHERE b.name = ${t}.bean
+            ORDER BY (b.roaster = ${t}.roaster) DESC, (b.roast_date <= substr(${t}.date, 1, 10)) DESC, b.roast_date DESC
+            LIMIT 1
+          )
+          WHERE bean_id IS NULL AND bean IS NOT NULL AND bean != ''
+        `)
+        db.exec(`CREATE INDEX IF NOT EXISTS idx_${t}_bean_id ON ${t}(bean_id)`)
+      }
+    },
+  },
+  {
+    // Brew modes used to be hard-coded for one machine. The ones already used in
+    // shots become the starting list; a new install starts with none (field hidden).
+    name: 'brew modes become a setting',
+    up: () => {
+      const used = db.prepare<[], { brew_mode: string }>(`
+        SELECT brew_mode FROM shots WHERE brew_mode IS NOT NULL AND brew_mode != ''
+        GROUP BY brew_mode ORDER BY MIN(date)
+      `).all().map(r => r.brew_mode)
+      if (used.length) {
+        db.prepare(`INSERT OR IGNORE INTO settings (key, value) VALUES ('brewModes', ?)`).run(JSON.stringify(used))
+      }
+    },
+  },
+]
+
+function runMigrations(): void {
+  const current = db.pragma('user_version', { simple: true }) as number
+  if (current > MIGRATIONS.length) {
+    console.warn(`  ! Database is from a newer Grounded (schema v${current}, this version knows v${MIGRATIONS.length})`)
+    return
+  }
+  if (current === MIGRATIONS.length) return
+
+  // A brand-new database already has the full schema: just record the version
+  if (isNewDatabase) {
+    db.pragma(`user_version = ${MIGRATIONS.length}`)
+    return
+  }
+
+  // Safety copy before changing an existing database (VACUUM INTO writes a consistent snapshot)
+  const stamp = new Date().toISOString().replace(/[-:]/g, '').replace('T', '-').slice(0, 15)
+  const backup = `${DB_PATH}.backup-v${current}-${stamp}`
+  db.exec(`VACUUM INTO '${backup.replace(/'/g, "''")}'`)
+  console.log(`  ✓ Backed up the database to ${path.basename(backup)} before updating it`)
+
+  for (let i = current; i < MIGRATIONS.length; i++) {
+    const m = MIGRATIONS[i]!
+    db.transaction(() => {
+      m.up()
+      db.pragma(`user_version = ${i + 1}`)
+    })()
+    console.log(`  ✓ Migration ${i + 1}: ${m.name}`)
+  }
+}
+
+runMigrations()
 
 // ── Seed (only if tables are empty) ─────────────────────────────────
 const seedIfEmpty = (table: string, seedFn: () => void) => {
@@ -178,10 +284,10 @@ seedIfEmpty('beans', () => {
 
 seedIfEmpty('shots', () => {
   const insert = db.prepare(`
-    INSERT INTO shots (id, date, bean, roaster, dose, yield, time, preinf, temp, grind, rating,
+    INSERT INTO shots (id, date, bean_id, bean, roaster, dose, yield, time, preinf, temp, grind, rating,
       taste_acidity, taste_sweetness, taste_body, taste_bitterness, taste_balance, taste_aftertaste,
       notes, verdict)
-    VALUES (@id, @date, @bean, @roaster, @dose, @yield, @time, @preinf, @temp, @grind, @rating,
+    VALUES (@id, @date, (SELECT id FROM beans WHERE name = @bean), @bean, @roaster, @dose, @yield, @time, @preinf, @temp, @grind, @rating,
       @taste_acidity, @taste_sweetness, @taste_body, @taste_bitterness, @taste_balance, @taste_aftertaste,
       @notes, @verdict)
   `)
@@ -214,11 +320,11 @@ seedIfEmpty('gear', () => {
 
 seedIfEmpty('brews', () => {
   const insert = db.prepare(`
-    INSERT INTO brews (id, date, bean, roaster, dripper, dose, water, temp, grind,
+    INSERT INTO brews (id, date, bean_id, bean, roaster, dripper, dose, water, temp, grind,
       bloom_time, num_pours, pours, time, rating,
       taste_acidity, taste_sweetness, taste_body, taste_bitterness, taste_balance, taste_aftertaste,
       notes, verdict)
-    VALUES (@id, @date, @bean, @roaster, @dripper, @dose, @water, @temp, @grind,
+    VALUES (@id, @date, (SELECT id FROM beans WHERE name = @bean), @bean, @roaster, @dripper, @dose, @water, @temp, @grind,
       @bloom_time, @num_pours, @pours, @time, @rating,
       @taste_acidity, @taste_sweetness, @taste_body, @taste_bitterness, @taste_balance, @taste_aftertaste,
       @notes, @verdict)

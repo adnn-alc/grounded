@@ -8,6 +8,12 @@ All notable changes to Grounded are listed here. Versions follow [Semantic Versi
 
 ## [Unreleased]
 
+- Shots and brews now link to their bean by id: renaming a bean keeps its history, two bags with the same name stay apart, and editing a shot's dose or bean now corrects the stock. Existing shots are matched to their bean automatically
+- Bean stock is now updated by the server, in the same step as saving the shot or brew
+- Brew modes are now set in Settings → Dial-in defaults (optional). With none set, the field is hidden. Modes already used in your shots are kept
+- Failed saves now show an error message, and the form stays open with your input
+- The API checks what it's sent and answers clear errors: 400 for invalid input, 404 for unknown items, instead of crashing
+- Database updates are now numbered and run once each; before updating, the database is copied to `data/grounded.db.backup-v…`
 - Fix: a brand-new database was missing several columns until the app was restarted once, so the first launch showed "Failed to connect to API"
 - Docker image now runs on Node 24 LTS (Node 20 is end-of-life); `better-sqlite3` upgraded from 9.6 to 12.11. Local development now needs Node 22+
 - Settings (theme, units, water recipes, dial-in defaults) are now stored in the database, so every browser and device sees the same ones. Existing settings from your browser are moved over automatically on first load

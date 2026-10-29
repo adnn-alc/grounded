@@ -45,6 +45,11 @@ jobs:
             -d '{"units":{"mass":"g","temp":"C"}}' \
             localhost:3001/api/settings > /dev/null || fail "PUT /api/settings failed"
           curl -sf localhost:3001/ | grep -q 'id="root"' || fail "frontend not served"
+          # Bad input and unknown ids answer 400/404 with a JSON error, not a crash
+          status() { curl -s -o /dev/null -w '%{http_code}' -H 'Content-Type: application/json' "$@"; }
+          [ "$(status -X POST -d '{"name":""}' localhost:3001/api/beans)" = 400 ] || fail "invalid bean not rejected with 400"
+          [ "$(status -X PUT -d '{"date":"2026-01-01 08:00","rating":5}' localhost:3001/api/shots/nope)" = 404 ] || fail "unknown shot not 404"
+          [ "$(status localhost:3001/api/nope)" = 404 ] || fail "unknown endpoint not 404"
           echo "All endpoints OK"
 
   docker:

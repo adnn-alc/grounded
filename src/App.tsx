@@ -1,6 +1,7 @@
 import { useState, useEffect, type ReactElement } from 'react'
 import { Sidebar, Topbar } from './components/Shell.tsx'
 import Settings from './components/Settings.tsx'
+import { Toaster } from './components/Toast.tsx'
 import Home from './pages/Home.tsx'
 import Dialin from './pages/Dialin.tsx'
 import { ShotHistory } from './pages/ShotHistory.tsx'
@@ -76,6 +77,7 @@ export default function App() {
   const units: Units    = { ...DEFAULT_UNITS, ...settings.units }
   const waterRecipes   = settings.waterRecipes?.length ? settings.waterRecipes : DEFAULT_WATER_RECIPES
   const dialinDefaults = settings.dialinDefaults || {}
+  const brewModes      = settings.brewModes || []
 
   useEffect(() => {
     if (!loading) applyAppearance(theme, fonts)
@@ -116,8 +118,8 @@ export default function App() {
 
   const pages: Record<Route, ReactElement> = {
     home:          <Home        shots={shots} brews={brews} beans={beans} units={units} goTo={goTo} />,
-    dialin:        <Dialin      shots={shots} beans={beans} gear={gear} units={units} waterRecipes={waterRecipes} dialinDefaults={dialinDefaults} onSaveShot={handleSaveShot} onSaveBrew={handleSaveBrew} onUpdateBean={updateBean} preset={dialinPreset} onPresetConsumed={() => setDialinPreset(null)} />,
-    'shot-history': <ShotHistory shots={shots} beans={beans} gear={gear} units={units} waterRecipes={waterRecipes} onDelete={deleteShot} onUpdateShot={updateShot} initialSelectedId={openShotId} onReplicate={onReplicateShot} onFavorite={favoriteShot} />,
+    dialin:        <Dialin      shots={shots} beans={beans} gear={gear} units={units} waterRecipes={waterRecipes} dialinDefaults={dialinDefaults} brewModes={brewModes} onSaveShot={handleSaveShot} onSaveBrew={handleSaveBrew} onUpdateBean={updateBean} preset={dialinPreset} onPresetConsumed={() => setDialinPreset(null)} />,
+    'shot-history': <ShotHistory shots={shots} beans={beans} gear={gear} units={units} waterRecipes={waterRecipes} brewModes={brewModes} onDelete={deleteShot} onUpdateShot={updateShot} initialSelectedId={openShotId} onReplicate={onReplicateShot} onFavorite={favoriteShot} />,
     'brew-history': <BrewHistory brews={brews} beans={beans} units={units} waterRecipes={waterRecipes} onDeleteBrew={deleteBrew} onUpdateBrew={updateBrew} initialSelectedId={openBrewId} onReplicate={onReplicateBrew} onFavorite={favoriteBrew} />,
     beans:   <Beans   beans={beans} gear={gear} units={units} onSaveBean={saveBean} onUpdateBean={updateBean} onArchiveBean={archiveBean} />,
     'archived-beans': <ArchivedBeans beans={archivedBeans} units={units} onUnarchive={unarchiveBean} onDelete={deleteBean} />,
@@ -152,7 +154,9 @@ export default function App() {
         units={units} setUnits={u => updateSettings({ units: u })}
         waterRecipes={waterRecipes} setWaterRecipes={w => updateSettings({ waterRecipes: w })}
         dialinDefaults={dialinDefaults} setDialinDefaults={d => updateSettings({ dialinDefaults: d })}
+        brewModes={brewModes} setBrewModes={m => updateSettings({ brewModes: m })}
       />
+      <Toaster />
     </div>
   )
 }

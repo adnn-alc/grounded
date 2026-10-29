@@ -3,10 +3,10 @@ import { Meta, ShotCard } from '../components/ui.tsx'
 import { FlavorRadar, FlavSliders } from '../components/charts.tsx'
 import { useUnits } from '../hooks/useUnits.ts'
 import Ico from '../components/Ico.tsx'
-import { BREW_MODES } from '../data/brewModes.ts'
 import { DEFAULT_WATER_RECIPES } from '../data/waterRecipes.ts'
 import { RPM_OPTIONS } from '../data/grinderRpm.ts'
 import type { Bean, Gear, Shot, ShotInput, Taste, Units, Verdict } from '../types.ts'
+import { beanLabel } from '../data/beans.ts'
 
 // ── SHOT HISTORY ─────────────────────────────────────────────────────
 interface ShotHistoryProps {
@@ -15,6 +15,7 @@ interface ShotHistoryProps {
   gear?:              Gear[]
   units:              Units
   waterRecipes?:      string[]
+  brewModes?:         string[]
   onDelete?:          (id: string) => Promise<void>
   onUpdateShot?:      (id: string, data: ShotInput) => Promise<Shot>
   initialSelectedId?: string | null
@@ -26,19 +27,18 @@ interface ShotHistoryProps {
 interface ShotEditForm {
   dose: string; yield: string; time: string; preinf: string; temp: string; grind: string
   water_recipe: string; grinder_rpm: string; basket: string; brew_mode: string
-  bean: string; machine: string; grinder_model: string
+  bean_id: string; machine: string; grinder_model: string   // bean_id '' = the shot's bean isn't linked
   taste: Taste
   notes: string
   verdict: string
 }
 
-export function ShotHistory({ shots, beans = [], gear = [], units, waterRecipes = DEFAULT_WATER_RECIPES, onDelete, onUpdateShot, initialSelectedId, onReplicate, onFavorite }: ShotHistoryProps) {
+export function ShotHistory({ shots, beans = [], gear = [], units, waterRecipes = DEFAULT_WATER_RECIPES, brewModes = [], onDelete, onUpdateShot, initialSelectedId, onReplicate, onFavorite }: ShotHistoryProps) {
   const U = useUnits(units)
   const gearOpts = (re: RegExp) => gear.filter(g => re.test(g.kind) && g.status !== 'Retired').map(g => g.name)
   const machineOpts = gearOpts(/machine/i)
   const grinderOpts = gearOpts(/grinder/i)
   const basketOpts  = gearOpts(/basket/i)
-  const beanOpts    = beans.map(b => b.name)
   // Keep the shot's saved value selectable even if that bean/gear is archived or retired
   const withCurrent = (opts: string[], cur: string) => cur && !opts.includes(cur) ? [cur, ...opts] : opts
   const [selectedShot, setSelectedShot] = useState<Shot | null>(null)
@@ -81,7 +81,7 @@ export function ShotHistory({ shots, beans = [], gear = [], units, waterRecipes 
       grinder_rpm: shot.grinder_rpm || 'manual',
       basket: shot.basket || '',
       brew_mode: shot.brew_mode || '',
-      bean: shot.bean || '',
+      bean_id: shot.bean_id ?? '',
       machine: shot.machine || '',
       grinder_model: shot.grinder_model || '',
       taste: { ...shot.taste },
@@ -96,8 +96,8 @@ export function ShotHistory({ shots, beans = [], gear = [], units, waterRecipes 
     const tasteVals = Object.values(editForm.taste)
     const updated = await onUpdateShot(editing.id, {
       ...editing,
-      bean: editForm.bean,
-      roaster: editForm.bean === editing.bean ? editing.roaster : (beans.find(b => b.name === editForm.bean)?.roaster || ''),
+      // The server fills in the bean's name and roaster from bean_id
+      bean_id: editForm.bean_id || null,
       machine: editForm.machine || null,
       grinder_model: editForm.grinder_model || null,
       taste: editForm.taste,
@@ -184,7 +184,7 @@ export function ShotHistory({ shots, beans = [], gear = [], units, waterRecipes 
               <Meta k="Basket"  v={selectedShot.basket || '–'} />
               <Meta k="Grinder" v={selectedShot.grinder_model || '–'} />
               <Meta k="RPM"     v={selectedShot.grinder_rpm || '–'} />
-              <Meta k="Brew mode" v={selectedShot.brew_mode || '–'} />
+              {selectedShot.brew_mode && <Meta k="Brew mode" v={selectedShot.brew_mode} />}
             </div>
             <div className="divider" />
             <div style={{ display: 'flex', justifyContent: 'center', margin: '8px 0' }}>
@@ -277,8 +277,12 @@ export function ShotHistory({ shots, beans = [], gear = [], units, waterRecipes 
               <div className="grid grid-2" style={{ gap: 12 }}>
                 <div className="dial-input">
                   <label>Beans</label>
-                  <select value={editForm.bean} onChange={e => setEditForm(f => ({ ...f!, bean: e.target.value }))}>
-                    {withCurrent(beanOpts, editForm.bean).map(b => <option key={b} value={b}>{b}</option>)}
+                  <select value={editForm.bean_id} onChange={e => setEditForm(f => ({ ...f!, bean_id: e.target.value }))}>
+                    {/* Keep the shot's own bean selectable even if it's archived, deleted or not linked */}
+                    {editing && !beans.some(b => b.id === editForm.bean_id) && (
+                      <option value={editForm.bean_id}>{editing.bean || '–'}</option>
+                    )}
+                    {beans.map(b => <option key={b.id} value={b.id}>{beanLabel(b, beans)}</option>)}
                   </select>
                 </div>
                 <div className="dial-input">
@@ -314,13 +318,15 @@ export function ShotHistory({ shots, beans = [], gear = [], units, waterRecipes 
                     {withCurrent(RPM_OPTIONS, editForm.grinder_rpm).map(r => <option key={r} value={r}>{r === 'manual' ? 'Manual' : `${r} RPM`}</option>)}
                   </select>
                 </div>
-                <div className="dial-input">
-                  <label>Brew mode</label>
-                  <select value={editForm.brew_mode} onChange={e => setEditForm(f => ({ ...f!, brew_mode: e.target.value }))}>
-                    <option value="">–</option>
-                    {withCurrent(BREW_MODES, editForm.brew_mode).map(m => <option key={m} value={m}>{m}</option>)}
-                  </select>
-                </div>
+                {(brewModes.length > 0 || editForm.brew_mode) && (
+                  <div className="dial-input">
+                    <label>Brew mode</label>
+                    <select value={editForm.brew_mode} onChange={e => setEditForm(f => ({ ...f!, brew_mode: e.target.value }))}>
+                      <option value="">–</option>
+                      {withCurrent(brewModes, editForm.brew_mode).map(m => <option key={m} value={m}>{m}</option>)}
+                    </select>
+                  </div>
+                )}
               </div>
               <div className="dial-input">
                 <label>Taste</label>
