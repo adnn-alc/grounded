@@ -15,21 +15,6 @@ const db = new Database(DB_PATH)
 db.pragma('journal_mode = WAL')
 db.pragma('foreign_keys = ON')
 
-// Migrations — safe to run repeatedly
-try { db.exec(`ALTER TABLE beans ADD COLUMN archived INTEGER DEFAULT 0`) } catch {}
-try { db.exec(`ALTER TABLE beans ADD COLUMN archived_at TEXT`) } catch {}
-try { db.exec(`ALTER TABLE gear ADD COLUMN price REAL`) } catch {}
-try { db.exec(`ALTER TABLE brews ADD COLUMN grinder_model TEXT`) } catch {}
-try { db.exec(`ALTER TABLE shots ADD COLUMN machine TEXT`) } catch {}
-try { db.exec(`ALTER TABLE shots ADD COLUMN grinder_model TEXT`) } catch {}
-try { db.exec(`ALTER TABLE shots ADD COLUMN grinder_rpm TEXT`) } catch {}
-try { db.exec(`ALTER TABLE brews ADD COLUMN grinder_rpm TEXT`) } catch {}
-try { db.exec(`ALTER TABLE shots ADD COLUMN water_recipe TEXT`) } catch {}
-try { db.exec(`ALTER TABLE brews ADD COLUMN water_recipe TEXT`) } catch {}
-try { db.exec(`ALTER TABLE shots ADD COLUMN favorited INTEGER DEFAULT 0`) } catch {}
-try { db.exec(`ALTER TABLE brews ADD COLUMN favorited INTEGER DEFAULT 0`) } catch {}
-try { db.exec(`ALTER TABLE shots ADD COLUMN basket TEXT`) } catch {}
-
 // ── Schema ──────────────────────────────────────────────────────────
 // tips column renames (category→section, title→category)
 try { db.exec(`ALTER TABLE tips RENAME COLUMN category TO section`) } catch {}
@@ -139,7 +124,21 @@ db.exec(`
   );
 `)
 
-// Runs after CREATE TABLE so it also applies to a fresh database
+// Migrations — safe to run repeatedly. They must run after CREATE TABLE so they
+// also apply to a fresh database (on an existing one they fail harmlessly).
+try { db.exec(`ALTER TABLE beans ADD COLUMN archived INTEGER DEFAULT 0`) } catch {}
+try { db.exec(`ALTER TABLE beans ADD COLUMN archived_at TEXT`) } catch {}
+try { db.exec(`ALTER TABLE gear ADD COLUMN price REAL`) } catch {}
+try { db.exec(`ALTER TABLE brews ADD COLUMN grinder_model TEXT`) } catch {}
+try { db.exec(`ALTER TABLE shots ADD COLUMN machine TEXT`) } catch {}
+try { db.exec(`ALTER TABLE shots ADD COLUMN grinder_model TEXT`) } catch {}
+try { db.exec(`ALTER TABLE shots ADD COLUMN grinder_rpm TEXT`) } catch {}
+try { db.exec(`ALTER TABLE brews ADD COLUMN grinder_rpm TEXT`) } catch {}
+try { db.exec(`ALTER TABLE shots ADD COLUMN water_recipe TEXT`) } catch {}
+try { db.exec(`ALTER TABLE brews ADD COLUMN water_recipe TEXT`) } catch {}
+try { db.exec(`ALTER TABLE shots ADD COLUMN favorited INTEGER DEFAULT 0`) } catch {}
+try { db.exec(`ALTER TABLE brews ADD COLUMN favorited INTEGER DEFAULT 0`) } catch {}
+try { db.exec(`ALTER TABLE shots ADD COLUMN basket TEXT`) } catch {}
 try { db.exec(`ALTER TABLE beans ADD COLUMN doses TEXT`) } catch {}  // JSON array of { basket, dose }
 try { db.exec(`ALTER TABLE shots ADD COLUMN brew_mode TEXT`) } catch {}  // Pagaia / Button 1 / Button 2
 

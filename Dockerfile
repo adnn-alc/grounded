@@ -1,5 +1,5 @@
 # ── Build stage ──────────────────────────────────────────────────────
-FROM node:20-alpine AS builder
+FROM node:24-alpine AS builder
 WORKDIR /app
 
 # Install build deps for better-sqlite3 native module
@@ -12,7 +12,7 @@ COPY . .
 RUN npm run build
 
 # ── Runtime stage ─────────────────────────────────────────────────────
-FROM node:20-alpine
+FROM node:24-alpine
 WORKDIR /app
 
 RUN apk add --no-cache python3 make g++

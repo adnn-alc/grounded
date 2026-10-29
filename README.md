@@ -52,7 +52,7 @@ docker compose up -d --build
 
 ## Local development
 
-Requires Node 20+.
+Requires Node 22+ (Node 24 LTS recommended — it's what the Docker image uses).
 
 ```bash
 npm install
