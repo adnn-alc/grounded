@@ -1,8 +1,23 @@
-import { useState } from 'react'
-import { MAP_W as W, MAP_H as H, PROJ, SPHERE, GRATICULE, COUNTRIES } from '../data/worldMap.js'
+import { useState, type CSSProperties, type ReactNode } from 'react'
+import { MAP_W as W, MAP_H as H, PROJ, SPHERE, GRATICULE, COUNTRIES } from '../data/worldMap.ts'
+import type { Bean } from '../types.ts'
+
+type Point = [x: number, y: number]
+
+/** One origin country on the map, aggregated over all bags from it */
+interface Origin {
+  name:       string     // Natural Earth name (map key)
+  label:      string     // display name
+  region:     string
+  bagsActive: number
+  bagsTotal:  number
+  regions:    string[]   // growing regions, from "Country · Region"
+  beans:      string[]   // active bean names
+  pos:        Point      // marker position in the viewBox
+}
 
 // ── Projection (Natural Earth I — must match scripts/build-world-map.mjs) ──
-function project(lng, lat) {
+function project(lng: number, lat: number): Point {
   const l = lng * Math.PI / 180, p = lat * Math.PI / 180
   const p2 = p * p, p4 = p2 * p2
   const x = l * (0.8707 - 0.131979 * p2 + p4 * (-0.013791 + p4 * (0.003971 * p2 - 0.001529 * p4)))
@@ -13,13 +28,13 @@ function project(lng, lat) {
 const BY_NAME = Object.fromEntries(COUNTRIES.map(c => [c.name, c]))
 
 // Map names are Natural Earth abbreviations; show friendlier ones
-const DISPLAY = {
+const DISPLAY: Record<string, string> = {
   'Dominican Rep.': 'Dominican Republic', 'Dem. Rep. Congo': 'DR Congo',
   'Central African Rep.': 'Central African Republic', 'United States of America': 'USA',
 }
 
 // Common spellings / growing regions found on coffee bags → map name
-const ALIASES = {
+const ALIASES: Record<string, string> = {
   'brasil': 'Brazil', 'dominican republic': 'Dominican Rep.', 'drc': 'Dem. Rep. Congo',
   'dr congo': 'Dem. Rep. Congo', 'democratic republic of the congo': 'Dem. Rep. Congo',
   'ivory coast': "Côte d'Ivoire", 'cote d\'ivoire': "Côte d'Ivoire", 'east timor': 'Timor-Leste',
@@ -30,15 +45,15 @@ const ALIASES = {
 }
 
 // Origins with no outline at this scale — marker only
-const POINT_ONLY = { 'Hawaii': [-155.6, 19.6] }
+const POINT_ONLY: Record<string, Point> = { 'Hawaii': [-155.6, 19.6] }
 
 // Put markers in the coffee-growing area rather than the geographic centre
-const COFFEE_ANCHORS = {
+const COFFEE_ANCHORS: Record<string, Point> = {
   'Brazil': [-45, -19], 'Mexico': [-93, 16.5], 'India': [76, 13], 'China': [100.5, 23.5],
   'Yemen': [44, 15], 'Vietnam': [108, 12.5],
 }
 
-const REGION = {
+const REGION: Record<string, string> = {
   'Ethiopia': 'East Africa', 'Kenya': 'East Africa', 'Rwanda': 'East Africa', 'Burundi': 'East Africa',
   'Tanzania': 'East Africa', 'Uganda': 'East Africa', 'Dem. Rep. Congo': 'East Africa', 'Malawi': 'East Africa',
   'Zambia': 'East Africa', 'Zimbabwe': 'East Africa',
@@ -53,13 +68,13 @@ const REGION = {
   'Yemen': 'Middle East',
 }
 
-const LOOKUP = {}
+const LOOKUP: Record<string, string> = {}
 COUNTRIES.forEach(c => { LOOKUP[c.name.toLowerCase()] = c.name })
 Object.entries(DISPLAY).forEach(([k, v]) => { LOOKUP[v.toLowerCase()] = k })
 Object.entries(ALIASES).forEach(([k, v]) => { LOOKUP[k] = v })
 
 /** "Ethiopia · Guji" → ['Ethiopia'];  "Brazil & Mexico" → ['Brazil', 'Mexico'];  "Random" → [] */
-function originCountries(origin) {
+function originCountries(origin: string): string[] {
   const head = (origin || '').split('·')[0].trim().toLowerCase()
   if (!head) return []
   if (LOOKUP[head]) return [LOOKUP[head]]
@@ -67,9 +82,9 @@ function originCountries(origin) {
   return [...new Set(found)]
 }
 
-function buildOrigins(beans) {
-  const map = {}
-  const unmapped = new Set()
+function buildOrigins(beans: Bean[]) {
+  const map: Record<string, Omit<Origin, 'regions' | 'pos'> & { regions: Set<string> }> = {}
+  const unmapped = new Set<string>()
   let mappedBags = 0
   beans.forEach(b => {
     if (!b.origin?.trim()) return
@@ -87,7 +102,7 @@ function buildOrigins(beans) {
       if (sub) o.regions.add(sub)
     })
   })
-  const origins = Object.values(map).map(o => {
+  const origins = Object.values(map).map((o): Origin => {
     const ll = COFFEE_ANCHORS[o.name] || POINT_ONLY[o.name]
     return { ...o, regions: [...o.regions], pos: ll ? project(...ll) : BY_NAME[o.name].c }
   })
@@ -95,7 +110,7 @@ function buildOrigins(beans) {
 }
 
 // [dx, dy, anchor] in viewBox units — keeps the crowded East Africa / Central America labels apart
-const LABEL_OFFSETS = {
+const LABEL_OFFSETS: Record<string, [dx: number, dy: number, anchor: 'start' | 'end']> = {
   'Ethiopia': [10, -4, 'start'], 'Kenya': [11, 4, 'start'], 'Uganda': [-9, -3, 'end'],
   'Rwanda': [-9, -2, 'end'], 'Burundi': [-9, 7, 'end'], 'Tanzania': [10, 8, 'start'],
   'Dem. Rep. Congo': [-10, 3, 'end'], 'Yemen': [-8, -6, 'end'],
@@ -106,7 +121,7 @@ const LABEL_OFFSETS = {
   'Mexico': [-9, -3, 'end'], 'Jamaica': [8, -4, 'start'], 'Dominican Rep.': [8, -4, 'start'],
 }
 
-const fillFor = (o) => !o ? 'var(--surface)'
+const fillFor = (o: { bagsActive: number } | undefined) => !o ? 'var(--surface)'
   : o.bagsActive > 0 ? 'color-mix(in oklch, var(--crema) 58%, var(--surface))'
   : 'color-mix(in oklch, var(--crema) 24%, var(--surface))'
 
@@ -135,7 +150,7 @@ function CoffeeBelt() {
 
 // Labels sit over open ocean, drawn above the countries
 function BeltLabels() {
-  const label = { fontFamily: MONO, fontSize: 7, letterSpacing: '0.12em', textTransform: 'uppercase', pointerEvents: 'none' }
+  const label: CSSProperties = { fontFamily: MONO, fontSize: 7, letterSpacing: '0.12em', textTransform: 'uppercase', pointerEvents: 'none' }
   return (
     <g>
       <text x={project(180, 23.4)[0] - 14} y={Y_CANCER - 4} textAnchor="end" style={{ ...label, fill: 'var(--crema)' }} opacity="0.7">Tropic of Cancer · 23.4°N</text>
@@ -145,7 +160,7 @@ function BeltLabels() {
   )
 }
 
-function HoverCard({ origin }) {
+function HoverCard({ origin }: { origin: Origin }) {
   const [x, y] = origin.pos
   const leftPct = (x / W) * 100
   return (
@@ -186,29 +201,29 @@ function HoverCard({ origin }) {
   )
 }
 
-function Tag({ children }) {
+function Tag({ children }: { children: ReactNode }) {
   return <span style={{ fontFamily: MONO, fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-3)' }}>{children}</span>
 }
-function Val({ children, color }) {
+function Val({ children, color }: { children: ReactNode; color?: string }) {
   return <span style={{ fontFamily: MONO, fontSize: 12, color: color || 'var(--text)' }}>{children}</span>
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export default function CoffeeMap({ beans = [], showRegionStrip = true }) {
-  const [hovered, setHovered] = useState(null)
+export default function CoffeeMap({ beans = [], showRegionStrip = true }: { beans?: Bean[]; showRegionStrip?: boolean }) {
+  const [hovered, setHovered] = useState<Origin | null>(null)
   const { origins, unmapped, mappedBags } = buildOrigins(beans)
   const byName = Object.fromEntries(origins.map(o => [o.name, o]))
 
-  const regions = Object.entries(origins.reduce((acc, o) => {
+  const regions = Object.entries(origins.reduce<Record<string, { countries: number; active: number; total: number }>>((acc, o) => {
     const r = acc[o.region] ||= { countries: 0, active: 0, total: 0 }
     r.countries++; r.active += o.bagsActive; r.total += o.bagsTotal
     return acc
   }, {})).sort((a, b) => b[1].total - a[1].total)
 
   // draw active last so its markers/labels sit on top
-  const markers = [...origins].sort((a, b) => (a.bagsActive > 0) - (b.bagsActive > 0))
-  const hover = (o) => () => setHovered(o)
+  const markers = [...origins].sort((a, b) => Number(a.bagsActive > 0) - Number(b.bagsActive > 0))
+  const hover = (o: Origin) => () => setHovered(o)
   const unhover = () => setHovered(null)
 
   return (

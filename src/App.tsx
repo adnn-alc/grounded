@@ -1,12 +1,21 @@
-import { useState, useEffect } from 'react'
-import { Sidebar, Topbar } from './components/Shell.jsx'
-import Settings from './components/Settings.jsx'
-import Home from './pages/Home.jsx'
-import Dialin from './pages/Dialin.jsx'
-import { ShotHistory, BrewHistory, Beans, ArchivedBeans, RecipesPage, GearPage, Stats, Stock, TipsPage } from './pages/pages.jsx'
-import { useData } from './hooks/useData.js'
-import { DEFAULT_WATER_RECIPES } from './data/waterRecipes.js'
-import { DEFAULT_FONTS, applyAppearance } from './data/fonts.js'
+import { useState, useEffect, type ReactElement } from 'react'
+import { Sidebar, Topbar } from './components/Shell.tsx'
+import Settings from './components/Settings.tsx'
+import Home from './pages/Home.tsx'
+import Dialin from './pages/Dialin.tsx'
+import { ShotHistory } from './pages/ShotHistory.tsx'
+import { BrewHistory } from './pages/BrewHistory.tsx'
+import { Beans } from './pages/Beans.tsx'
+import { ArchivedBeans } from './pages/ArchivedBeans.tsx'
+import { RecipesPage } from './pages/Recipes.tsx'
+import { GearPage } from './pages/Gear.tsx'
+import { Stats } from './pages/Stats.tsx'
+import { Stock } from './pages/Stock.tsx'
+import { TipsPage } from './pages/Tips.tsx'
+import { useData } from './hooks/useData.ts'
+import { DEFAULT_WATER_RECIPES } from './data/waterRecipes.ts'
+import { DEFAULT_FONTS, applyAppearance } from './data/fonts.ts'
+import type { Brew, BrewInput, DialinPreset, Fonts, Route, Shot, ShotInput, Units } from './types.ts'
 
 function LoadingScreen() {
   return (
@@ -17,7 +26,7 @@ function LoadingScreen() {
   )
 }
 
-function ErrorScreen({ message, onRetry }) {
+function ErrorScreen({ message, onRetry }: { message: string; onRetry: () => void }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', flexDirection: 'column', gap: 16 }}>
       <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--bitter)' }}>Failed to connect to API</div>
@@ -27,23 +36,23 @@ function ErrorScreen({ message, onRetry }) {
   )
 }
 
-const VALID_ROUTES = new Set(['home', 'dialin', 'shot-history', 'brew-history', 'beans', 'archived-beans', 'recipes', 'gear', 'stats', 'stock', 'tips'])
+const VALID_ROUTES = new Set<string>(['home', 'dialin', 'shot-history', 'brew-history', 'beans', 'archived-beans', 'recipes', 'gear', 'stats', 'stock', 'tips'])
 
-function routeFromHash() {
+function routeFromHash(): Route {
   const hash = window.location.hash.slice(2) // strip '#/'
-  return VALID_ROUTES.has(hash) ? hash : 'home'
+  return VALID_ROUTES.has(hash) ? hash as Route : 'home'
 }
 
-const DEFAULT_UNITS = { mass: 'g', temp: 'C' }
+const DEFAULT_UNITS: Units = { mass: 'g', temp: 'C' }
 
 export default function App() {
   const [route, setRoute] = useState(routeFromHash)
   const [settingsOpen, setSettingsOpen] = useState(false)
-  const [openShotId, setOpenShotId] = useState(null)
-  const [openBrewId, setOpenBrewId] = useState(null)
-  const [dialinPreset, setDialinPreset] = useState(null)
+  const [openShotId, setOpenShotId] = useState<string | null>(null)
+  const [openBrewId, setOpenBrewId] = useState<string | null>(null)
+  const [dialinPreset, setDialinPreset] = useState<DialinPreset | null>(null)
 
-  const goTo = (route, id) => {
+  const goTo = (route: Route, id?: string) => {
     setRoute(route)
     if (route === 'shot-history') setOpenShotId(id || null)
     if (route === 'brew-history') setOpenBrewId(id || null)
@@ -63,8 +72,8 @@ export default function App() {
 
   // Preferences live in the database (shared by every browser), with defaults
   const theme          = settings.theme || 'moody'
-  const fonts          = { ...DEFAULT_FONTS, ...settings.fonts }
-  const units          = { ...DEFAULT_UNITS, ...settings.units }
+  const fonts: Fonts    = { ...DEFAULT_FONTS, ...settings.fonts }
+  const units: Units    = { ...DEFAULT_UNITS, ...settings.units }
   const waterRecipes   = settings.waterRecipes?.length ? settings.waterRecipes : DEFAULT_WATER_RECIPES
   const dialinDefaults = settings.dialinDefaults || {}
 
@@ -85,27 +94,27 @@ export default function App() {
   if (loading) return <LoadingScreen />
   if (error)   return <ErrorScreen message={error} onRetry={reload} />
 
-  const handleSaveShot = async (shot) => {
+  const handleSaveShot = async (shot: ShotInput) => {
     await saveShot(shot)
     setRoute('shot-history')
   }
 
-  const handleSaveBrew = async (brew) => {
+  const handleSaveBrew = async (brew: BrewInput) => {
     await saveBrew(brew)
     setRoute('brew-history')
   }
 
-  const onReplicateShot = (shot) => {
+  const onReplicateShot = (shot: Shot) => {
     setDialinPreset({ type: 'espresso', ...shot })
     setRoute('dialin')
   }
 
-  const onReplicateBrew = (brew) => {
+  const onReplicateBrew = (brew: Brew) => {
     setDialinPreset({ type: 'filter', ...brew })
     setRoute('dialin')
   }
 
-  const pages = {
+  const pages: Record<Route, ReactElement> = {
     home:          <Home        shots={shots} brews={brews} beans={beans} units={units} goTo={goTo} />,
     dialin:        <Dialin      shots={shots} beans={beans} gear={gear} units={units} waterRecipes={waterRecipes} dialinDefaults={dialinDefaults} onSaveShot={handleSaveShot} onSaveBrew={handleSaveBrew} onUpdateBean={updateBean} preset={dialinPreset} onPresetConsumed={() => setDialinPreset(null)} />,
     'shot-history': <ShotHistory shots={shots} beans={beans} gear={gear} units={units} waterRecipes={waterRecipes} onDelete={deleteShot} onUpdateShot={updateShot} initialSelectedId={openShotId} onReplicate={onReplicateShot} onFavorite={favoriteShot} />,

@@ -1,13 +1,21 @@
-import { useRef } from 'react'
-import { flavColor } from '../hooks/useUnits.js'
+import { useRef, type PointerEvent as ReactPointerEvent } from 'react'
+import { flavColor } from '../hooks/useUnits.ts'
+import type { Taste, TasteAxis } from '../types.ts'
 
-export function FlavorRadar({ taste, size = 200, color = 'var(--crema)', compareTaste = null }) {
-  const axes   = ['acidity', 'sweetness', 'body', 'bitterness', 'balance', 'aftertaste']
+interface FlavorRadarProps {
+  taste:         Taste
+  size?:         number
+  color?:        string
+  compareTaste?: Taste | null
+}
+
+export function FlavorRadar({ taste, size = 200, color = 'var(--crema)', compareTaste = null }: FlavorRadarProps) {
+  const axes: TasteAxis[] = ['acidity', 'sweetness', 'body', 'bitterness', 'balance', 'aftertaste']
   const labels = ['Acid', 'Sweet', 'Body', 'Bitter', 'Balance', 'Finish']
   const cx = size / 2, cy = size / 2, r = size / 2 - 30
-  const angle  = (i) => (-Math.PI / 2) + (i * 2 * Math.PI / axes.length)
-  const pt     = (val, i) => { const rr = (val / 10) * r; return [cx + rr * Math.cos(angle(i)), cy + rr * Math.sin(angle(i))] }
-  const poly   = (t) => axes.map((k, i) => pt(t[k] || 0, i).join(',')).join(' ')
+  const angle  = (i: number) => (-Math.PI / 2) + (i * 2 * Math.PI / axes.length)
+  const pt     = (val: number, i: number) => { const rr = (val / 10) * r; return [cx + rr * Math.cos(angle(i)), cy + rr * Math.sin(angle(i))] }
+  const poly   = (t: Taste) => axes.map((k, i) => pt(t[k] || 0, i).join(',')).join(' ')
 
   return (
     <svg width={size} height={size} style={{ display: 'block' }}>
@@ -41,20 +49,27 @@ export function FlavorRadar({ taste, size = 200, color = 'var(--crema)', compare
   )
 }
 
-export function WeekTrend({ ratings, labels, max: maxProp, sundays }) {
+interface WeekTrendProps {
+  ratings:  (number | null)[]   // null = no data that day (gap in the line)
+  labels?:  string[]
+  max?:     number
+  sundays?: boolean[]
+}
+
+export function WeekTrend({ ratings, labels, max: maxProp, sundays }: WeekTrendProps) {
   const lbs = labels || ['M', 'T', 'W', 'T', 'F', 'S', 'S']
   const vw = 600, h = 120, min = 0
   const max = maxProp ?? 10
   const LEFT = 24, RIGHT = 8, BOTTOM = 16, TOP = 8
-  const px = (i) => LEFT + (i / (ratings.length - 1)) * (vw - LEFT - RIGHT)
-  const py = (v) => h - BOTTOM - ((v - min) / (max - min)) * (h - BOTTOM - TOP)
+  const px = (i: number) => LEFT + (i / (ratings.length - 1)) * (vw - LEFT - RIGHT)
+  const py = (v: number) => h - BOTTOM - ((v - min) / (max - min)) * (h - BOTTOM - TOP)
 
   // Ticks at every 2 units up to max (max is always even)
   const ticks = Array.from({ length: max / 2 }, (_, i) => (i + 1) * 2)
 
   // Build segments of consecutive non-null values
-  const segments = []
-  let current = null
+  const segments: { v: number; i: number }[][] = []
+  let current: { v: number; i: number }[] | null = null
   ratings.forEach((v, i) => {
     if (v !== null) {
       if (!current) { current = []; segments.push(current) }
@@ -99,14 +114,20 @@ export function WeekTrend({ ratings, labels, max: maxProp, sundays }) {
   )
 }
 
-export function FlowGraph({ points, live, dose }) {
+interface FlowPoint {
+  t:    number   // seconds
+  mass: number   // grams in the cup
+  flow: number   // g/s
+}
+
+export function FlowGraph({ points, live, dose }: { points: FlowPoint[]; live?: boolean; dose?: number }) {
   const W = 400, H = 160
   const target = (dose || 18) * 2.2
   const maxT = Math.max(40, ...points.map(p => p.t))
   const maxM = Math.max(target + 6, ...points.map(p => p.mass))
-  const px  = (t) => 28 + (t / maxT) * (W - 40)
-  const py  = (m) => H - 22 - (m / maxM) * (H - 42)
-  const pyF = (f) => H - 22 - (f / 5) * (H - 42)
+  const px  = (t: number) => 28 + (t / maxT) * (W - 40)
+  const py  = (m: number) => H - 22 - (m / maxM) * (H - 42)
+  const pyF = (f: number) => H - 22 - (f / 5) * (H - 42)
 
   const massPath = points.length ? 'M' + points.map(p => `${px(p.t)},${py(p.mass)}`).join(' L') : ''
   const flowPath = points.length ? 'M' + points.map(p => `${px(p.t)},${pyF(p.flow)}`).join(' L') : ''
@@ -171,7 +192,14 @@ export function FlowGraph({ points, live, dose }) {
   )
 }
 
-export function Sparkline({ values, width = 80, height = 24, color = 'var(--crema)' }) {
+interface SparklineProps {
+  values:  number[]
+  width?:  number
+  height?: number
+  color?:  string
+}
+
+export function Sparkline({ values, width = 80, height = 24, color = 'var(--crema)' }: SparklineProps) {
   const max  = Math.max(...values, 1)
   const min  = Math.min(...values, 0)
   const span = max - min || 1
@@ -187,7 +215,7 @@ export function Sparkline({ values, width = 80, height = 24, color = 'var(--crem
   )
 }
 
-export function BarChart({ data }) {
+export function BarChart({ data }: { data: { label: string; value: number }[] }) {
   const W = 360, H = 140
   const max = Math.max(...data.map(d => d.value), 1)
   const bw  = (W - 40) / data.length
@@ -210,21 +238,21 @@ export function BarChart({ data }) {
   )
 }
 
-export function FlavSliders({ taste, onChange }) {
-  const axes = ['acidity', 'sweetness', 'body', 'bitterness', 'balance', 'aftertaste']
+export function FlavSliders({ taste, onChange }: { taste: Taste; onChange: (taste: Taste) => void }) {
+  const axes: TasteAxis[] = ['acidity', 'sweetness', 'body', 'bitterness', 'balance', 'aftertaste']
   const tasteRef = useRef(taste)
   tasteRef.current = taste
 
-  const handlePointerDown = (k, e) => {
+  const handlePointerDown = (k: TasteAxis, e: ReactPointerEvent<HTMLDivElement>) => {
     e.preventDefault()
     const bar = e.currentTarget
-    const update = (clientX) => {
+    const update = (clientX: number) => {
       const rect = bar.getBoundingClientRect()
       const v = Math.max(1, Math.min(10, Math.round(((clientX - rect.left) / rect.width) * 10)))
       onChange({ ...tasteRef.current, [k]: v })
     }
     update(e.clientX)
-    const onMove = (ev) => update(ev.clientX)
+    const onMove = (ev: PointerEvent) => update(ev.clientX)
     const onUp = () => {
       window.removeEventListener('pointermove', onMove)
       window.removeEventListener('pointerup', onUp)

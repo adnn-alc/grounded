@@ -17,6 +17,8 @@ All notable changes to Grounded are listed here. Versions follow [Semantic Versi
 - Docker image: no compilers in the runtime image (smaller), plus a health check (`GET /api/health`)
 - Added SECURITY.md, a CI workflow (build + fresh-database smoke test + Docker build) and Dependabot
 - Removed unused files (`nginx.conf`, an old copy of the seed data)
+- The code is now TypeScript (strict) instead of JavaScript. Shared types for shots, brews, beans, gear, recipes, tips and settings are used by both the API and the UI, and CI type-checks every push (`npm run typecheck`). Node runs the API's `.ts` files directly, so there is still no server build step. Local development now needs Node 22.18+
+- The 2,000-line `pages.jsx` is split into one file per page
 
 ## [1.0.0] — 2026-10-28
 

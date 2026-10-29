@@ -52,7 +52,7 @@ docker compose up -d --build
 
 ## Local development
 
-Requires Node 22+ (Node 24 LTS recommended — it's what the Docker image uses).
+Requires Node 22.18+ (Node 24 LTS recommended — it's what the Docker image uses). The API is TypeScript that Node runs directly, so there is no server build step.
 
 ```bash
 npm install
@@ -73,6 +73,7 @@ Vite proxies `/api/*` to Express, so there's no CORS setup needed. The dev datab
 | `npm run dev:api` | Express only (restarts on file changes)             |
 | `npm run build`   | Build the frontend into `dist/`                     |
 | `npm start`       | Run the API; with `NODE_ENV=production` it also serves `dist/` |
+| `npm run typecheck` | Type-check the UI and the API with `tsc`          |
 
 ### Running without Docker
 
@@ -125,21 +126,24 @@ grounded/
 ├── Dockerfile              # Multi-stage build: builds the UI, runs the API
 ├── docker-compose.yml
 ├── .github/                # CI workflow and Dependabot config
+├── tsconfig.json           # Type-checking for the UI (strict)
 ├── server/
-│   ├── index.js            # Express API — all routes
-│   └── db.js               # SQLite schema, migrations, seed data
+│   ├── index.ts            # Express API — all routes
+│   ├── db.ts               # SQLite schema, migrations, seed data
+│   └── tsconfig.json       # Type-checking for the API
 ├── src/
-│   ├── App.jsx             # Hash routing, theme, settings
-│   ├── api/client.js       # All fetch() calls
+│   ├── types.ts            # Types shared by the API and the UI
+│   ├── App.tsx             # Hash routing, theme, settings
+│   ├── api/client.ts       # All fetch() calls
 │   ├── hooks/
-│   │   ├── useData.js      # Loads all data, exposes mutation helpers
-│   │   └── useUnits.js     # g/oz and °C/°F helpers
-│   ├── pages/              # Home, Dial-in, history, beans, gear, stats…
+│   │   ├── useData.ts      # Loads all data, exposes mutation helpers
+│   │   └── useUnits.ts     # g/oz and °C/°F helpers
+│   ├── pages/              # One file per page: Home, Dial-in, histories, beans, gear, stats…
 │   ├── components/         # Shell, charts, settings, world map, basket doses
 │   ├── data/               # Static data (world map, fonts, water recipes, brew modes)
 │   └── styles/global.css   # Themes via CSS custom properties
 └── scripts/
-    └── build-world-map.mjs # Regenerates src/data/worldMap.js
+    └── build-world-map.mjs # Regenerates src/data/worldMap.ts
 ```
 
 ---
@@ -165,6 +169,7 @@ All endpoints are JSON under `/api`.
 
 | Layer    | Choice                                      |
 |----------|---------------------------------------------|
+| Language | TypeScript (strict)                         |
 | UI       | React 18 + Vite 5                           |
 | API      | Express 4                                   |
 | Database | SQLite via better-sqlite3                   |

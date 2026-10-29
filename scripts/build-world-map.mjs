@@ -1,6 +1,6 @@
-// Generates src/data/worldMap.js — pre-projected Natural Earth country paths.
+// Generates src/data/worldMap.ts — pre-projected Natural Earth country paths.
 // Usage: npm i --prefix /tmp/mapdeps d3-geo@3 topojson-client@3 world-atlas@2
-//        node scripts/build-world-map.mjs /tmp/mapdeps src/data/worldMap.js 110m
+//        node scripts/build-world-map.mjs /tmp/mapdeps src/data/worldMap.ts 110m
 import fs from 'fs'
 import path from 'path'
 import { createRequire } from 'module'
@@ -71,7 +71,7 @@ export const MAP_H = ${H}
 export const PROJ = { k: ${projection.scale()}, tx: ${ftx}, ty: ${fty} }
 export const SPHERE = ${JSON.stringify(sphere)}
 export const GRATICULE = ${JSON.stringify(graticule)}
-export const COUNTRIES = [
+export const COUNTRIES: { name: string; c: [number, number]; d: string }[] = [
 ${out.map(c => `  { name: ${JSON.stringify(c.name)}, c: ${JSON.stringify(c.c)}, d: ${JSON.stringify(c.d)} },`).join('\n')}
 ]
 `

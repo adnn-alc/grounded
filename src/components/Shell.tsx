@@ -1,7 +1,19 @@
-import Ico from './Ico.jsx'
+import Ico, { type IconName } from './Ico.tsx'
+import type { Bean, Brew, Gear, Recipe, Route, Shot } from '../types.ts'
 
-export function Sidebar({ route, setRoute, shots, brews = [], beans, archivedBeans, recipes, gear }) {
-  const counts = {
+interface SidebarProps {
+  route:         Route
+  setRoute:      (route: Route) => void
+  shots:         Shot[]
+  brews?:        Brew[]
+  beans:         Bean[]
+  archivedBeans: Bean[]
+  recipes:       Recipe[]
+  gear:          Gear[]
+}
+
+export function Sidebar({ route, setRoute, shots, brews = [], beans, archivedBeans, recipes, gear }: SidebarProps) {
+  const counts: Partial<Record<Route, number>> = {
     'shot-history': shots.length,
     'brew-history': brews.length,
     beans: beans.length,
@@ -10,7 +22,7 @@ export function Sidebar({ route, setRoute, shots, brews = [], beans, archivedBea
     gear: gear.length,
   }
 
-  const NavItem = ({ id, label, icon, accent }) => (
+  const NavItem = ({ id, label, icon, accent }: { id: Route; label: string; icon: IconName; accent?: boolean }) => (
     <a href={`#/${id}`} className={`nav-item${route === id ? ' active' : ''}`} onClick={e => { if (e.metaKey || e.ctrlKey) return; e.preventDefault(); setRoute(id) }}>
       <Ico name={icon} className="ico" />
       <span>{label}</span>
@@ -71,8 +83,14 @@ export function Sidebar({ route, setRoute, shots, brews = [], beans, archivedBea
   )
 }
 
-export function Topbar({ route, onNewShot, onOpenSettings }) {
-  const crumbs = {
+interface TopbarProps {
+  route:           Route
+  onNewShot:       () => void
+  onOpenSettings?: () => void
+}
+
+export function Topbar({ route, onNewShot, onOpenSettings }: TopbarProps) {
+  const crumbs: Record<Route, string[]> = {
     home:             ['Grounded'],
     dialin:           ['Workspace', 'Dial-in'],
     'shot-history':   ['Library', 'Shot history'],

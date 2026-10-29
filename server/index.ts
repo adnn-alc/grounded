@@ -2,7 +2,12 @@ import express from 'express'
 import cors from 'cors'
 import path from 'path'
 import { fileURLToPath } from 'url'
-import db from './db.js'
+import db from './db.ts'
+import type {
+  Shot, ShotInput, ShotRow, Brew, BrewInput, BrewRow, Bean, BeanInput, BeanRow,
+  GearInput, GearRow, Recipe, RecipeInput, RecipeRow, TipInput, TipRow,
+  Settings, SettingKey, SettingRow,
+} from '../src/types.ts'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const app = express()
@@ -11,8 +16,11 @@ const PORT = process.env.PORT || 3001
 app.use(express.json())
 app.use(cors({ origin: 'http://localhost:5173' })) // dev only; prod serves from same origin
 
+// Lookups by id below end in `!`: the row was just written, or the :id is
+// unknown, in which case the rowTo*() helper throws and Express answers 500.
+
 // ── Helper: map a DB shot row → API shape ───────────────────────────
-function rowToShot(row) {
+function rowToShot(row: ShotRow): Shot {
   return {
     id:      row.id,
     date:    row.date,
@@ -45,7 +53,7 @@ function rowToShot(row) {
   }
 }
 
-function rowToBrew(row) {
+function rowToBrew(row: BrewRow): Brew {
   return {
     id:          row.id,
     date:        row.date,
@@ -78,22 +86,22 @@ function rowToBrew(row) {
   }
 }
 
-function rowToBean(row) {
+function rowToBean(row: BeanRow): Bean {
   return { ...row, notes: JSON.parse(row.notes || '[]'), doses: JSON.parse(row.doses || '[]') }
 }
 
-function rowToRecipe(row) {
+function rowToRecipe(row: RecipeRow): Recipe {
   return { ...row, tags: JSON.parse(row.tags || '[]'), steps: JSON.parse(row.steps || '[]') }
 }
 
 // ── SHOTS ────────────────────────────────────────────────────────────
 app.get('/api/shots', (req, res) => {
-  const rows = db.prepare('SELECT * FROM shots ORDER BY date DESC').all()
+  const rows = db.prepare<[], ShotRow>('SELECT * FROM shots ORDER BY date DESC').all()
   res.json(rows.map(rowToShot))
 })
 
 app.post('/api/shots', (req, res) => {
-  const s = req.body
+  const s: ShotInput = req.body
   const id = s.id || 'shot-' + Date.now()
   db.prepare(`
     INSERT INTO shots (id, date, bean, roaster, dose, yield, time, preinf, temp, grind, rating,
@@ -106,12 +114,12 @@ app.post('/api/shots', (req, res) => {
     s.notes, s.verdict, s.machine, s.grinder_model, s.grinder_rpm ?? null, s.water_recipe ?? null, s.basket ?? null,
     s.brew_mode ?? null
   )
-  const row = db.prepare('SELECT * FROM shots WHERE id = ?').get(id)
+  const row = db.prepare<[string], ShotRow>('SELECT * FROM shots WHERE id = ?').get(id)!
   res.status(201).json(rowToShot(row))
 })
 
 app.put('/api/shots/:id', (req, res) => {
-  const s = req.body
+  const s: ShotInput = req.body
   db.prepare(`
     UPDATE shots SET
       date=?, bean=?, roaster=?, dose=?, yield=?, time=?, preinf=?, temp=?, grind=?, rating=?,
@@ -124,7 +132,7 @@ app.put('/api/shots/:id', (req, res) => {
     s.notes, s.verdict, s.machine, s.grinder_model, s.grinder_rpm ?? null, s.water_recipe ?? null, s.basket ?? null,
     s.brew_mode ?? null, req.params.id
   )
-  res.json(rowToShot(db.prepare('SELECT * FROM shots WHERE id = ?').get(req.params.id)))
+  res.json(rowToShot(db.prepare<[string], ShotRow>('SELECT * FROM shots WHERE id = ?').get(req.params.id)!))
 })
 
 app.delete('/api/shots/:id', (req, res) => {
@@ -134,17 +142,17 @@ app.delete('/api/shots/:id', (req, res) => {
 
 app.patch('/api/shots/:id/favorite', (req, res) => {
   db.prepare('UPDATE shots SET favorited = ? WHERE id = ?').run(req.body.favorited ? 1 : 0, req.params.id)
-  res.json(rowToShot(db.prepare('SELECT * FROM shots WHERE id = ?').get(req.params.id)))
+  res.json(rowToShot(db.prepare<[string], ShotRow>('SELECT * FROM shots WHERE id = ?').get(req.params.id)!))
 })
 
 // ── BREWS ────────────────────────────────────────────────────────────
 app.get('/api/brews', (req, res) => {
-  const rows = db.prepare('SELECT * FROM brews ORDER BY date DESC').all()
+  const rows = db.prepare<[], BrewRow>('SELECT * FROM brews ORDER BY date DESC').all()
   res.json(rows.map(rowToBrew))
 })
 
 app.post('/api/brews', (req, res) => {
-  const b = req.body
+  const b: BrewInput = req.body
   const id = b.id || 'brew-' + Date.now()
   db.prepare(`
     INSERT INTO brews (id, date, bean, roaster, dripper, grinder_model, dose, water, temp, grind,
@@ -158,11 +166,11 @@ app.post('/api/brews', (req, res) => {
     b.taste?.acidity, b.taste?.sweetness, b.taste?.body, b.taste?.bitterness, b.taste?.balance, b.taste?.aftertaste,
     b.notes, b.verdict, b.grinder_rpm ?? null, b.water_recipe ?? null
   )
-  res.status(201).json(rowToBrew(db.prepare('SELECT * FROM brews WHERE id = ?').get(id)))
+  res.status(201).json(rowToBrew(db.prepare<[string], BrewRow>('SELECT * FROM brews WHERE id = ?').get(id)!))
 })
 
 app.put('/api/brews/:id', (req, res) => {
-  const b = req.body
+  const b: BrewInput = req.body
   db.prepare(`
     UPDATE brews SET
       date=?, bean=?, roaster=?, dripper=?, grinder_model=?, dose=?, water=?, temp=?, grind=?,
@@ -176,7 +184,7 @@ app.put('/api/brews/:id', (req, res) => {
     b.taste?.acidity, b.taste?.sweetness, b.taste?.body, b.taste?.bitterness, b.taste?.balance, b.taste?.aftertaste,
     b.notes, b.verdict, b.grinder_rpm ?? null, b.water_recipe ?? null, req.params.id
   )
-  res.json(rowToBrew(db.prepare('SELECT * FROM brews WHERE id = ?').get(req.params.id)))
+  res.json(rowToBrew(db.prepare<[string], BrewRow>('SELECT * FROM brews WHERE id = ?').get(req.params.id)!))
 })
 
 app.delete('/api/brews/:id', (req, res) => {
@@ -186,20 +194,20 @@ app.delete('/api/brews/:id', (req, res) => {
 
 app.patch('/api/brews/:id/favorite', (req, res) => {
   db.prepare('UPDATE brews SET favorited = ? WHERE id = ?').run(req.body.favorited ? 1 : 0, req.params.id)
-  res.json(rowToBrew(db.prepare('SELECT * FROM brews WHERE id = ?').get(req.params.id)))
+  res.json(rowToBrew(db.prepare<[string], BrewRow>('SELECT * FROM brews WHERE id = ?').get(req.params.id)!))
 })
 
 // ── BEANS ────────────────────────────────────────────────────────────
 app.get('/api/beans', (req, res) => {
-  res.json(db.prepare('SELECT * FROM beans WHERE archived = 0 OR archived IS NULL ORDER BY roast_date DESC').all().map(rowToBean))
+  res.json(db.prepare<[], BeanRow>('SELECT * FROM beans WHERE archived = 0 OR archived IS NULL ORDER BY roast_date DESC').all().map(rowToBean))
 })
 
 app.get('/api/beans/archived', (req, res) => {
-  res.json(db.prepare('SELECT * FROM beans WHERE archived = 1 ORDER BY archived_at DESC').all().map(rowToBean))
+  res.json(db.prepare<[], BeanRow>('SELECT * FROM beans WHERE archived = 1 ORDER BY archived_at DESC').all().map(rowToBean))
 })
 
 app.post('/api/beans', (req, res) => {
-  const b = req.body
+  const b: BeanInput = req.body
   const id = b.id || 'bean-' + Date.now()
   db.prepare(`
     INSERT INTO beans (id, name, roaster, origin, process, variety, roast_date, roast, altitude, notes, price, weight, remaining, stock, doses)
@@ -207,11 +215,11 @@ app.post('/api/beans', (req, res) => {
   `).run(id, b.name, b.roaster, b.origin, b.process, b.variety, b.roast_date,
     b.roast, b.altitude, JSON.stringify(b.notes || []), b.price, b.weight, b.remaining, b.stock || 'good',
     JSON.stringify(b.doses || []))
-  res.status(201).json(rowToBean(db.prepare('SELECT * FROM beans WHERE id = ?').get(id)))
+  res.status(201).json(rowToBean(db.prepare<[string], BeanRow>('SELECT * FROM beans WHERE id = ?').get(id)!))
 })
 
 app.put('/api/beans/:id', (req, res) => {
-  const b = req.body
+  const b: BeanInput = req.body
   db.prepare(`
     UPDATE beans SET name=?, roaster=?, origin=?, process=?, variety=?, roast_date=?, roast=?,
       altitude=?, notes=?, price=?, weight=?, remaining=?, stock=?, archived=?, archived_at=?,
@@ -223,7 +231,7 @@ app.put('/api/beans/:id', (req, res) => {
     // Only overwrite doses when the client sends them, so other bean edits can't wipe them
     Array.isArray(b.doses) ? JSON.stringify(b.doses) : null,
     req.params.id)
-  res.json(rowToBean(db.prepare('SELECT * FROM beans WHERE id = ?').get(req.params.id)))
+  res.json(rowToBean(db.prepare<[string], BeanRow>('SELECT * FROM beans WHERE id = ?').get(req.params.id)!))
 })
 
 app.delete('/api/beans/:id', (req, res) => {
@@ -233,26 +241,26 @@ app.delete('/api/beans/:id', (req, res) => {
 
 // ── GEAR ─────────────────────────────────────────────────────────────
 app.get('/api/gear', (req, res) => {
-  res.json(db.prepare('SELECT * FROM gear ORDER BY kind, name').all())
+  res.json(db.prepare<[], GearRow>('SELECT * FROM gear ORDER BY kind, name').all())
 })
 
 app.post('/api/gear', (req, res) => {
-  const g = req.body
+  const g: GearInput = req.body
   const id = g.id || 'gear-' + Date.now()
   db.prepare('INSERT INTO gear (id, kind, name, owned, status, meta, price) VALUES (?, ?, ?, ?, ?, ?, ?)')
     .run(id, g.kind, g.name, g.owned, g.status, g.meta, g.price || null)
-  res.status(201).json(db.prepare('SELECT * FROM gear WHERE id = ?').get(id))
+  res.status(201).json(db.prepare<[string], GearRow>('SELECT * FROM gear WHERE id = ?').get(id)!)
 })
 
 app.put('/api/gear/:id', (req, res) => {
-  const g = req.body
+  const g: GearInput = req.body
   if (g.status === 'Primary') {
     db.prepare("UPDATE gear SET status='Active' WHERE kind=? AND status='Primary' AND id != ?")
       .run(g.kind, req.params.id)
   }
   db.prepare('UPDATE gear SET kind=?, name=?, owned=?, status=?, meta=?, price=? WHERE id=?')
     .run(g.kind, g.name, g.owned, g.status, g.meta, g.price || null, req.params.id)
-  res.json(db.prepare('SELECT * FROM gear WHERE id = ?').get(req.params.id))
+  res.json(db.prepare<[string], GearRow>('SELECT * FROM gear WHERE id = ?').get(req.params.id)!)
 })
 
 app.delete('/api/gear/:id', (req, res) => {
@@ -262,25 +270,25 @@ app.delete('/api/gear/:id', (req, res) => {
 
 // ── RECIPES ──────────────────────────────────────────────────────────
 app.get('/api/recipes', (req, res) => {
-  res.json(db.prepare('SELECT * FROM recipes ORDER BY name').all().map(rowToRecipe))
+  res.json(db.prepare<[], RecipeRow>('SELECT * FROM recipes ORDER BY name').all().map(rowToRecipe))
 })
 
 app.post('/api/recipes', (req, res) => {
-  const r = req.body
+  const r: RecipeInput = req.body
   const id = r.id || 'recipe-' + Date.now()
   db.prepare(`INSERT INTO recipes (id, name, type, time, dose, water, ratio, temp, grind, author, tags, steps)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
     .run(id, r.name, r.type, r.time, r.dose, r.water, r.ratio, r.temp, r.grind, r.author,
       JSON.stringify(r.tags || []), JSON.stringify(r.steps || []))
-  res.status(201).json(rowToRecipe(db.prepare('SELECT * FROM recipes WHERE id = ?').get(id)))
+  res.status(201).json(rowToRecipe(db.prepare<[string], RecipeRow>('SELECT * FROM recipes WHERE id = ?').get(id)!))
 })
 
 app.put('/api/recipes/:id', (req, res) => {
-  const r = req.body
+  const r: RecipeInput = req.body
   db.prepare(`UPDATE recipes SET name=?, type=?, time=?, dose=?, water=?, ratio=?, temp=?, grind=?, author=?, tags=?, steps=? WHERE id=?`)
     .run(r.name, r.type, r.time, r.dose, r.water, r.ratio, r.temp, r.grind, r.author,
       JSON.stringify(r.tags || []), JSON.stringify(r.steps || []), req.params.id)
-  res.json(rowToRecipe(db.prepare('SELECT * FROM recipes WHERE id = ?').get(req.params.id)))
+  res.json(rowToRecipe(db.prepare<[string], RecipeRow>('SELECT * FROM recipes WHERE id = ?').get(req.params.id)!))
 })
 
 app.delete('/api/recipes/:id', (req, res) => {
@@ -290,22 +298,22 @@ app.delete('/api/recipes/:id', (req, res) => {
 
 // ── TIPS ─────────────────────────────────────────────────────────────
 app.get('/api/tips', (req, res) => {
-  res.json(db.prepare('SELECT * FROM tips ORDER BY section, category, sort_order, created_at').all())
+  res.json(db.prepare<[], TipRow>('SELECT * FROM tips ORDER BY section, category, sort_order, created_at').all())
 })
 
 app.post('/api/tips', (req, res) => {
-  const t = req.body
+  const t: TipInput = req.body
   const id = t.id || 'tip-' + Date.now()
   db.prepare('INSERT INTO tips (id, section, category, body, sort_order) VALUES (?, ?, ?, ?, ?)')
     .run(id, t.section, t.category, t.body || '', t.sort_order || 0)
-  res.status(201).json(db.prepare('SELECT * FROM tips WHERE id = ?').get(id))
+  res.status(201).json(db.prepare<[string], TipRow>('SELECT * FROM tips WHERE id = ?').get(id)!)
 })
 
 app.put('/api/tips/:id', (req, res) => {
-  const t = req.body
+  const t: TipInput = req.body
   db.prepare('UPDATE tips SET section=?, category=?, body=?, sort_order=? WHERE id=?')
     .run(t.section, t.category, t.body || '', t.sort_order || 0, req.params.id)
-  res.json(db.prepare('SELECT * FROM tips WHERE id = ?').get(req.params.id))
+  res.json(db.prepare<[string], TipRow>('SELECT * FROM tips WHERE id = ?').get(req.params.id)!)
 })
 
 app.delete('/api/tips/:id', (req, res) => {
@@ -315,11 +323,11 @@ app.delete('/api/tips/:id', (req, res) => {
 
 // ── SETTINGS ─────────────────────────────────────────────────────────
 // Stored as one row per key with a JSON value, returned as a single object
-const SETTING_KEYS = new Set(['theme', 'fonts', 'units', 'waterRecipes', 'dialinDefaults'])
+const SETTING_KEYS = new Set<string>(['theme', 'fonts', 'units', 'waterRecipes', 'dialinDefaults'] satisfies SettingKey[])
 
-function readSettings() {
-  const out = {}
-  for (const row of db.prepare('SELECT key, value FROM settings').all()) {
+function readSettings(): Settings {
+  const out: Record<string, unknown> = {}
+  for (const row of db.prepare<[], Pick<SettingRow, 'key' | 'value'>>('SELECT key, value FROM settings').all()) {
     try { out[row.key] = JSON.parse(row.value) } catch {}
   }
   return out
@@ -331,7 +339,7 @@ app.get('/api/settings', (req, res) => {
 
 // Partial update: only the keys sent are changed
 app.put('/api/settings', (req, res) => {
-  const body = req.body
+  const body: unknown = req.body
   if (!body || typeof body !== 'object' || Array.isArray(body)) {
     return res.status(400).json({ error: 'Expected an object of settings' })
   }

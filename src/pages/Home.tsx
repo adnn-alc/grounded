@@ -1,13 +1,22 @@
 import { useState, useRef, useLayoutEffect } from 'react'
-import { StatCard, Meta } from '../components/ui.jsx'
-import { WeekTrend } from '../components/charts.jsx'
-import { useUnits } from '../hooks/useUnits.js'
-import Ico from '../components/Ico.jsx'
+import { StatCard, Meta } from '../components/ui.tsx'
+import { WeekTrend } from '../components/charts.tsx'
+import { useUnits } from '../hooks/useUnits.ts'
+import Ico from '../components/Ico.tsx'
+import type { Bean, Brew, Route, Shot, Units } from '../types.ts'
 
 const FAV_GAP = 8          // matches the favorites stack gap
 const FAV_MIN_PER_PAGE = 3 // keep paging usable when there are only one or two open bags
 
-export default function Home({ shots, brews, beans, units, goTo }) {
+interface HomeProps {
+  shots: Shot[]
+  brews: Brew[]
+  beans: Bean[]
+  units: Units
+  goTo:  (route: Route, id?: string) => void
+}
+
+export default function Home({ shots, brews, beans, units, goTo }: HomeProps) {
   const U = useUnits(units)
 
   const now = new Date()
@@ -59,8 +68,8 @@ export default function Home({ shots, brews, beans, units, goTo }) {
   const todayShots = shots.filter(s => s.date.slice(0, 10) === todayStr)
   const todayBrews = brews.filter(b => b.date.slice(0, 10) === todayStr)
   const todayAll = [
-    ...todayShots.map(s => ({ ...s, _type: 'shot' })),
-    ...todayBrews.map(b => ({ ...b, _type: 'brew' })),
+    ...todayShots.map(s => ({ ...s, _type: 'shot' as const })),
+    ...todayBrews.map(b => ({ ...b, _type: 'brew' as const })),
   ].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 5)
 
   // 14-day trend: shots + brews combined, count per day
@@ -79,29 +88,29 @@ export default function Home({ shots, brews, beans, units, goTo }) {
     return c > 0 ? c : null
   })
   const hasTrendData = trendCounts.some(r => r !== null)
-  const maxCount = Math.max(1, ...trendCounts.filter(Boolean))
+  const maxCount = Math.max(1, ...trendCounts.filter((c): c is number => Boolean(c)))
   // round up to next even number above the max (4-5→6, 6-7→8, etc.), minimum 4
   const trendMax = Math.max(4, Math.ceil((maxCount + 1) / 2) * 2)
 
   // favorites
   const favorites = [
-    ...shots.filter(s => s.favorited).map(s => ({ ...s, _type: 'shot' })),
-    ...brews.filter(b => b.favorited).map(b => ({ ...b, _type: 'brew' })),
+    ...shots.filter(s => s.favorited).map(s => ({ ...s, _type: 'shot' as const })),
+    ...brews.filter(b => b.favorited).map(b => ({ ...b, _type: 'brew' as const })),
   ].sort((a, b) => b.date.localeCompare(a.date))
 
   // Favorites page size: as many rows as fit in the height of the Open bags content.
   // Measures the bags body (not the card) so the grid's equal-height stretch can't feed back into it.
   const [favPage, setFavPage]       = useState(0)
   const [favPerPage, setFavPerPage] = useState(FAV_MIN_PER_PAGE)
-  const favListRef  = useRef(null)
-  const bagsBodyRef = useRef(null)
+  const favListRef  = useRef<HTMLDivElement>(null)
+  const bagsBodyRef = useRef<HTMLDivElement>(null)
   const hasFavorites = favorites.length > 0
 
   useLayoutEffect(() => {
     const list = favListRef.current, bags = bagsBodyRef.current
     if (!list || !bags) return
     const measure = () => {
-      const row = list.firstElementChild
+      const row = list.firstElementChild as HTMLElement | null
       if (!row) return
       const avail = bags.offsetTop + bags.offsetHeight - list.offsetTop
       const fit = Math.floor((avail + FAV_GAP) / (row.offsetHeight + FAV_GAP))
@@ -122,12 +131,12 @@ export default function Home({ shots, brews, beans, units, goTo }) {
     if (!b.roast_date || b.roast_date.trim() === '') return false
     return !isNaN(new Date(b.roast_date).getTime())
   }).sort((a, b) => {
-    const da = a.roast_date ? Math.floor((now - new Date(a.roast_date)) / 86400000) : 9999
-    const db = b.roast_date ? Math.floor((now - new Date(b.roast_date)) / 86400000) : 9999
+    const da = a.roast_date ? Math.floor((now.getTime() - new Date(a.roast_date).getTime()) / 86400000) : 9999
+    const db = b.roast_date ? Math.floor((now.getTime() - new Date(b.roast_date).getTime()) / 86400000) : 9999
     return da - db
   })
 
-  function freshnessInfo(days) {
+  function freshnessInfo(days: number | null) {
     if (days === null) return { label: '—', color: 'var(--text-4)', cls: '' }
     if (days < 7)  return { label: 'too fresh', color: 'var(--text-3)', cls: '' }
     if (days <= 28) return { label: 'in window', color: 'var(--crema)', cls: 'text-crema' }
@@ -281,7 +290,7 @@ export default function Home({ shots, brews, beans, units, goTo }) {
             <div className="stack" style={{ gap: 12 }}>
               {openBeans.map(bean => {
                 const days = bean.roast_date
-                  ? Math.floor((now - new Date(bean.roast_date)) / 86400000)
+                  ? Math.floor((now.getTime() - new Date(bean.roast_date).getTime()) / 86400000)
                   : null
                 const pct = bean.weight > 0 ? Math.min(100, Math.round((bean.remaining / bean.weight) * 100)) : 0
                 const { label: freshnessLabel, color: freshnessColor } = freshnessInfo(days)

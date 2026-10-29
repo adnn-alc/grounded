@@ -156,8 +156,8 @@ for (const t of ['shots', 'brews']) {
 }
 
 // ── Seed (only if tables are empty) ─────────────────────────────────
-const seedIfEmpty = (table, seedFn) => {
-  const count = db.prepare(`SELECT COUNT(*) as c FROM ${table}`).get().c
+const seedIfEmpty = (table: string, seedFn: () => void) => {
+  const count = (db.prepare(`SELECT COUNT(*) as c FROM ${table}`).get() as { c: number }).c
   if (count === 0) seedFn()
 }
 

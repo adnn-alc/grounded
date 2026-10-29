@@ -1,16 +1,17 @@
 import { useState, useEffect, useRef } from 'react'
-import Ico from '../components/Ico.jsx'
-import { FlavorRadar, FlavSliders } from '../components/charts.jsx'
-import { useUnits } from '../hooks/useUnits.js'
-import { DEFAULT_WATER_RECIPES } from '../data/waterRecipes.js'
-import { BeanDosesCard } from '../components/BeanDoses.jsx'
-import { BREW_MODES } from '../data/brewModes.js'
+import Ico from '../components/Ico.tsx'
+import { FlavorRadar, FlavSliders } from '../components/charts.tsx'
+import { useUnits } from '../hooks/useUnits.ts'
+import { DEFAULT_WATER_RECIPES } from '../data/waterRecipes.ts'
+import { BeanDosesCard } from '../components/BeanDoses.tsx'
+import { BREW_MODES } from '../data/brewModes.ts'
+import type { Bean, BeanInput, Brew, BrewInput, DialinDefaults, DialinPreset, Gear, Shot, ShotInput, Taste, Units, Verdict } from '../types.ts'
 
-const DEFAULT_TASTE = { acidity: 5, sweetness: 5, body: 5, bitterness: 5, balance: 5, aftertaste: 5 }
+const DEFAULT_TASTE: Taste = { acidity: 5, sweetness: 5, body: 5, bitterness: 5, balance: 5, aftertaste: 5 }
 
 // Dial-in default from Settings (stored in the database), or the built-in fallback
-function dd(defaults, mode, key, fallback) {
-  const v = defaults?.[mode]?.[key]
+function dd(defaults: DialinDefaults, mode: 'espresso' | 'filter', key: string, fallback: string): string {
+  const v = (defaults?.[mode] as Record<string, string | undefined> | undefined)?.[key]
   return v != null && v !== '' ? String(v) : fallback
 }
 
@@ -19,12 +20,25 @@ const FILTER_TYPES       = ['Paper (bleached)', 'Paper (natural)', 'Metal', 'Clo
 const ESPRESSO_MACHINES  = ['Bianca', 'Lelit Mara X', 'ECM Synchronika', 'Rocket Appartamento', 'La Marzocco Linea Mini', 'Gaggia Classic', 'Breville Barista Express']
 const ESPRESSO_GRINDERS  = ['DF64 Gen 2', 'Niche Zero', 'Lagom P64', 'Fellow Ode', 'Baratza Vario', 'Comandante C40']
 
-const activeGear = (gear, re) => gear.filter(g => re.test(g.kind) && g.status !== 'Retired')
+const activeGear = (gear: Gear[], re: RegExp) => gear.filter(g => re.test(g.kind) && g.status !== 'Retired')
 // Keep a preset value selectable even if that gear was since retired or removed
-const withCurrent = (opts, cur) => cur && !opts.includes(cur) ? [cur, ...opts] : opts
+const withCurrent = (opts: string[], cur: string) => cur && !opts.includes(cur) ? [cur, ...opts] : opts
 
 // ── Espresso mode ─────────────────────────────────────────────────────
-function EspressoDialin({ shots, beans, gear = [], units, waterRecipes, dialinDefaults, onSaveShot, onUpdateBean, preset, onPresetConsumed }) {
+interface EspressoDialinProps {
+  shots:             Shot[]
+  beans:             Bean[]
+  gear?:             Gear[]
+  units:             Units
+  waterRecipes:      string[]
+  dialinDefaults:    DialinDefaults
+  onSaveShot:        (shot: ShotInput) => void
+  onUpdateBean:      (id: string, data: BeanInput) => Promise<Bean>
+  preset:            Shot | null
+  onPresetConsumed?: () => void
+}
+
+function EspressoDialin({ shots, beans, gear = [], units, waterRecipes, dialinDefaults, onSaveShot, onUpdateBean, preset, onPresetConsumed }: EspressoDialinProps) {
   const U = useUnits(units)
 
   const machineGear   = activeGear(gear, /machine/i)
@@ -51,7 +65,7 @@ function EspressoDialin({ shots, beans, gear = [], units, waterRecipes, dialinDe
   const [brewMode,     setBrewMode]     = useState(() => shots[0]?.brew_mode || '')  // carry over from the last shot
   const [waterRecipe,  setWaterRecipe]  = useState(() => dd(dialinDefaults, 'espresso', 'waterRecipe', waterRecipes[0]))
 
-  const [taste,   setTaste]   = useState({ ...DEFAULT_TASTE })
+  const [taste,   setTaste]   = useState<Taste>({ ...DEFAULT_TASTE })
   const [notes,   setNotes]   = useState('')
   const [verdict, setVerdict] = useState('')
 
@@ -62,7 +76,7 @@ function EspressoDialin({ shots, beans, gear = [], units, waterRecipes, dialinDe
   const timeNum   = parseInt(shotTime, 10) || 0
   const canSave   = timeNum > 0
 
-  const ratio = yieldG > 0 ? (parseFloat(yieldG) / doseNum).toFixed(2) : '–'
+  const ratio = Number(yieldG) > 0 ? (parseFloat(yieldG) / doseNum).toFixed(2) : '–'
 
   useEffect(() => {
     if (!preset) return
@@ -104,7 +118,7 @@ function EspressoDialin({ shots, beans, gear = [], units, waterRecipes, dialinDe
       rating: avgRating,
       taste:   { ...taste },
       notes,
-      verdict: verdict || 'good',
+      verdict: (verdict || 'good') as Verdict,
     })
   }
 
@@ -293,7 +307,18 @@ function EspressoDialin({ shots, beans, gear = [], units, waterRecipes, dialinDe
 }
 
 // ── Filter mode ───────────────────────────────────────────────────────
-function FilterDialin({ beans, gear = [], units, waterRecipes, dialinDefaults, onSaveBrew, preset, onPresetConsumed }) {
+interface FilterDialinProps {
+  beans:             Bean[]
+  gear?:             Gear[]
+  units:             Units
+  waterRecipes:      string[]
+  dialinDefaults:    DialinDefaults
+  onSaveBrew:        (brew: BrewInput) => void
+  preset:            Brew | null
+  onPresetConsumed?: () => void
+}
+
+function FilterDialin({ beans, gear = [], units, waterRecipes, dialinDefaults, onSaveBrew, preset, onPresetConsumed }: FilterDialinProps) {
   const U = useUnits(units)
 
   const dripperGear    = activeGear(gear, /dripper|pour.?over|v60|chemex|aeropress|kalita|clever|origami|melitta/i)
@@ -308,7 +333,7 @@ function FilterDialin({ beans, gear = [], units, waterRecipes, dialinDefaults, o
   const [manualMode, setManualMode] = useState(false)
   const [manualM,    setManualM]    = useState('0')
   const [manualS,    setManualS]    = useState('0')
-  const intervalRef = useRef(null)
+  const intervalRef = useRef<ReturnType<typeof setInterval>>()
 
   const [dose,         setDose]         = useState(() => dd(dialinDefaults, 'filter', 'dose', '15'))
   const [waterTarget,  setWaterTarget]  = useState(() => dd(dialinDefaults, 'filter', 'water', '250'))
@@ -327,12 +352,13 @@ function FilterDialin({ beans, gear = [], units, waterRecipes, dialinDefaults, o
   const grindNum       = parseFloat(grind)       || 18
 
   const initPours = () => Array.from({ length: numPoursNum }, (_, i) => i === 0 ? 50 : 100)
-  const [pours, setPours] = useState(() => initPours())
+  // Numbers until edited, then the input's string
+  const [pours, setPours] = useState<(number | string)[]>(() => initPours())
 
-  const totalPoured = pours.reduce((a, b) => a + (parseFloat(b) || 0), 0)
+  const totalPoured = pours.reduce<number>((a, b) => a + (parseFloat(String(b)) || 0), 0)
   const ratio = waterTargetNum > 0 && doseNum > 0 ? (waterTargetNum / doseNum).toFixed(1) : '–'
 
-  const updatePour = (i, val) => setPours(prev => {
+  const updatePour = (i: number, val: string) => setPours(prev => {
     const next = [...prev]
     next[i] = val
     return next
@@ -377,7 +403,7 @@ function FilterDialin({ beans, gear = [], units, waterRecipes, dialinDefaults, o
     if (preset.grinder_model) setGrinderModel(preset.grinder_model)
     if (preset.grinder_rpm) setGrinderRpm(String(preset.grinder_rpm))
     if (preset.water_recipe) setWaterRecipe(preset.water_recipe)
-    if (preset.pours?.length) setPours(preset.pours.map(p => typeof p === 'object' ? (p.water ?? p) : p))
+    if (preset.pours?.length) setPours(preset.pours.map(p => typeof p === 'object' ? (p.water ?? p) : p) as (number | string)[])
     onPresetConsumed?.()
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -386,7 +412,7 @@ function FilterDialin({ beans, gear = [], units, waterRecipes, dialinDefaults, o
     if (grinder?.meta && /\bmanual\b/i.test(grinder.meta)) setGrinderRpm('manual')
   }, [grinderModel])
 
-  const [taste,   setTaste]   = useState({ ...DEFAULT_TASTE })
+  const [taste,   setTaste]   = useState<Taste>({ ...DEFAULT_TASTE })
   const [notes,   setNotes]   = useState('')
   const [verdict, setVerdict] = useState('')
 
@@ -408,17 +434,17 @@ function FilterDialin({ beans, gear = [], units, waterRecipes, dialinDefaults, o
       grind:       grindNum,
       bloom_time:  0,
       num_pours:   pours.length,
-      pours:       pours.map(p => parseFloat(p) || 0),
+      pours:       pours.map(p => parseFloat(String(p)) || 0),
       time:        elapsed,
       rating:      avgRating,
       taste:       { ...taste },
       notes,
-      verdict:     verdict || 'good',
+      verdict:     (verdict || 'good') as Verdict,
     })
     reset()
     setTaste({ ...DEFAULT_TASTE })
     setNotes('')
-    setVerdict([])
+    setVerdict('')
   }
 
   const mins = String(Math.floor(elapsed / 60)).padStart(2, '0')
@@ -614,7 +640,7 @@ function FilterDialin({ beans, gear = [], units, waterRecipes, dialinDefaults, o
                 <div style={{ flex: 1, height: 4, background: 'var(--surface)', borderRadius: 2, overflow: 'hidden' }}>
                   <div style={{
                     height: '100%', borderRadius: 2,
-                    width: `${Math.min(100, waterTargetNum > 0 ? ((parseFloat(p) || 0) / waterTargetNum) * 100 : 0)}%`,
+                    width: `${Math.min(100, waterTargetNum > 0 ? ((parseFloat(String(p)) || 0) / waterTargetNum) * 100 : 0)}%`,
                     background: i === 0 ? 'var(--sour)' : 'var(--crema)',
                   }} />
                 </div>
@@ -670,7 +696,21 @@ function FilterDialin({ beans, gear = [], units, waterRecipes, dialinDefaults, o
 }
 
 // ── Outer shell with mode tabs ────────────────────────────────────────
-export default function Dialin({ shots, beans, gear = [], units, waterRecipes = DEFAULT_WATER_RECIPES, dialinDefaults = {}, onSaveShot, onSaveBrew, onUpdateBean, preset, onPresetConsumed }) {
+interface DialinProps {
+  shots:             Shot[]
+  beans:             Bean[]
+  gear?:             Gear[]
+  units:             Units
+  waterRecipes?:     string[]
+  dialinDefaults?:   DialinDefaults
+  onSaveShot:        (shot: ShotInput) => void
+  onSaveBrew:        (brew: BrewInput) => void
+  onUpdateBean:      (id: string, data: BeanInput) => Promise<Bean>
+  preset:            DialinPreset | null
+  onPresetConsumed?: () => void
+}
+
+export default function Dialin({ shots, beans, gear = [], units, waterRecipes = DEFAULT_WATER_RECIPES, dialinDefaults = {}, onSaveShot, onSaveBrew, onUpdateBean, preset, onPresetConsumed }: DialinProps) {
   const [mode, setMode] = useState(preset?.type === 'filter' ? 'filter' : 'espresso')
 
   return (

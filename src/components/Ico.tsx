@@ -1,3 +1,5 @@
+import type { CSSProperties, ReactElement } from 'react'
+
 const paths = {
   home:      <><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V20h14V9.5"/></>,
   cup:       <><path d="M5 8h12v6a5 5 0 0 1-5 5H10a5 5 0 0 1-5-5z"/><path d="M17 10h2a2 2 0 0 1 0 4h-2"/><path d="M8 3c0 1.5-1 1.5-1 3s1 1.5 1 3"/><path d="M12 3c0 1.5-1 1.5-1 3s1 1.5 1 3"/></>,
@@ -34,9 +36,18 @@ const paths = {
   download:  <><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></>,
   trash:     <><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6M10 11v6M14 11v6M9 6V4h6v2"/></>,
   pencil:    <path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/>,
+} satisfies Record<string, ReactElement>
+
+export type IconName = keyof typeof paths
+
+interface IcoProps {
+  name:       IconName
+  size?:      number
+  className?: string
+  style?:     CSSProperties
 }
 
-export default function Ico({ name, size = 16, className = '', style = {} }) {
+export default function Ico({ name, size = 16, className = '', style = {} }: IcoProps) {
   return (
     <svg
       width={size} height={size} viewBox="0 0 24 24"

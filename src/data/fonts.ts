@@ -25,18 +25,26 @@ import '@fontsource/dm-serif-display/400-italic.css'
 import '@fontsource-variable/source-serif-4'
 import '@fontsource-variable/source-serif-4/wght-italic.css'
 
+import type { FontRole, Fonts } from '../types.ts'
+
+export interface FontOption {
+  id:    string
+  name:  string
+  stack: string   // CSS font-family value
+}
+
 const SANS_FALLBACK  = "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
 const MONO_FALLBACK  = 'ui-monospace, SFMono-Regular, Menlo, monospace'
 const SERIF_FALLBACK = 'Georgia, serif'
 
 // Three font roles, each mapped to a CSS variable in global.css
-export const FONT_ROLES = [
+export const FONT_ROLES: { role: FontRole; label: string; desc: string }[] = [
   { role: 'sans',  label: 'Text',             desc: 'Body text, buttons and forms.' },
   { role: 'mono',  label: 'Numbers & labels', desc: 'Doses, times, stats and small caps labels.' },
   { role: 'serif', label: 'Headings',         desc: 'Page titles and big italic numbers.' },
 ]
 
-export const FONT_OPTIONS = {
+export const FONT_OPTIONS: Record<FontRole, FontOption[]> = {
   sans: [
     { id: 'inter',         name: 'Inter',         stack: `'Inter Variable', ${SANS_FALLBACK}` },
     { id: 'geist',         name: 'Geist',         stack: `'Geist Variable', ${SANS_FALLBACK}` },
@@ -62,14 +70,14 @@ export const FONT_OPTIONS = {
   ],
 }
 
-export const DEFAULT_FONTS = { sans: 'inter', mono: 'jetbrains-mono', serif: 'instrument-serif' }
+export const DEFAULT_FONTS: Fonts = { sans: 'inter', mono: 'jetbrains-mono', serif: 'instrument-serif' }
 
-export const fontStack = (role, id) =>
-  (FONT_OPTIONS[role].find(f => f.id === id) || FONT_OPTIONS[role].find(f => f.id === DEFAULT_FONTS[role])).stack
+export const fontStack = (role: FontRole, id: string): string =>
+  (FONT_OPTIONS[role].find(f => f.id === id) || FONT_OPTIONS[role].find(f => f.id === DEFAULT_FONTS[role])!).stack
 
 // Applies theme + fonts to <html>. Also cached in localStorage so the next page
 // load paints with the right look before the settings arrive from the API.
-export function applyAppearance(theme, fonts) {
+export function applyAppearance(theme: string, fonts: Fonts) {
   const root = document.documentElement
   root.setAttribute('data-theme', theme)
   for (const { role } of FONT_ROLES) root.style.setProperty(`--font-${role}`, fontStack(role, fonts[role]))
@@ -83,7 +91,7 @@ export function applyCachedAppearance() {
   let theme = 'moody', fonts = DEFAULT_FONTS
   try {
     theme = localStorage.getItem('grounded-theme') || theme
-    fonts = { ...DEFAULT_FONTS, ...JSON.parse(localStorage.getItem('grounded-fonts')) }
+    fonts = { ...DEFAULT_FONTS, ...JSON.parse(localStorage.getItem('grounded-fonts') ?? 'null') }
   } catch {}
   applyAppearance(theme, fonts)
 }

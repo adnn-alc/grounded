@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react'
-import Ico from './Ico.jsx'
-import { FONT_ROLES, FONT_OPTIONS, fontStack } from '../data/fonts.js'
+import Ico from './Ico.tsx'
+import { FONT_ROLES, FONT_OPTIONS, fontStack } from '../data/fonts.ts'
+import { RPM_OPTIONS } from '../data/grinderRpm.ts'
+import type { DialinDefaults, EspressoDefaults, FilterDefaults, FontRole, Fonts, Units } from '../types.ts'
 
-const FONT_SAMPLES = { sans: 'Bright, sweet, clean finish', mono: '18.0g → 36.4g · 28s', serif: 'Dial-in' }
+const FONT_SAMPLES: Record<FontRole, string> = { sans: 'Bright, sweet, clean finish', mono: '18.0g → 36.4g · 28s', serif: 'Dial-in' }
 
 const THEMES = [
   { id: 'moody',     name: 'Moody',     tag: 'espresso bar', bg: '#2a2420', sb: '#1f1a17', accent: '#d1a16a', txt: '#efe6d9', card: '#332a24' },
@@ -11,12 +13,25 @@ const THEMES = [
   { id: 'parchment', name: 'Parchment', tag: 'editorial',    bg: '#efe7d4', sb: '#e5dcc6', accent: '#9a5a2c', txt: '#2e2518', card: '#f7f1e0' },
 ]
 
-const RPM_OPTIONS   = ['manual', '500', '600', '700', '800', '900', '1000', '1100', '1200', '1300', '1400', '1500', '1600']
+const ESP_FALLBACK: EspressoDefaults = { dose: '18', yield: '36', temp: '92', grind: '3', preinf: '0', waterRecipe: 'Light and Bright', grinderRpm: '800' }
+const FIL_FALLBACK: FilterDefaults = { dose: '15', water: '250', temp: '92', grind: '10', numPours: '3', waterRecipe: 'Light and Bright', grinderRpm: '800' }
 
-const ESP_FALLBACK = { dose: '18', yield: '36', temp: '92', grind: '3', preinf: '0', waterRecipe: 'Light and Bright', grinderRpm: '800' }
-const FIL_FALLBACK = { dose: '15', water: '250', temp: '92', grind: '10', numPours: '3', waterRecipe: 'Light and Bright', grinderRpm: '800' }
+interface SettingsProps {
+  open:              boolean
+  onClose:           () => void
+  theme:             string
+  setTheme:          (theme: string) => void
+  fonts:             Fonts
+  setFonts:          (fonts: Fonts) => void
+  units:             Units
+  setUnits:          (units: Units) => void
+  waterRecipes:      string[]
+  setWaterRecipes:   (recipes: string[]) => void
+  dialinDefaults:    DialinDefaults
+  setDialinDefaults: (defaults: DialinDefaults) => void
+}
 
-export default function Settings({ open, onClose, theme, setTheme, fonts, setFonts, units, setUnits, waterRecipes, setWaterRecipes, dialinDefaults, setDialinDefaults }) {
+export default function Settings({ open, onClose, theme, setTheme, fonts, setFonts, units, setUnits, waterRecipes, setWaterRecipes, dialinDefaults, setDialinDefaults }: SettingsProps) {
   const [tab, setTab]   = useState('preferences')
   const [defs, setDefs] = useState(dialinDefaults)
   const [newRecipe, setNewRecipe] = useState('')
@@ -28,7 +43,7 @@ export default function Settings({ open, onClose, theme, setTheme, fonts, setFon
     return () => clearTimeout(t)
   }, [defs]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const updateDef = (mode, key, val) => setDefs(prev => ({ ...prev, [mode]: { ...(prev[mode] || {}), [key]: val } }))
+  const updateDef = (mode: 'espresso' | 'filter', key: keyof EspressoDefaults | keyof FilterDefaults, val: string) => setDefs(prev => ({ ...prev, [mode]: { ...(prev[mode] || {}), [key]: val } }))
 
   const addWaterRecipe = () => {
     const name = newRecipe.trim()
@@ -37,7 +52,7 @@ export default function Settings({ open, onClose, theme, setTheme, fonts, setFon
     setNewRecipe('')
   }
 
-  const removeWaterRecipe = (name) => {
+  const removeWaterRecipe = (name: string) => {
     if (waterRecipes.length <= 1) return
     setWaterRecipes(waterRecipes.filter(r => r !== name))
   }

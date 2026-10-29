@@ -1,1 +1,0 @@
-export const DEFAULT_WATER_RECIPES = ['Light and Bright', 'Simple and Sweet', 'Light and Bright (espresso)', 'Simple and Sweet (espresso)', 'Bright and Juicy', "Rao's Recipe", 'Ultra Light']

@@ -1,0 +1,19 @@
+{
+  // The API runs on Node directly (Node 22.18+ strips the types, no build step),
+  // so this only type-checks it. Only erasable syntax is allowed: no enums or
+  // namespaces, and type-only imports must use `import type`.
+  "compilerOptions": {
+    "target": "es2023",
+    "lib": ["es2023"],
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "types": ["node"],
+    "noEmit": true,
+    "allowImportingTsExtensions": true,
+    "erasableSyntaxOnly": true,
+    "verbatimModuleSyntax": true,
+    "strict": true,
+    "skipLibCheck": true
+  },
+  "include": ["."]
+}

@@ -1,33 +1,45 @@
-import { useState } from 'react'
-import Ico from './Ico.jsx'
+import { useState, type FormEvent } from 'react'
+import Ico from './Ico.tsx'
+import type { UnitHelpers } from '../hooks/useUnits.ts'
+import type { Bean, BeanDose, BeanInput } from '../types.ts'
 
 // A bean's doses are [{ basket, dose, grind? }] — one measured dose per basket.
 // grind is the reference grind setting the dose was measured at (optional).
 // Adding a basket that already has an entry replaces its dose.
-export function upsertDose(doses = [], basket, dose, grind) {
-  const entry = grind > 0 ? { basket, dose, grind } : { basket, dose }
+export function upsertDose(doses: BeanDose[] = [], basket: string, dose: number, grind: number): BeanDose[] {
+  const entry: BeanDose = grind > 0 ? { basket, dose, grind } : { basket, dose }
   return [...doses.filter(d => d.basket !== basket), entry].sort((a, b) => a.dose - b.dose)
 }
 
-const withCurrent = (opts, cur) => cur && !opts.includes(cur) ? [cur, ...opts] : opts
+const withCurrent = (opts: string[], cur: string) => cur && !opts.includes(cur) ? [cur, ...opts] : opts
 
 // ── Dial-in card: doses for the selected bean ─────────────────────────
 // The basket picker here is the same value as the Gear card's basket, so changing either updates both.
-export function BeanDosesCard({ bean, basketOpts, currentBasket, U, onUpdateBean, onApply, onSelectBasket }) {
+interface BeanDosesCardProps {
+  bean:           Bean | undefined
+  basketOpts:     string[]
+  currentBasket:  string
+  U:              UnitHelpers
+  onUpdateBean:   (id: string, data: BeanInput) => Promise<Bean>
+  onApply:        (dose: BeanDose) => void
+  onSelectBasket: (basket: string) => void
+}
+
+export function BeanDosesCard({ bean, basketOpts, currentBasket, U, onUpdateBean, onApply, onSelectBasket }: BeanDosesCardProps) {
   const doses = bean?.doses || []
   const newBasket = currentBasket
   const [newDose,   setNewDose]   = useState('')
   const [newGrind,  setNewGrind]  = useState('')
   const [saving,    setSaving]    = useState(false)
 
-  const selectBasket = (b) => {
+  const selectBasket = (b: string) => {
     const saved = doses.find(d => d.basket === b)
     saved ? onApply(saved) : onSelectBasket(b)
   }
 
-  const save = async (next) => {
+  const save = async (next: BeanDose[]) => {
     setSaving(true)
-    try { await onUpdateBean(bean.id, { ...bean, doses: next }) }
+    try { await onUpdateBean(bean!.id, { ...bean!, doses: next }) }
     finally { setSaving(false) }
   }
 
@@ -109,20 +121,33 @@ export function BeanDosesCard({ bean, basketOpts, currentBasket, U, onUpdateBean
 }
 
 // ── Beans page popup: edit all doses for one bean ─────────────────────
-export function BeanDosesModal({ bean, basketOpts, onSave, onClose }) {
-  const [rows,   setRows]   = useState(() => (bean.doses || []).map(d => ({ basket: d.basket, dose: String(d.dose), grind: d.grind ? String(d.grind) : '' })))
+interface DoseRow {
+  basket: string
+  dose:   string
+  grind:  string
+}
+
+interface BeanDosesModalProps {
+  bean:       Bean
+  basketOpts: string[]
+  onSave:     (doses: BeanDose[]) => Promise<unknown>
+  onClose:    () => void
+}
+
+export function BeanDosesModal({ bean, basketOpts, onSave, onClose }: BeanDosesModalProps) {
+  const [rows,   setRows]   = useState<DoseRow[]>(() => (bean.doses || []).map(d => ({ basket: d.basket, dose: String(d.dose), grind: d.grind ? String(d.grind) : '' })))
   const [saving, setSaving] = useState(false)
 
-  const setRow = (i, k, v) => setRows(rs => rs.map((r, j) => j === i ? { ...r, [k]: v } : r))
+  const setRow = (i: number, k: keyof DoseRow, v: string) => setRows(rs => rs.map((r, j) => j === i ? { ...r, [k]: v } : r))
   const addRow = () => {
     const unused = basketOpts.find(b => !rows.some(r => r.basket === b))
     setRows(rs => [...rs, { basket: unused || basketOpts[0] || '', dose: '', grind: '' }])
   }
 
-  const handleSave = async (e) => {
+  const handleSave = async (e: FormEvent) => {
     e.preventDefault()
     // Last row wins if the same basket is listed twice
-    const doses = rows.reduce((acc, r) => {
+    const doses = rows.reduce<BeanDose[]>((acc, r) => {
       const dose = parseFloat(r.dose)
       return r.basket && dose > 0 ? upsertDose(acc, r.basket, dose, parseFloat(r.grind)) : acc
     }, [])

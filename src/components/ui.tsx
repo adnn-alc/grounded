@@ -1,6 +1,17 @@
-import { useUnits } from '../hooks/useUnits.js'
+import type { ReactNode } from 'react'
+import { useUnits } from '../hooks/useUnits.ts'
+import type { Brew, Shot, Units } from '../types.ts'
 
-export function StatCard({ label, value, delta, sub, warn, serif }) {
+interface StatCardProps {
+  label:  string
+  value:  string
+  delta?: string
+  sub:    string
+  warn?:  boolean
+  serif?: boolean
+}
+
+export function StatCard({ label, value, delta, sub, warn, serif }: StatCardProps) {
   return (
     <div className="card">
       <div className="micro">{label}</div>
@@ -18,7 +29,7 @@ export function StatCard({ label, value, delta, sub, warn, serif }) {
   )
 }
 
-export function Meta({ k, v }) {
+export function Meta({ k, v }: { k: string; v: ReactNode }) {
   return (
     <div style={{ padding: '5px 0' }}>
       <div className="micro">{k}</div>
@@ -27,7 +38,15 @@ export function Meta({ k, v }) {
   )
 }
 
-export function ShotCard({ shot, index, total, active, onClick, units }) {
+interface CardProps {
+  index:   number
+  total:   number
+  active:  boolean
+  onClick: () => void
+  units:   Units
+}
+
+export function ShotCard({ shot, index, total, active, onClick, units }: CardProps & { shot: Shot }) {
   const U = useUnits(units)
   return (
     <div className={`shot-card${active ? ' active' : ''}`} onClick={onClick}>
@@ -44,7 +63,7 @@ export function ShotCard({ shot, index, total, active, onClick, units }) {
   )
 }
 
-export function BrewCard({ brew, index, total, active, onClick, units }) {
+export function BrewCard({ brew, index, total, active, onClick, units }: CardProps & { brew: Brew }) {
   const U = useUnits(units)
   const ratio = brew.water && brew.dose ? (brew.water / brew.dose).toFixed(1) : '–'
   const mins = brew.time ? `${Math.floor(brew.time / 60)}:${String(brew.time % 60).padStart(2, '0')}` : '–'
