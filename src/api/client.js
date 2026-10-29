@@ -49,4 +49,8 @@ export const api = {
   createTip:  (t)       => req('POST',   '/tips', t),
   updateTip:  (id, t)   => req('PUT',    `/tips/${id}`, t),
   deleteTip:  (id)      => req('DELETE', `/tips/${id}`),
+
+  // Settings (partial update — only the keys sent are changed)
+  getSettings:    ()        => req('GET', '/settings'),
+  updateSettings: (partial) => req('PUT', '/settings', partial),
 }

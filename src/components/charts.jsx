@@ -33,7 +33,7 @@ export function FlavorRadar({ taste, size = 200, color = 'var(--crema)', compare
         const [x, y] = pt(12.5, i)
         return (
           <text key={l} x={x} y={y} textAnchor="middle" dominantBaseline="middle"
-            fill="var(--text-4)" fontFamily="JetBrains Mono,monospace" fontSize="9"
+            fill="var(--text-4)" fontFamily="var(--font-mono)" fontSize="9"
             style={{ textTransform: 'uppercase', letterSpacing: '0.1em' }}>{l}</text>
         )
       })}
@@ -75,7 +75,7 @@ export function WeekTrend({ ratings, labels, max: maxProp, sundays }) {
       {ticks.map(v => (
         <g key={v}>
           <line x1={LEFT} y1={py(v)} x2={vw - RIGHT} y2={py(v)} stroke="var(--border)" strokeWidth="0.5" opacity="0.3" />
-          <text x={LEFT - 12} y={py(v) + 3.5} fill="var(--text-4)" fontSize="9" fontFamily="JetBrains Mono,monospace" textAnchor="end">{v}</text>
+          <text x={LEFT - 12} y={py(v) + 3.5} fill="var(--text-4)" fontSize="9" fontFamily="var(--font-mono)" textAnchor="end">{v}</text>
         </g>
       ))}
       {segments.map((seg, si) => {
@@ -93,7 +93,7 @@ export function WeekTrend({ ratings, labels, max: maxProp, sundays }) {
         <circle key={i} cx={px(i)} cy={py(v)} r="3" fill="var(--crema)" />
       ) : null)}
       {lbs.map((l, i) => (
-        <text key={i} x={px(i)} y={h - 1} fill={sundays?.[i] ? 'var(--bad)' : 'var(--text-4)'} fontSize="9" fontFamily="JetBrains Mono,monospace" textAnchor="middle">{l}</text>
+        <text key={i} x={px(i)} y={h - 1} fill={sundays?.[i] ? 'var(--bad)' : 'var(--text-4)'} fontSize="9" fontFamily="var(--font-mono)" textAnchor="middle">{l}</text>
       ))}
     </svg>
   )
@@ -126,15 +126,15 @@ export function FlowGraph({ points, live, dose }) {
       {[0, 10, 20, 30, 40].map(t => (
         <g key={t}>
           <line x1={px(t)} y1={12} x2={px(t)} y2={H - 22} stroke="var(--border)" strokeWidth="0.5" opacity="0.4" />
-          <text x={px(t)} y={H - 6} fill="var(--text-4)" fontSize="9" fontFamily="JetBrains Mono,monospace" textAnchor="middle">{t}s</text>
+          <text x={px(t)} y={H - 6} fill="var(--text-4)" fontSize="9" fontFamily="var(--font-mono)" textAnchor="middle">{t}s</text>
         </g>
       ))}
       <line x1="28" y1={py(target)} x2={W - 12} y2={py(target)} stroke="var(--crema)" strokeWidth="0.8" strokeDasharray="3 4" opacity="0.7" />
-      <text x={W - 14} y={py(target) - 4} fill="var(--crema)" fontSize="9" fontFamily="JetBrains Mono,monospace" textAnchor="end" opacity="0.8">target {target.toFixed(1)}g</text>
+      <text x={W - 14} y={py(target) - 4} fill="var(--crema)" fontSize="9" fontFamily="var(--font-mono)" textAnchor="end" opacity="0.8">target {target.toFixed(1)}g</text>
       {massArea && <path d={massArea} fill="url(#massGrad)" />}
       {massPath
         ? <path d={massPath} fill="none" stroke="var(--crema)" strokeWidth="2" />
-        : <text x={W / 2} y={H / 2} fill="var(--text-4)" fontSize="11" fontFamily="JetBrains Mono,monospace" textAnchor="middle">Start timer to record flow</text>
+        : <text x={W / 2} y={H / 2} fill="var(--text-4)" fontSize="11" fontFamily="var(--font-mono)" textAnchor="middle">Start timer to record flow</text>
       }
       {flowPath && <path d={flowPath} fill="none" stroke="var(--sour)" strokeWidth="1.2" opacity="0.8" strokeDasharray="1 2" />}
       {last && (
@@ -155,7 +155,7 @@ export function FlowGraph({ points, live, dose }) {
         return (
           <>
             <rect x={px(0)} y={12} width={preinfX - px(0)} height={H - 34} fill="var(--sour)" opacity="0.06" />
-            <text x={px(0) + 4} y={22} fill="var(--sour)" fontSize="8" fontFamily="JetBrains Mono,monospace" opacity="0.7" style={{ textTransform: 'uppercase', letterSpacing: '0.1em' }}>pre-inf</text>
+            <text x={px(0) + 4} y={22} fill="var(--sour)" fontSize="8" fontFamily="var(--font-mono)" opacity="0.7" style={{ textTransform: 'uppercase', letterSpacing: '0.1em' }}>pre-inf</text>
           </>
         )
       })()}
@@ -163,9 +163,9 @@ export function FlowGraph({ points, live, dose }) {
       <g transform={`translate(${W - 130}, 10)`}>
         <rect x="0" y="0" width="122" height="30" fill="var(--bg-2)" stroke="var(--border)" rx="4" />
         <line x1="8" y1="9"  x2="20" y2="9"  stroke="var(--crema)" strokeWidth="2" />
-        <text x="24" y="12" fill="var(--text-3)" fontSize="9" fontFamily="JetBrains Mono,monospace">yield (g)</text>
+        <text x="24" y="12" fill="var(--text-3)" fontSize="9" fontFamily="var(--font-mono)">yield (g)</text>
         <line x1="8" y1="22" x2="20" y2="22" stroke="var(--sour)" strokeWidth="1.2" strokeDasharray="1 2" />
-        <text x="24" y="25" fill="var(--text-3)" fontSize="9" fontFamily="JetBrains Mono,monospace">flow (g/s)</text>
+        <text x="24" y="25" fill="var(--text-3)" fontSize="9" fontFamily="var(--font-mono)">flow (g/s)</text>
       </g>
     </svg>
   )
@@ -201,8 +201,8 @@ export function BarChart({ data }) {
         return (
           <g key={i}>
             <rect x={x} y={y} width={bw - 6} height={h} fill="var(--crema)" fillOpacity="0.85" rx="2" />
-            <text x={x + (bw - 6) / 2} y={H - 8} fill="var(--text-4)" fontSize="10" fontFamily="JetBrains Mono,monospace" textAnchor="middle">{d.label}</text>
-            {d.value > 0 && <text x={x + (bw - 6) / 2} y={y - 4} fill="var(--text-3)" fontSize="11" fontFamily="JetBrains Mono,monospace" textAnchor="middle">{d.value}</text>}
+            <text x={x + (bw - 6) / 2} y={H - 8} fill="var(--text-4)" fontSize="10" fontFamily="var(--font-mono)" textAnchor="middle">{d.label}</text>
+            {d.value > 0 && <text x={x + (bw - 6) / 2} y={y - 4} fill="var(--text-3)" fontSize="11" fontFamily="var(--font-mono)" textAnchor="middle">{d.value}</text>}
           </g>
         )
       })}

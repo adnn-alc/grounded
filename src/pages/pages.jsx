@@ -107,7 +107,7 @@ export function ShotHistory({ shots, beans = [], gear = [], units, waterRecipes 
         {beans.length > 0 && (
           <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', marginLeft: 12 }}>
             <select value={beanFilter} onChange={e => changeBeanFilter(e.target.value)}
-              style={{ fontSize: 11, fontFamily: 'JetBrains Mono,monospace', width: 148, paddingRight: 18, appearance: 'none', WebkitAppearance: 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              style={{ fontSize: 11, fontFamily: 'var(--font-mono)', width: 148, paddingRight: 18, appearance: 'none', WebkitAppearance: 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               <option value=''>All beans</option>
               {beans.map(b => <option key={b.id} value={b.name}>{b.name}</option>)}
             </select>
@@ -115,7 +115,7 @@ export function ShotHistory({ shots, beans = [], gear = [], units, waterRecipes 
           </div>
         )}
         <select value={perPage} onChange={e => changePerPage(Number(e.target.value))}
-          style={{ marginLeft: 12, fontSize: 11, fontFamily: 'JetBrains Mono,monospace' }}>
+          style={{ marginLeft: 12, fontSize: 11, fontFamily: 'var(--font-mono)' }}>
           {[10, 25, 50].map(n => <option key={n} value={n}>{n} / page</option>)}
         </select>
       </div>
@@ -124,7 +124,7 @@ export function ShotHistory({ shots, beans = [], gear = [], units, waterRecipes 
         <div className="stack" style={{ gap: 8 }}>
           {filtered.length === 0 ? (
             <div className="card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 160 }}>
-              <div style={{ textAlign: 'center', color: 'var(--text-4)', fontFamily: 'JetBrains Mono,monospace', fontSize: 11 }}>
+              <div style={{ textAlign: 'center', color: 'var(--text-4)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>
                 {beanFilter ? `No shots found for ${beanFilter}.` : 'No shots logged yet.'}
               </div>
             </div>
@@ -147,7 +147,7 @@ export function ShotHistory({ shots, beans = [], gear = [], units, waterRecipes 
               <span className="card-title">Shot #{shots.length - shots.indexOf(selectedShot)}</span>
               <span className="card-more">{selectedShot.date}</span>
             </div>
-            <div style={{ fontFamily: 'Instrument Serif,serif', fontStyle: 'italic', fontSize: 30, lineHeight: 1 }}>{selectedShot.bean}</div>
+            <div style={{ fontFamily: 'var(--font-serif)', fontStyle: 'italic', fontSize: 30, lineHeight: 1 }}>{selectedShot.bean}</div>
             <div className="text-muted mono" style={{ fontSize: 10, marginTop: 4 }}>{selectedShot.roaster?.toUpperCase()}</div>
             <div className="divider" />
             <div className="grid grid-2" style={{ gap: 4 }}>
@@ -170,7 +170,7 @@ export function ShotHistory({ shots, beans = [], gear = [], units, waterRecipes 
               <FlavorRadar taste={selectedShot.taste} size={200} />
             </div>
             {selectedShot.notes && (
-              <div style={{ fontSize: 12, color: 'var(--text-3)', fontFamily: 'JetBrains Mono,monospace', fontStyle: 'italic' }}>
+              <div style={{ fontSize: 12, color: 'var(--text-3)', fontFamily: 'var(--font-mono)', fontStyle: 'italic' }}>
                 "{selectedShot.notes}"
               </div>
             )}
@@ -210,7 +210,7 @@ export function ShotHistory({ shots, beans = [], gear = [], units, waterRecipes 
           </div>
         ) : (
           <div className="card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 200 }}>
-            <div style={{ textAlign: 'center', color: 'var(--text-4)', fontFamily: 'JetBrains Mono,monospace', fontSize: 11 }}>
+            <div style={{ textAlign: 'center', color: 'var(--text-4)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>
               Select a shot to inspect
             </div>
           </div>
@@ -415,7 +415,7 @@ export function BrewHistory({ brews = [], beans = [], units, waterRecipes = DEFA
         {beans.length > 0 && (
           <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', marginLeft: 12 }}>
             <select value={beanFilter} onChange={e => changeBeanFilter(e.target.value)}
-              style={{ fontSize: 11, fontFamily: 'JetBrains Mono,monospace', width: 148, paddingRight: 18, appearance: 'none', WebkitAppearance: 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              style={{ fontSize: 11, fontFamily: 'var(--font-mono)', width: 148, paddingRight: 18, appearance: 'none', WebkitAppearance: 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               <option value=''>All beans</option>
               {beans.map(b => <option key={b.id} value={b.name}>{b.name}</option>)}
             </select>
@@ -423,7 +423,7 @@ export function BrewHistory({ brews = [], beans = [], units, waterRecipes = DEFA
           </div>
         )}
         <select value={perPage} onChange={e => changePerPage(Number(e.target.value))}
-          style={{ marginLeft: 12, fontSize: 11, fontFamily: 'JetBrains Mono,monospace' }}>
+          style={{ marginLeft: 12, fontSize: 11, fontFamily: 'var(--font-mono)' }}>
           {[10, 25, 50].map(n => <option key={n} value={n}>{n} / page</option>)}
         </select>
       </div>
@@ -432,7 +432,7 @@ export function BrewHistory({ brews = [], beans = [], units, waterRecipes = DEFA
         <div className="stack" style={{ gap: 8 }}>
           {filtered.length === 0 ? (
             <div className="card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 160 }}>
-              <div style={{ textAlign: 'center', color: 'var(--text-4)', fontFamily: 'JetBrains Mono,monospace', fontSize: 11 }}>
+              <div style={{ textAlign: 'center', color: 'var(--text-4)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>
                 {beanFilter ? `No brews found for ${beanFilter}.` : <><span>No brews logged yet.</span><br /><span>Switch to Filter in Dial-in to record one.</span></>}
               </div>
             </div>
@@ -455,7 +455,7 @@ export function BrewHistory({ brews = [], beans = [], units, waterRecipes = DEFA
               <span className="card-title">Brew #{brews.length - brews.indexOf(selectedBrew)}</span>
               <span className="card-more">{selectedBrew.date}</span>
             </div>
-            <div style={{ fontFamily: 'Instrument Serif,serif', fontStyle: 'italic', fontSize: 30, lineHeight: 1 }}>{selectedBrew.bean}</div>
+            <div style={{ fontFamily: 'var(--font-serif)', fontStyle: 'italic', fontSize: 30, lineHeight: 1 }}>{selectedBrew.bean}</div>
             <div className="text-muted mono" style={{ fontSize: 10, marginTop: 4 }}>{selectedBrew.roaster?.toUpperCase()}</div>
             <div className="divider" />
             <div className="grid grid-2" style={{ gap: 4 }}>
@@ -494,7 +494,7 @@ export function BrewHistory({ brews = [], beans = [], units, waterRecipes = DEFA
               <FlavorRadar taste={selectedBrew.taste} size={200} />
             </div>
             {selectedBrew.notes && (
-              <div style={{ fontSize: 12, color: 'var(--text-3)', fontFamily: 'JetBrains Mono,monospace', fontStyle: 'italic' }}>
+              <div style={{ fontSize: 12, color: 'var(--text-3)', fontFamily: 'var(--font-mono)', fontStyle: 'italic' }}>
                 "{selectedBrew.notes}"
               </div>
             )}
@@ -534,7 +534,7 @@ export function BrewHistory({ brews = [], beans = [], units, waterRecipes = DEFA
           </div>
         ) : (
           <div className="card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 200 }}>
-            <div style={{ textAlign: 'center', color: 'var(--text-4)', fontFamily: 'JetBrains Mono,monospace', fontSize: 11 }}>
+            <div style={{ textAlign: 'center', color: 'var(--text-4)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>
               Select a brew to inspect
             </div>
           </div>
@@ -761,7 +761,7 @@ export function Beans({ beans, gear = [], units, onSaveBean, onUpdateBean, onArc
             <div key={b.id} className="bean-card">
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
                 <div>
-                  <div style={{ fontFamily: 'Instrument Serif,serif', fontStyle: 'italic', fontSize: 28, lineHeight: 1 }}>{b.name}</div>
+                  <div style={{ fontFamily: 'var(--font-serif)', fontStyle: 'italic', fontSize: 28, lineHeight: 1 }}>{b.name}</div>
                   <div className="text-muted mono" style={{ fontSize: 10, marginTop: 4, letterSpacing: '0.08em' }}>
                     {b.roaster.toUpperCase()} · {b.origin.toUpperCase()}
                   </div>
@@ -794,7 +794,7 @@ export function Beans({ beans, gear = [], units, onSaveBean, onUpdateBean, onArc
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                   <div className="micro">Remaining</div>
-                  <div style={{ fontFamily: 'JetBrains Mono,monospace', fontSize: 11 }}>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11 }}>
                     {U.m(b.remaining)}{U.mU()} / {U.m(b.weight)}{U.mU()}
                   </div>
                 </div>
@@ -928,7 +928,7 @@ export function ArchivedBeans({ beans, units, onUnarchive, onDelete }) {
 
       {beans.length === 0 && (
         <div className="card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 160 }}>
-          <div style={{ textAlign: 'center', color: 'var(--text-4)', fontFamily: 'JetBrains Mono,monospace', fontSize: 11 }}>
+          <div style={{ textAlign: 'center', color: 'var(--text-4)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>
             No archived beans yet.<br />Archive a bean from the Beans page when it's finished.
           </div>
         </div>
@@ -939,7 +939,7 @@ export function ArchivedBeans({ beans, units, onUnarchive, onDelete }) {
           <div key={b.id} className="bean-card" style={{ opacity: 0.85 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
               <div>
-                <div style={{ fontFamily: 'Instrument Serif,serif', fontStyle: 'italic', fontSize: 28, lineHeight: 1 }}>{b.name}</div>
+                <div style={{ fontFamily: 'var(--font-serif)', fontStyle: 'italic', fontSize: 28, lineHeight: 1 }}>{b.name}</div>
                 <div className="text-muted mono" style={{ fontSize: 10, marginTop: 4, letterSpacing: '0.08em' }}>
                   {b.roaster?.toUpperCase()} · {b.origin?.toUpperCase()}
                 </div>
@@ -1109,7 +1109,7 @@ export function RecipesPage({ recipes = [], units, onSaveRecipe, onUpdateRecipe,
               </button>
             </div>
           </div>
-          <div style={{ fontFamily: 'Instrument Serif,serif', fontStyle: 'italic', fontSize: 30, lineHeight: 1 }}>{r.name}</div>
+          <div style={{ fontFamily: 'var(--font-serif)', fontStyle: 'italic', fontSize: 30, lineHeight: 1 }}>{r.name}</div>
           <div className="divider" />
           <div className="grid" style={{ gridTemplateColumns: 'repeat(5,1fr)', gap: 4, marginBottom: 14 }}>
             <Meta k="Dose"  v={`${U.m(r.dose)}${U.mU()}`} />
@@ -1347,20 +1347,20 @@ export function GearPage({ gear = [], onSaveGear, onUpdateGear, onDeleteGear }) 
             borderBottom: '1px solid var(--border)',
             display: 'flex', alignItems: 'center', gap: 10,
           }}>
-            <span style={{ fontFamily: 'JetBrains Mono,monospace', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.14em', color: 'var(--text-3)', fontWeight: 500 }}>{kind}</span>
-            <span style={{ fontFamily: 'JetBrains Mono,monospace', fontSize: 10, color: 'var(--text-4)' }}>{gear.filter(g => g.kind === kind).length}</span>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.14em', color: 'var(--text-3)', fontWeight: 500 }}>{kind}</span>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-4)' }}>{gear.filter(g => g.kind === kind).length}</span>
           </div>
           <div style={{ padding: '0 18px' }}>
             {gear.filter(g => g.kind === kind).map((g, i, arr) => (
               <div key={g.id} className="gear-row" style={{ borderBottom: i < arr.length - 1 ? '1px solid var(--border)' : 'none' }}>
                 <div>
                   <div style={{ fontSize: 13, fontWeight: 500 }}>{g.name}</div>
-                  {g.meta && <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 2, fontFamily: 'JetBrains Mono,monospace' }}>{g.meta.split(',').map(s => s.trim()).filter(Boolean).join(' · ')}</div>}
+                  {g.meta && <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 2, fontFamily: 'var(--font-mono)' }}>{g.meta.split(',').map(s => s.trim()).filter(Boolean).join(' · ')}</div>}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginLeft: 'auto' }}>
                   <span className={`badge ${ACTIVE_STATUSES.has(g.status) ? 'good' : ''}`}>{g.status}</span>
-                  {g.price > 0 && <div style={{ fontFamily: 'JetBrains Mono,monospace', fontSize: 10, color: 'var(--text-4)' }}>€{g.price % 1 === 0 ? g.price : g.price.toFixed(2)}</div>}
-                  {g.owned && <div style={{ fontFamily: 'JetBrains Mono,monospace', fontSize: 10, color: 'var(--text-4)' }}>{g.owned}</div>}
+                  {g.price > 0 && <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-4)' }}>€{g.price % 1 === 0 ? g.price : g.price.toFixed(2)}</div>}
+                  {g.owned && <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-4)' }}>{g.owned}</div>}
                   <button className="icon-btn" style={{ width: 24, height: 24, borderColor: 'transparent' }}
                     onClick={() => openEdit(g)} title="Edit">
                     <Ico name="pencil" size={11} />
@@ -1679,7 +1679,7 @@ function BasketStats({ shots, U }) {
           </div>
           {rows.map(r => (
             <div key={r.name} className="mono" style={{ ...cols, fontSize: 13, padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
-              <div style={{ fontFamily: 'Instrument Serif,serif', fontStyle: 'italic', fontSize: 18 }}>{r.name}</div>
+              <div style={{ fontFamily: 'var(--font-serif)', fontStyle: 'italic', fontSize: 18 }}>{r.name}</div>
               <div>{r.count}</div>
               <div style={{ color: r === best && rows.length > 1 ? 'var(--crema)' : undefined }}>{r.rating.toFixed(1)}</div>
               <div>{U.m(r.dose)} → {U.m(r.yield)}{U.mU()}</div>
@@ -1756,9 +1756,9 @@ export function Stats({ shots, brews = [], beans = [], gear = [], units }) {
                 <div>
                   <div className="micro" style={{ marginBottom: 6 }}>most expensive bag</div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <div style={{ fontFamily: 'Instrument Serif,serif', fontStyle: 'italic', fontSize: 20 }}>{mostExpBean.name}</div>
-                    <div style={{ fontFamily: 'JetBrains Mono,monospace', fontSize: 11, color: 'var(--text-3)' }}>{mostExpBean.roaster}</div>
-                    <div style={{ marginLeft: 'auto', fontFamily: 'JetBrains Mono,monospace', fontSize: 16, color: 'var(--crema)' }}>€{mostExpBean.price.toFixed(2)}</div>
+                    <div style={{ fontFamily: 'var(--font-serif)', fontStyle: 'italic', fontSize: 20 }}>{mostExpBean.name}</div>
+                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-3)' }}>{mostExpBean.roaster}</div>
+                    <div style={{ marginLeft: 'auto', fontFamily: 'var(--font-mono)', fontSize: 16, color: 'var(--crema)' }}>€{mostExpBean.price.toFixed(2)}</div>
                   </div>
                 </div>
               ) : <div />}
@@ -1767,7 +1767,7 @@ export function Stats({ shots, brews = [], beans = [], gear = [], units }) {
                   <div className="micro" style={{ marginBottom: 6 }}>beans consumed</div>
                   <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
                     <div className="mono" style={{ fontSize: 26, color: 'var(--crema)' }}>{consumedDisplay}</div>
-                    <div style={{ fontFamily: 'JetBrains Mono,monospace', fontSize: 11, color: 'var(--text-3)' }}>from {beans.filter(b => b.archived && b.weight > 0).length} bags</div>
+                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-3)' }}>from {beans.filter(b => b.archived && b.weight > 0).length} bags</div>
                   </div>
                 </div>
               )}
@@ -1816,7 +1816,7 @@ export function Stock({ beans, units }) {
             <div style={{ display: 'flex', alignItems: 'start', gap: 14 }}>
               <div style={{ flex: 1 }}>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
-                  <div style={{ fontFamily: 'Instrument Serif,serif', fontStyle: 'italic', fontSize: 26 }}>{b.name}</div>
+                  <div style={{ fontFamily: 'var(--font-serif)', fontStyle: 'italic', fontSize: 26 }}>{b.name}</div>
                   <span className={`badge ${stockBadge[b.stock] || ''}`}>{b.stock}</span>
                 </div>
                 <div className="mono" style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 3 }}>{b.roaster} · {b.origin}</div>
@@ -1830,7 +1830,7 @@ export function Stock({ beans, units }) {
               <div className="bean-stock-bar" style={{ height: 6 }}>
                 <div className="bean-stock-fill" style={{ width: `${pct}%`, background: sc }} />
               </div>
-              <div className="row" style={{ marginTop: 6, fontFamily: 'JetBrains Mono,monospace', fontSize: 10, color: 'var(--text-4)' }}>
+              <div className="row" style={{ marginTop: 6, fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-4)' }}>
                 <span>{pct}% remaining</span><span>·</span><span>~{shots} shots</span><span>·</span><span>~{days} days</span>
               </div>
             </div>
@@ -1857,15 +1857,15 @@ function TipsColumn({ section, label, tips, onAdd, onEdit, onDelete }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        <span style={{ fontFamily: 'JetBrains Mono,monospace', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.14em', color: 'var(--text-2)', fontWeight: 600 }}>{label}</span>
-        <span style={{ fontFamily: 'JetBrains Mono,monospace', fontSize: 10, color: 'var(--text-4)' }}>{tips.length}</span>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.14em', color: 'var(--text-2)', fontWeight: 600 }}>{label}</span>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-4)' }}>{tips.length}</span>
         <button className="icon-btn" style={{ width: 24, height: 24, borderColor: 'transparent', marginLeft: 'auto' }} onClick={() => onAdd(section)} title={`Add ${label} note`}>
           <Ico name="plus" size={11} />
         </button>
       </div>
 
       {tips.length === 0 && (
-        <div className="card" style={{ padding: '28px 18px', textAlign: 'center', color: 'var(--text-4)', fontFamily: 'JetBrains Mono,monospace', fontSize: 11 }}>
+        <div className="card" style={{ padding: '28px 18px', textAlign: 'center', color: 'var(--text-4)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>
           No notes yet — add your first one
         </div>
       )}
@@ -1878,8 +1878,8 @@ function TipsColumn({ section, label, tips, onAdd, onEdit, onDelete }) {
             borderBottom: '1px solid var(--border)',
             display: 'flex', alignItems: 'center', gap: 10,
           }}>
-            <span style={{ fontFamily: 'JetBrains Mono,monospace', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.14em', color: 'var(--text-3)', fontWeight: 500 }}>{cat}</span>
-            <span style={{ fontFamily: 'JetBrains Mono,monospace', fontSize: 10, color: 'var(--text-4)' }}>{tips.filter(t => t.category === cat).length}</span>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.14em', color: 'var(--text-3)', fontWeight: 500 }}>{cat}</span>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-4)' }}>{tips.filter(t => t.category === cat).length}</span>
           </div>
           <div style={{ padding: '0 18px' }}>
             {tips.filter(t => t.category === cat).map((tip, i, arr) => (

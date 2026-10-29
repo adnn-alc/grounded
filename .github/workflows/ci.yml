@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build & smoke test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+      - run: npm run build
+
+      # Starts the real server on an empty database, like a brand-new install,
+      # and checks that every endpoint answers (this would have caught the
+      # missing-columns bug fixed in e981bb5)
+      - name: Smoke test on a fresh database
+        env:
+          NODE_ENV: production
+          DB_PATH: ${{ runner.temp }}/ci.db
+          PORT: 3001
+        run: |
+          node server/index.js > server.log 2>&1 &
+          for i in $(seq 1 30); do curl -sf localhost:3001/api/health > /dev/null && break; sleep 1; done
+          fail() { echo "::error::$1"; cat server.log; exit 1; }
+          for path in health shots brews beans beans/archived gear recipes tips settings; do
+            curl -sf "localhost:3001/api/$path" > /dev/null || fail "GET /api/$path failed"
+          done
+          curl -sf -X POST -H 'Content-Type: application/json' \
+            -d '{"kind":"Grinder","name":"CI grinder","status":"Active","price":1}' \
+            localhost:3001/api/gear > /dev/null || fail "POST /api/gear failed"
+          curl -sf -X PUT -H 'Content-Type: application/json' \
+            -d '{"units":{"mass":"g","temp":"C"}}' \
+            localhost:3001/api/settings > /dev/null || fail "PUT /api/settings failed"
+          curl -sf localhost:3001/ | grep -q 'id="root"' || fail "frontend not served"
+          echo "All endpoints OK"
+
+  docker:
+    name: Docker image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - run: docker build -t grounded:ci .
+
+      - name: Run the image and check it answers
+        run: |
+          docker run -d --name grounded-ci -p 3001:3001 grounded:ci
+          for i in $(seq 1 30); do curl -sf localhost:3001/api/health > /dev/null && break; sleep 1; done
+          curl -sf localhost:3001/api/health || { docker logs grounded-ci; exit 1; }
+          curl -sf localhost:3001/ | grep -q 'id="root"' || { docker logs grounded-ci; exit 1; }
+          docker rm -f grounded-ci

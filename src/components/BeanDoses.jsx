@@ -39,7 +39,7 @@ export function BeanDosesCard({ bean, basketOpts, currentBasket, U, onUpdateBean
     setNewGrind('')
   }
 
-  const inputStyle = { background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: 6, padding: '5px 8px', fontFamily: 'JetBrains Mono,monospace', fontSize: 12, width: '100%' }
+  const inputStyle = { background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: 6, padding: '5px 8px', fontFamily: 'var(--font-mono)', fontSize: 12, width: '100%' }
 
   return (
     <div className="card">

@@ -1,5 +1,8 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Ico from './Ico.jsx'
+import { FONT_ROLES, FONT_OPTIONS, fontStack } from '../data/fonts.js'
+
+const FONT_SAMPLES = { sans: 'Bright, sweet, clean finish', mono: '18.0g → 36.4g · 28s', serif: 'Dial-in' }
 
 const THEMES = [
   { id: 'moody',     name: 'Moody',     tag: 'espresso bar', bg: '#2a2420', sb: '#1f1a17', accent: '#d1a16a', txt: '#efe6d9', card: '#332a24' },
@@ -13,20 +16,19 @@ const RPM_OPTIONS   = ['manual', '500', '600', '700', '800', '900', '1000', '110
 const ESP_FALLBACK = { dose: '18', yield: '36', temp: '92', grind: '3', preinf: '0', waterRecipe: 'Light and Bright', grinderRpm: '800' }
 const FIL_FALLBACK = { dose: '15', water: '250', temp: '92', grind: '10', numPours: '3', waterRecipe: 'Light and Bright', grinderRpm: '800' }
 
-function loadDefaults() {
-  try { return JSON.parse(localStorage.getItem('grounded-dialin-defaults')) || {} } catch { return {} }
-}
-
-export default function Settings({ open, onClose, theme, setTheme, units, setUnits, waterRecipes, setWaterRecipes }) {
+export default function Settings({ open, onClose, theme, setTheme, fonts, setFonts, units, setUnits, waterRecipes, setWaterRecipes, dialinDefaults, setDialinDefaults }) {
   const [tab, setTab]   = useState('preferences')
-  const [defs, setDefs] = useState(loadDefaults)
+  const [defs, setDefs] = useState(dialinDefaults)
   const [newRecipe, setNewRecipe] = useState('')
 
-  const updateDef = (mode, key, val) => setDefs(prev => {
-    const next = { ...prev, [mode]: { ...(prev[mode] || {}), [key]: val } }
-    localStorage.setItem('grounded-dialin-defaults', JSON.stringify(next))
-    return next
-  })
+  // Typing in the number fields saves after a short pause, not on every keystroke
+  useEffect(() => {
+    if (defs === dialinDefaults) return
+    const t = setTimeout(() => setDialinDefaults(defs), 500)
+    return () => clearTimeout(t)
+  }, [defs]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const updateDef = (mode, key, val) => setDefs(prev => ({ ...prev, [mode]: { ...(prev[mode] || {}), [key]: val } }))
 
   const addWaterRecipe = () => {
     const name = newRecipe.trim()
@@ -100,6 +102,24 @@ export default function Settings({ open, onClose, theme, setTheme, units, setUni
               </div>
 
               <div className="settings-section">
+                <h3>Appearance · Fonts</h3>
+                {FONT_ROLES.map(({ role, label, desc }) => (
+                  <div key={role} className="settings-row">
+                    <div>
+                      <div className="label">{label}</div>
+                      <div className="desc">{desc}</div>
+                      <div className={`font-sample${role === 'serif' ? ' serif' : ''}`} style={{ fontFamily: fontStack(role, fonts[role]) }}>
+                        {FONT_SAMPLES[role]}
+                      </div>
+                    </div>
+                    <select className="font-select" value={fonts[role]} onChange={e => setFonts({ ...fonts, [role]: e.target.value })}>
+                      {FONT_OPTIONS[role].map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+                    </select>
+                  </div>
+                ))}
+              </div>
+
+              <div className="settings-section">
                 <h3>Units</h3>
                 <div className="settings-row">
                   <div>
@@ -107,8 +127,8 @@ export default function Settings({ open, onClose, theme, setTheme, units, setUni
                     <div className="desc">Used for dose, yield, stock, and all weights.</div>
                   </div>
                   <div className="unit-toggle">
-                    <button className={units.mass === 'g'  ? 'on' : ''} onClick={() => setUnits(u => ({ ...u, mass: 'g' }))}>grams</button>
-                    <button className={units.mass === 'oz' ? 'on' : ''} onClick={() => setUnits(u => ({ ...u, mass: 'oz' }))}>ounces</button>
+                    <button className={units.mass === 'g'  ? 'on' : ''} onClick={() => setUnits({ ...units, mass: 'g' })}>grams</button>
+                    <button className={units.mass === 'oz' ? 'on' : ''} onClick={() => setUnits({ ...units, mass: 'oz' })}>ounces</button>
                   </div>
                 </div>
                 <div className="settings-row">
@@ -117,8 +137,8 @@ export default function Settings({ open, onClose, theme, setTheme, units, setUni
                     <div className="desc">Group-head, kettle, and brew temp displays.</div>
                   </div>
                   <div className="unit-toggle">
-                    <button className={units.temp === 'C' ? 'on' : ''} onClick={() => setUnits(u => ({ ...u, temp: 'C' }))}>Celsius</button>
-                    <button className={units.temp === 'F' ? 'on' : ''} onClick={() => setUnits(u => ({ ...u, temp: 'F' }))}>Fahrenheit</button>
+                    <button className={units.temp === 'C' ? 'on' : ''} onClick={() => setUnits({ ...units, temp: 'C' })}>Celsius</button>
+                    <button className={units.temp === 'F' ? 'on' : ''} onClick={() => setUnits({ ...units, temp: 'F' })}>Fahrenheit</button>
                   </div>
                 </div>
               </div>

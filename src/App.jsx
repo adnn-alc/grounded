@@ -6,12 +6,13 @@ import Dialin from './pages/Dialin.jsx'
 import { ShotHistory, BrewHistory, Beans, ArchivedBeans, RecipesPage, GearPage, Stats, Stock, TipsPage } from './pages/pages.jsx'
 import { useData } from './hooks/useData.js'
 import { DEFAULT_WATER_RECIPES } from './data/waterRecipes.js'
+import { DEFAULT_FONTS, applyAppearance } from './data/fonts.js'
 
 function LoadingScreen() {
   return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', flexDirection: 'column', gap: 16 }}>
-      <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 20, color: 'var(--crema)', letterSpacing: '-0.03em' }}><span style={{ opacity: 0.4 }}>[</span> grounded <span style={{ opacity: 0.4 }}>]</span></div>
-      <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11, color: 'var(--text-4)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Loading…</div>
+      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 20, color: 'var(--crema)', letterSpacing: '-0.03em' }}><span style={{ opacity: 0.4 }}>[</span> grounded <span style={{ opacity: 0.4 }}>]</span></div>
+      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-4)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Loading…</div>
     </div>
   )
 }
@@ -19,8 +20,8 @@ function LoadingScreen() {
 function ErrorScreen({ message, onRetry }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', flexDirection: 'column', gap: 16 }}>
-      <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 12, color: 'var(--bitter)' }}>Failed to connect to API</div>
-      <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: 'var(--text-4)' }}>{message}</div>
+      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--bitter)' }}>Failed to connect to API</div>
+      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-4)' }}>{message}</div>
       <button className="ghost-btn" onClick={onRetry}>Retry</button>
     </div>
   )
@@ -33,24 +34,11 @@ function routeFromHash() {
   return VALID_ROUTES.has(hash) ? hash : 'home'
 }
 
+const DEFAULT_UNITS = { mass: 'g', temp: 'C' }
+
 export default function App() {
   const [route, setRoute] = useState(routeFromHash)
-  const [units, setUnits] = useState({ mass: 'g', temp: 'C' })
-  const [theme, setTheme] = useState(() => {
-    const old = localStorage.getItem('cascara-theme')
-    if (old && !localStorage.getItem('grounded-theme')) {
-      localStorage.setItem('grounded-theme', old)
-      localStorage.removeItem('cascara-theme')
-    }
-    return localStorage.getItem('grounded-theme') || 'moody'
-  })
   const [settingsOpen, setSettingsOpen] = useState(false)
-  const [waterRecipes, setWaterRecipes] = useState(() => {
-    try {
-      const saved = JSON.parse(localStorage.getItem('grounded-water-recipes'))
-      return Array.isArray(saved) && saved.length ? saved : DEFAULT_WATER_RECIPES
-    } catch { return DEFAULT_WATER_RECIPES }
-  })
   const [openShotId, setOpenShotId] = useState(null)
   const [openBrewId, setOpenBrewId] = useState(null)
   const [dialinPreset, setDialinPreset] = useState(null)
@@ -61,14 +49,28 @@ export default function App() {
     if (route === 'brew-history') setOpenBrewId(id || null)
   }
 
-  useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme)
-    localStorage.setItem('grounded-theme', theme)
-  }, [theme])
+  const {
+    shots, brews, beans, archivedBeans, gear, recipes, tips, settings,
+    loading, error, reload,
+    saveShot, updateShot, deleteShot, favoriteShot,
+    saveBrew, updateBrew, deleteBrew, favoriteBrew,
+    saveBean, updateBean, deleteBean, archiveBean, unarchiveBean,
+    saveGear, updateGear, deleteGear,
+    saveRecipe, updateRecipe, deleteRecipe,
+    saveTip, updateTip, deleteTip,
+    updateSettings,
+  } = useData()
+
+  // Preferences live in the database (shared by every browser), with defaults
+  const theme          = settings.theme || 'moody'
+  const fonts          = { ...DEFAULT_FONTS, ...settings.fonts }
+  const units          = { ...DEFAULT_UNITS, ...settings.units }
+  const waterRecipes   = settings.waterRecipes?.length ? settings.waterRecipes : DEFAULT_WATER_RECIPES
+  const dialinDefaults = settings.dialinDefaults || {}
 
   useEffect(() => {
-    localStorage.setItem('grounded-water-recipes', JSON.stringify(waterRecipes))
-  }, [waterRecipes])
+    if (!loading) applyAppearance(theme, fonts)
+  }, [loading, theme, fonts.sans, fonts.mono, fonts.serif]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     window.location.hash = '/' + route
@@ -79,17 +81,6 @@ export default function App() {
     window.addEventListener('hashchange', onHashChange)
     return () => window.removeEventListener('hashchange', onHashChange)
   }, [])
-
-  const {
-    shots, brews, beans, archivedBeans, gear, recipes, tips,
-    loading, error, reload,
-    saveShot, updateShot, deleteShot, favoriteShot,
-    saveBrew, updateBrew, deleteBrew, favoriteBrew,
-    saveBean, updateBean, deleteBean, archiveBean, unarchiveBean,
-    saveGear, updateGear, deleteGear,
-    saveRecipe, updateRecipe, deleteRecipe,
-    saveTip, updateTip, deleteTip,
-  } = useData()
 
   if (loading) return <LoadingScreen />
   if (error)   return <ErrorScreen message={error} onRetry={reload} />
@@ -116,7 +107,7 @@ export default function App() {
 
   const pages = {
     home:          <Home        shots={shots} brews={brews} beans={beans} units={units} goTo={goTo} />,
-    dialin:        <Dialin      shots={shots} beans={beans} gear={gear} units={units} waterRecipes={waterRecipes} onSaveShot={handleSaveShot} onSaveBrew={handleSaveBrew} onUpdateBean={updateBean} preset={dialinPreset} onPresetConsumed={() => setDialinPreset(null)} />,
+    dialin:        <Dialin      shots={shots} beans={beans} gear={gear} units={units} waterRecipes={waterRecipes} dialinDefaults={dialinDefaults} onSaveShot={handleSaveShot} onSaveBrew={handleSaveBrew} onUpdateBean={updateBean} preset={dialinPreset} onPresetConsumed={() => setDialinPreset(null)} />,
     'shot-history': <ShotHistory shots={shots} beans={beans} gear={gear} units={units} waterRecipes={waterRecipes} onDelete={deleteShot} onUpdateShot={updateShot} initialSelectedId={openShotId} onReplicate={onReplicateShot} onFavorite={favoriteShot} />,
     'brew-history': <BrewHistory brews={brews} beans={beans} units={units} waterRecipes={waterRecipes} onDeleteBrew={deleteBrew} onUpdateBrew={updateBrew} initialSelectedId={openBrewId} onReplicate={onReplicateBrew} onFavorite={favoriteBrew} />,
     beans:   <Beans   beans={beans} gear={gear} units={units} onSaveBean={saveBean} onUpdateBean={updateBean} onArchiveBean={archiveBean} />,
@@ -147,9 +138,11 @@ export default function App() {
       </div>
       <Settings
         open={settingsOpen} onClose={() => setSettingsOpen(false)}
-        theme={theme} setTheme={setTheme}
-        units={units} setUnits={setUnits}
-        waterRecipes={waterRecipes} setWaterRecipes={setWaterRecipes}
+        theme={theme} setTheme={t => updateSettings({ theme: t })}
+        fonts={fonts} setFonts={f => updateSettings({ fonts: f })}
+        units={units} setUnits={u => updateSettings({ units: u })}
+        waterRecipes={waterRecipes} setWaterRecipes={w => updateSettings({ waterRecipes: w })}
+        dialinDefaults={dialinDefaults} setDialinDefaults={d => updateSettings({ dialinDefaults: d })}
       />
     </div>
   )

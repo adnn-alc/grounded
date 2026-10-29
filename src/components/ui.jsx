@@ -6,7 +6,7 @@ export function StatCard({ label, value, delta, sub, warn, serif }) {
       <div className="micro">{label}</div>
       <div className="row" style={{ marginTop: 8, alignItems: 'baseline', gap: 8 }}>
         {serif
-          ? <div style={{ fontFamily: 'Instrument Serif,serif', fontStyle: 'italic', fontSize: 36, lineHeight: 1 }}>{value}</div>
+          ? <div style={{ fontFamily: 'var(--font-serif)', fontStyle: 'italic', fontSize: 36, lineHeight: 1 }}>{value}</div>
           : <div className="stat stat-lg">{value}</div>
         }
         {delta && (

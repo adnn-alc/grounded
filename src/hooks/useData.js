@@ -1,8 +1,30 @@
 import { useState, useEffect, useCallback } from 'react'
 import { api } from '../api/client.js'
 
+// Older versions kept these preferences in this browser's localStorage.
+// Returns the ones the database doesn't have yet, so they can be moved over once.
+function legacySettings(current) {
+  const out = {}
+  try {
+    const read = (k) => { try { return JSON.parse(localStorage.getItem(k)) } catch { return null } }
+    const theme = localStorage.getItem('grounded-theme')
+    if (!current.theme && theme) out.theme = theme
+    const water = read('grounded-water-recipes')
+    if (!current.waterRecipes && Array.isArray(water) && water.length) out.waterRecipes = water
+    const defs = read('grounded-dialin-defaults')
+    if (!current.dialinDefaults && defs && typeof defs === 'object') out.dialinDefaults = defs
+  } catch {}
+  return out
+}
+
+function clearLegacySettings() {
+  try {
+    for (const k of ['grounded-water-recipes', 'grounded-dialin-defaults']) localStorage.removeItem(k)
+  } catch {}
+}
+
 /**
- * Central data hook. Loads shots, beans, gear, recipes
+ * Central data hook. Loads shots, beans, gear, recipes, tips and settings
  * from the SQLite API on mount and exposes mutation helpers that keep
  * local state in sync without a full refetch.
  */
@@ -14,6 +36,7 @@ export function useData() {
   const [gear,          setGear]          = useState([])
   const [recipes,       setRecipes]       = useState([])
   const [tips,          setTips]          = useState([])
+  const [settings,      setSettings]      = useState({})
   const [loading,       setLoading]       = useState(true)
   const [error,         setError]         = useState(null)
 
@@ -21,7 +44,7 @@ export function useData() {
     setLoading(true)
     setError(null)
     try {
-      const [s, bw, b, ab, g, r, ti] = await Promise.all([
+      const [s, bw, b, ab, g, r, ti, st] = await Promise.all([
         api.getShots(),
         api.getBrews(),
         api.getBeans(),
@@ -29,7 +52,14 @@ export function useData() {
         api.getGear(),
         api.getRecipes(),
         api.getTips(),
+        api.getSettings(),
       ])
+      let loadedSettings = st
+      const legacy = legacySettings(st)
+      if (Object.keys(legacy).length) {
+        loadedSettings = await api.updateSettings(legacy)
+        clearLegacySettings()
+      }
       setShots(s)
       setBrews(bw)
       setBeans(b)
@@ -37,6 +67,7 @@ export function useData() {
       setGear(g)
       setRecipes(r)
       setTips(ti)
+      setSettings(loadedSettings)
     } catch (e) {
       setError(e.message)
     } finally {
@@ -205,9 +236,21 @@ export function useData() {
     setTips(prev => prev.filter(t => t.id !== id))
   }
 
+  // ── Settings ────────────────────────────────────────────────────
+  // Optimistic: the UI updates immediately; on failure, reload what the server has
+  const updateSettings = async (partial) => {
+    setSettings(prev => ({ ...prev, ...partial }))
+    try {
+      await api.updateSettings(partial)
+    } catch (e) {
+      console.error('Saving settings failed', e)
+      try { setSettings(await api.getSettings()) } catch {}
+    }
+  }
+
   return {
     // Data
-    shots, brews, beans, archivedBeans, gear, recipes, tips,
+    shots, brews, beans, archivedBeans, gear, recipes, tips, settings,
     loading, error,
     reload: load,
 
@@ -218,5 +261,6 @@ export function useData() {
     saveGear, updateGear, deleteGear,
     saveRecipe, updateRecipe, deleteRecipe,
     saveTip, updateTip, deleteTip,
+    updateSettings,
   }
 }

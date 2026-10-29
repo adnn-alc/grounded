@@ -260,7 +260,6 @@ app.delete('/api/gear/:id', (req, res) => {
   res.json({ ok: true })
 })
 
-// ── GRINDER LOG ──────────────────────────────────────────────────────
 // ── RECIPES ──────────────────────────────────────────────────────────
 app.get('/api/recipes', (req, res) => {
   res.json(db.prepare('SELECT * FROM recipes ORDER BY name').all().map(rowToRecipe))
@@ -311,6 +310,48 @@ app.put('/api/tips/:id', (req, res) => {
 
 app.delete('/api/tips/:id', (req, res) => {
   db.prepare('DELETE FROM tips WHERE id = ?').run(req.params.id)
+  res.json({ ok: true })
+})
+
+// ── SETTINGS ─────────────────────────────────────────────────────────
+// Stored as one row per key with a JSON value, returned as a single object
+const SETTING_KEYS = new Set(['theme', 'fonts', 'units', 'waterRecipes', 'dialinDefaults'])
+
+function readSettings() {
+  const out = {}
+  for (const row of db.prepare('SELECT key, value FROM settings').all()) {
+    try { out[row.key] = JSON.parse(row.value) } catch {}
+  }
+  return out
+}
+
+app.get('/api/settings', (req, res) => {
+  res.json(readSettings())
+})
+
+// Partial update: only the keys sent are changed
+app.put('/api/settings', (req, res) => {
+  const body = req.body
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return res.status(400).json({ error: 'Expected an object of settings' })
+  }
+  const unknown = Object.keys(body).filter(k => !SETTING_KEYS.has(k))
+  if (unknown.length) return res.status(400).json({ error: `Unknown setting: ${unknown.join(', ')}` })
+
+  const upsert = db.prepare(`
+    INSERT INTO settings (key, value, updated_at) VALUES (?, ?, datetime('now'))
+    ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
+  `)
+  db.transaction(() => {
+    for (const [key, value] of Object.entries(body)) upsert.run(key, JSON.stringify(value))
+  })()
+  res.json(readSettings())
+})
+
+// ── HEALTH ───────────────────────────────────────────────────────────
+// Used by the Docker HEALTHCHECK and CI; also confirms the DB is readable
+app.get('/api/health', (req, res) => {
+  db.prepare('SELECT 1').get()
   res.json({ ok: true })
 })
 

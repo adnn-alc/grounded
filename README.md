@@ -16,7 +16,7 @@ React + Express + SQLite in a single Docker container. No accounts, no cloud, no
 - **Recipes & tips** — store your own brew recipes and notes.
 - **Gear** — machines, grinders, baskets, drippers, scales and kettles. Active gear feeds the dial-in dropdowns.
 - **Stats** — 14-day trend, bean origins world map, espresso stats per basket, and more.
-- **Settings** — four themes (Moody, Midnight, Parchment, Terminal), g/oz and °C/°F units, default dial-in values and custom water recipes.
+- **Settings** — four themes (Moody, Midnight, Parchment, Terminal), a choice of bundled fonts, g/oz and °C/°F units, default dial-in values and custom water recipes. Settings are stored on the server, so every browser and device sees the same ones.
 
 ---
 
@@ -98,7 +98,7 @@ Everything is served from one port (3001 by default).
 
 ## Backup & restore
 
-All your data is in the `data/` folder. SQLite runs in WAL mode, so stop the container before copying to get a consistent snapshot:
+All your data — logs, beans, gear, recipes and settings — is in the `data/` folder. SQLite runs in WAL mode, so stop the container before copying to get a consistent snapshot:
 
 ```bash
 docker compose stop
@@ -114,6 +114,8 @@ To restore, stop the container, put the backup back at `data/grounded.db` (and r
 
 Grounded has **no login or authentication** — anyone who can reach the port can view and edit all data. It's meant for a home network. If you expose it to the internet, put it behind a reverse proxy with authentication (e.g. Nginx Proxy Manager access lists, Authelia, or a VPN like Tailscale).
 
+Found a security problem? Please report it privately — see [SECURITY.md](SECURITY.md).
+
 ---
 
 ## Project structure
@@ -122,6 +124,7 @@ Grounded has **no login or authentication** — anyone who can reach the port ca
 grounded/
 ├── Dockerfile              # Multi-stage build: builds the UI, runs the API
 ├── docker-compose.yml
+├── .github/                # CI workflow and Dependabot config
 ├── server/
 │   ├── index.js            # Express API — all routes
 │   └── db.js               # SQLite schema, migrations, seed data
@@ -133,7 +136,7 @@ grounded/
 │   │   └── useUnits.js     # g/oz and °C/°F helpers
 │   ├── pages/              # Home, Dial-in, history, beans, gear, stats…
 │   ├── components/         # Shell, charts, settings, world map, basket doses
-│   ├── data/               # Static data (world map, water recipes, brew modes)
+│   ├── data/               # Static data (world map, fonts, water recipes, brew modes)
 │   └── styles/global.css   # Themes via CSS custom properties
 └── scripts/
     └── build-world-map.mjs # Regenerates src/data/worldMap.js
@@ -153,6 +156,8 @@ All endpoints are JSON under `/api`.
 | Gear     | `GET /gear` · `POST /gear` · `PUT /gear/:id` · `DELETE /gear/:id` |
 | Recipes  | `GET /recipes` · `POST /recipes` · `PUT /recipes/:id` · `DELETE /recipes/:id` |
 | Tips     | `GET /tips` · `POST /tips` · `PUT /tips/:id` · `DELETE /tips/:id` |
+| Settings | `GET /settings` · `PUT /settings` (partial update) |
+| Health   | `GET /health` |
 
 ---
 
@@ -165,7 +170,7 @@ All endpoints are JSON under `/api`.
 | Database | SQLite via better-sqlite3                   |
 | Styling  | Plain CSS with custom properties            |
 | Charts   | Hand-rolled SVG                             |
-| Fonts    | Inter · JetBrains Mono · Instrument Serif   |
+| Fonts    | Bundled via Fontsource (Inter, JetBrains Mono, Instrument Serif by default) |
 | Deploy   | Docker / Docker Compose                     |
 
 ---

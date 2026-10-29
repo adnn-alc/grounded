@@ -122,6 +122,13 @@ db.exec(`
     verdict      TEXT,
     created_at   TEXT DEFAULT (datetime('now'))
   );
+
+  -- App-wide preferences (theme, fonts, units, water recipes, dial-in defaults)
+  CREATE TABLE IF NOT EXISTS settings (
+    key        TEXT PRIMARY KEY,
+    value      TEXT NOT NULL,   -- JSON
+    updated_at TEXT DEFAULT (datetime('now'))
+  );
 `)
 
 // Migrations — safe to run repeatedly. They must run after CREATE TABLE so they

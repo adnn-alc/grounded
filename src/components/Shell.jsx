@@ -64,7 +64,7 @@ export function Sidebar({ route, setRoute, shots, brews = [], beans, archivedBea
         <div className="status-dot" />
         <div>
           <div style={{ color: 'var(--text-2)' }}>Local database</div>
-          <div style={{ fontSize: 10, color: 'var(--text-4)', fontFamily: 'JetBrains Mono,monospace' }}>local · no sync</div>
+          <div style={{ fontSize: 10, color: 'var(--text-4)', fontFamily: 'var(--font-mono)' }}>local · no sync</div>
         </div>
       </div>
     </aside>

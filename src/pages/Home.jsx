@@ -289,18 +289,18 @@ export default function Home({ shots, brews, beans, units, goTo }) {
                   <div key={bean.id}>
                     <div className="row" style={{ justifyContent: 'space-between', marginBottom: 5, gap: 8 }}>
                       <div style={{ minWidth: 0 }}>
-                        <span style={{ fontFamily: 'JetBrains Mono,monospace', fontSize: 12, display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {bean.name}
                         </span>
                         <span className="text-muted" style={{ fontSize: 11 }}>{bean.roaster}</span>
                       </div>
                       <div style={{ textAlign: 'right', flexShrink: 0 }}>
                         {days !== null && (
-                          <span style={{ fontFamily: 'JetBrains Mono,monospace', fontSize: 11, color: freshnessColor }}>
+                          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: freshnessColor }}>
                             {days}d · {freshnessLabel}
                           </span>
                         )}
-                        <span className="text-muted" style={{ fontFamily: 'JetBrains Mono,monospace', fontSize: 11, display: 'block' }}>
+                        <span className="text-muted" style={{ fontFamily: 'var(--font-mono)', fontSize: 11, display: 'block' }}>
                           {U.m(bean.remaining)}{U.mU()} left
                         </span>
                       </div>

@@ -110,8 +110,8 @@ const fillFor = (o) => !o ? 'var(--surface)'
   : o.bagsActive > 0 ? 'color-mix(in oklch, var(--crema) 58%, var(--surface))'
   : 'color-mix(in oklch, var(--crema) 24%, var(--surface))'
 
-const MONO = 'JetBrains Mono, monospace'
-const SERIF = 'Instrument Serif, serif'
+const MONO = 'var(--font-mono)'
+const SERIF = 'var(--font-serif)'
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 

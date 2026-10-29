@@ -1,0 +1,28 @@
+# Weekly update PRs for npm packages, GitHub Actions and the Docker base image.
+# CI runs on every Dependabot PR, so a green check means the update builds.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      fonts:
+        patterns: ["@fontsource*"]
+      minor-and-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+    ignore:
+      # Stay on the current Node LTS line; move to the next LTS by hand
+      - dependency-name: node
+        update-types: ["version-update:semver-major"]
