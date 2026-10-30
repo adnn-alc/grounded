@@ -207,6 +207,12 @@ git push --follow-tags
 
 ---
 
+## Contributing
+
+Bug reports, ideas and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for how to run it locally and what a pull request needs, and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md). Security problems go through [SECURITY.md](SECURITY.md).
+
+---
+
 ## License
 
 Copyright (C) 2026 adnn-alc

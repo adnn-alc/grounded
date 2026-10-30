@@ -1,0 +1,48 @@
+name: Bug report
+description: Something in Grounded doesn't work as expected
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! For security problems, please don't use this form; see SECURITY.md instead.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, and what happened instead?
+      placeholder: |
+        1. Went to Dial-in → Espresso
+        2. Saved a shot with …
+        3. Expected … but saw …
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Grounded version
+      description: Shown in the sidebar and under Settings → About.
+      placeholder: "1.1.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: How do you run it?
+      options:
+        - Docker / Docker Compose
+        - Node (npm start)
+        - Local development (npm run dev)
+    validations:
+      required: true
+  - type: input
+    id: browser
+    attributes:
+      label: Browser and device
+      placeholder: "Firefox 140 on Windows, Safari on iPhone, …"
+  - type: textarea
+    id: logs
+    attributes:
+      label: Error messages or logs
+      description: The error shown in the app, the browser console, or `docker compose logs grounded`.
+      render: text

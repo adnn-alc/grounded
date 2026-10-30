@@ -1,0 +1,31 @@
+name: Feature idea
+description: Suggest something that would make Grounded better
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What would you like to do?
+      description: Describe the problem or situation, e.g. "When I dial in a new bag, I want to see …"
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: How could Grounded help?
+      description: Your idea for a solution, if you have one. Sketches and screenshots are welcome.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Which part of the app?
+      options:
+        - Dial-in (espresso)
+        - Dial-in (filter)
+        - History
+        - Beans & inventory
+        - Gear
+        - Recipes & tips
+        - Stats
+        - Settings
+        - Docker / self-hosting
+        - Something else

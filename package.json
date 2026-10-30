@@ -1,7 +1,28 @@
 {
   "name": "grounded",
   "version": "1.1.0",
-  "description": "Self-hosted espresso & coffee tracking app",
+  "description": "Self-hosted espresso & filter coffee tracker: dial-in log, beans, gear and stats in one Docker container",
+  "keywords": [
+    "coffee",
+    "espresso",
+    "pour-over",
+    "filter-coffee",
+    "dial-in",
+    "self-hosted",
+    "homelab",
+    "sqlite",
+    "react",
+    "docker"
+  ],
+  "homepage": "https://github.com/adnn-alc/grounded#readme",
+  "bugs": {
+    "url": "https://github.com/adnn-alc/grounded/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/adnn-alc/grounded.git"
+  },
+  "author": "adnn-alc (https://github.com/adnn-alc)",
   "license": "AGPL-3.0-or-later",
   "private": true,
   "type": "module",
