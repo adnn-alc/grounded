@@ -1,0 +1,88 @@
+name: Release image
+
+# Builds the Docker image for every release tag (v1.2.3) and publishes it to
+# GitHub Container Registry as ghcr.io/<owner>/grounded, for amd64 and arm64
+# (e.g. Synology/x86 NAS boxes and Raspberry Pi 4/5).
+#
+# Tags: 1.2.3, 1.2, 1 and latest (pre-releases like v2.0.0-rc.1 get only their own tag).
+# To publish an image for a tag that existed before this workflow, run it by hand
+# (Actions → Release image → Run workflow) with that tag. Building an older tag
+# moves `latest` back to it, so only do that for the newest release.
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag to build, e.g. v1.2.0
+        required: true
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  TAG: ${{ inputs.tag || github.ref_name }}
+
+jobs:
+  image:
+    name: Build & publish
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.TAG }}
+
+      - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      # Also adds the OCI labels that link the package to this repository
+      - name: Image tags
+        id: meta
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        with:
+          images: ghcr.io/${{ github.repository }}
+          flavor: latest=false
+          tags: |
+            type=semver,pattern={{version}},value=${{ env.TAG }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ env.TAG }}
+            type=semver,pattern={{major}},value=${{ env.TAG }}
+            type=raw,value=latest,enable=${{ !contains(env.TAG, '-') }}
+
+      # Build the amd64 image locally first and check it starts, so a broken
+      # release never reaches the registry
+      - name: Build for testing
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          platforms: linux/amd64
+          load: true
+          tags: grounded:release-test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Check the image answers
+        run: |
+          docker run -d --name grounded-release -p 3001:3001 grounded:release-test
+          for i in $(seq 1 30); do curl -sf localhost:3001/api/health > /dev/null && break; sleep 1; done
+          curl -sf localhost:3001/api/health || { docker logs grounded-release; exit 1; }
+          curl -sf localhost:3001/ | grep -q 'id="root"' || { docker logs grounded-release; exit 1; }
+          docker rm -f grounded-release
+
+      - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build & push (amd64 + arm64)
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

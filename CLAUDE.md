@@ -25,7 +25,7 @@ Linting is oxlint, not ESLint, because typescript-eslint doesn't support TypeScr
 
 Tests use Node's built-in runner, no framework: `server/api.test.ts` (routes, stock, errors, headers on a fresh seeded DB), `server/migrations.test.ts` (upgrading a 1.0-layout DB) and `server/hosts.test.ts` (`ALLOWED_HOSTS`). Each file runs in its own process with a temp database from `createTempDatabase()` in `server/test-helpers.ts`; set `DB_PATH` before importing `app.ts`/`db.ts`. Test files are excluded from the Docker image (`.dockerignore`).
 
-CI (`.github/workflows/ci.yml`) runs `npm ci`, `npm run lint`, `npm run typecheck`, `npm test` and `npm run build`, then starts the server on an **empty** database and hits every endpoint, and separately builds and runs the Docker image. Dependabot (`.github/dependabot.yml`) opens weekly update PRs.
+CI (`.github/workflows/ci.yml`) runs `npm ci`, `npm run lint`, `npm run typecheck`, `npm test` and `npm run build`, then starts the server on an **empty** database and hits every endpoint, and separately builds and runs the Docker image. `.github/workflows/release-image.yml` runs on every `v*` tag (or by hand with a tag): it checks the amd64 image starts, then pushes amd64 + arm64 to `ghcr.io/adnn-alc/grounded` as `X.Y.Z`, `X.Y`, `X` and `latest` (pre-release tags get only their own tag). The package stays private until it is made public in its GitHub settings, which can't be undone. Dependabot (`.github/dependabot.yml`) opens weekly update PRs.
 
 ## Architecture
 
@@ -97,4 +97,4 @@ Theme (`moody` by default) is applied as a `data-theme` attribute on `<html>`. F
 
 ### Versioning
 
-Semantic versioning; the version lives only in `package.json` and is injected into the UI as `__APP_VERSION__` via `define` in `vite.config.js` (sidebar brand tag, Settings → About). Never hard-code a version string in components. For a release: add an entry to `CHANGELOG.md`, then `npm version patch|minor|major` (commits + creates the `vX.Y.Z` tag) and `git push --follow-tags`.
+Semantic versioning; the version lives only in `package.json` and is injected into the UI as `__APP_VERSION__` via `define` in `vite.config.js` (sidebar brand tag, Settings → About). Never hard-code a version string in components. For a release: add an entry to `CHANGELOG.md`, then `npm version patch|minor|major` (commits + creates the `vX.Y.Z` tag) and `git push --follow-tags`. The tag push publishes the Docker image (see Commands).

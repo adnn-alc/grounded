@@ -8,6 +8,8 @@ All notable changes to Grounded are listed here. Versions follow [Semantic Versi
 
 ## [Unreleased]
 
+- Each release now also builds a ready-made Docker image for amd64 and arm64 and publishes it to GitHub Container Registry (`ghcr.io/adnn-alc/grounded`)
+
 ## [1.2.0] — 2026-10-30
 
 Safer by default: the container no longer runs as root. Also a paged bean archive, a one-time option to clear the sample data on new installs, and guides for contributors. No database changes.
