@@ -729,3 +729,12 @@ select {
   font-size: 13px; line-height: 1.4;
 }
 .toast > span { flex: 1; padding-top: 4px; }
+
+/* ── Sample data banner (new installs only) ── */
+.sample-banner { display: flex; align-items: center; gap: 14px; border-color: var(--crema); color: var(--text-2); }
+.sample-banner > svg { color: var(--crema); flex-shrink: 0; }
+.sample-banner-text { flex: 1; font-size: 13px; line-height: 1.5; }
+.sample-banner-text strong { color: var(--text); font-weight: 500; }
+.sample-banner-actions { gap: 8px; flex-shrink: 0; }
+.ghost-btn.danger { color: var(--bitter); }
+.ghost-btn.danger:hover { border-color: var(--bitter); }

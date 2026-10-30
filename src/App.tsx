@@ -68,7 +68,7 @@ export default function App() {
     saveGear, updateGear, deleteGear,
     saveRecipe, updateRecipe, deleteRecipe,
     saveTip, updateTip, deleteTip,
-    updateSettings,
+    updateSettings, clearSampleData,
   } = useData()
 
   // Preferences live in the database (shared by every browser), with defaults
@@ -117,7 +117,10 @@ export default function App() {
   }
 
   const pages: Record<Route, ReactElement> = {
-    home:          <Home        shots={shots} brews={brews} beans={beans} units={units} goTo={goTo} />,
+    home:          <Home        shots={shots} brews={brews} beans={beans} units={units} goTo={goTo}
+                     showSampleBanner={settings.sampleData === 'present'}
+                     onRemoveSampleData={clearSampleData}
+                     onKeepSampleData={() => updateSettings({ sampleData: 'dismissed' })} />,
     dialin:        <Dialin      shots={shots} beans={beans} gear={gear} units={units} waterRecipes={waterRecipes} dialinDefaults={dialinDefaults} brewModes={brewModes} onSaveShot={handleSaveShot} onSaveBrew={handleSaveBrew} onUpdateBean={updateBean} preset={dialinPreset} onPresetConsumed={() => setDialinPreset(null)} />,
     'shot-history': <ShotHistory shots={shots} beans={beans} gear={gear} units={units} waterRecipes={waterRecipes} brewModes={brewModes} onDelete={deleteShot} onUpdateShot={updateShot} initialSelectedId={openShotId} onReplicate={onReplicateShot} onFavorite={favoriteShot} />,
     'brew-history': <BrewHistory brews={brews} beans={beans} units={units} waterRecipes={waterRecipes} onDeleteBrew={deleteBrew} onUpdateBrew={updateBrew} initialSelectedId={openBrewId} onReplicate={onReplicateBrew} onFavorite={favoriteBrew} />,

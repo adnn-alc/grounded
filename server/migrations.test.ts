@@ -58,6 +58,10 @@ test('runs every migration and records the version', () => {
   assert.ok(columns('gear').includes('price'))
 })
 
+test('an existing database is never marked as having sample data', () => {
+  assert.equal(db.prepare(`SELECT 1 FROM settings WHERE key = 'sampleData'`).get(), undefined)
+})
+
 test('saves a backup before changing the database', () => {
   assert.ok(readdirSync(tmp.dir).some(f => f.startsWith('grounded.db.backup-v0-')))
 })

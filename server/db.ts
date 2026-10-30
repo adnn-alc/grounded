@@ -395,4 +395,21 @@ seedIfEmpty('recipes', () => {
   console.log('  ✓ Seeded recipes')
 })
 
+// ── Sample data ─────────────────────────────────────────────────────
+// The rows a brand-new install is seeded with (keep in sync with the seeds above).
+// POST /api/sample-data/clear removes exactly these and nothing else. The sample
+// recipes aren't listed: they're real recipes and stay useful.
+export const SAMPLE_IDS = {
+  beans: ['b-idido', 'b-finca', 'b-suke', 'b-geisha'],
+  shots: ['s-38', 's-39', 's-40', 's-41', 's-42'],
+  brews: ['brew-1', 'brew-2'],
+  gear:  ['g-lelit', 'g-df64', 'g-comandante', 'g-v60', 'g-aero', 'g-kettle', 'g-acaia', 'g-basket'],
+} as const
+
+// Only a brand-new install is marked, so only there does the UI offer to remove
+// the samples. Existing databases never get this setting.
+if (isNewDatabase) {
+  db.prepare(`INSERT OR IGNORE INTO settings (key, value) VALUES ('sampleData', '"present"')`).run()
+}
+
 export default db

@@ -1,6 +1,6 @@
 import type {
   Shot, ShotInput, Brew, BrewInput, Bean, BeanInput, Gear, GearInput,
-  Recipe, RecipeInput, Tip, TipInput, Settings, OkResponse,
+  Recipe, RecipeInput, Tip, TipInput, Settings, OkResponse, ClearSampleDataResponse,
 } from '../types.ts'
 
 const BASE = '/api'
@@ -67,4 +67,7 @@ export const api = {
   // Settings (partial update — only the keys sent are changed)
   getSettings:    ()                  => req<Settings>('GET', '/settings'),
   updateSettings: (partial: Settings) => req<Settings>('PUT', '/settings', partial),
+
+  // Sample data a new install starts with
+  clearSampleData: () => req<ClearSampleDataResponse>('POST', '/sample-data/clear'),
 }

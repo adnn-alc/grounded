@@ -280,6 +280,22 @@ export function useData() {
     }
   }
 
+  // ── Sample data ─────────────────────────────────────────────────
+  // Removes the sample beans/shots/brews/gear on a new install, then reloads
+  // what changed (quietly, without the full-page loading screen)
+  const clearSampleData = async () => {
+    await api.clearSampleData()
+    const [s, bw, b, ab, g, st] = await Promise.all([
+      api.getShots(), api.getBrews(), api.getBeans(), api.getArchivedBeans(), api.getGear(), api.getSettings(),
+    ])
+    setShots(s)
+    setBrews(bw)
+    setBeans(b)
+    setArchivedBeans(ab)
+    setGear(g)
+    setSettings(st)
+  }
+
   return {
     // Data
     shots, brews, beans, archivedBeans, gear, recipes, tips, settings,
@@ -310,6 +326,7 @@ export function useData() {
     updateTip:     reportErrors("Couldn't save the note", updateTip),
     deleteTip:     reportErrors("Couldn't delete the note", deleteTip),
     updateSettings,
+    clearSampleData: reportErrors("Couldn't remove the sample data", clearSampleData),
   }
 }
 

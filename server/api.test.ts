@@ -114,3 +114,24 @@ test('responses carry the security headers and hide Express', async () => {
   assert.equal(res.headers.get('x-powered-by'), null)
   assert.equal(res.headers.get('x-frame-options'), null, 'embedding in a dashboard stays possible')
 })
+
+// Keep this last: it removes the sample beans the tests above use
+test('removing sample data deletes only the samples, once', async () => {
+  assert.equal((await api.call<Settings>('GET', '/api/settings')).body.sampleData, 'present')
+  const mine = (await api.call<Shot>('POST', '/api/shots', shotBody('b-finca', DOSE))).body
+  const recipesBefore = (await api.call<unknown[]>('GET', '/api/recipes')).body.length
+
+  const res = await api.call<{ removed: Record<string, number> }>('POST', '/api/sample-data/clear')
+  assert.equal(res.status, OK)
+  assert.ok(res.body.removed.beans > 0 && res.body.removed.gear > 0)
+
+  const shots = (await api.call<Shot[]>('GET', '/api/shots')).body
+  const kept = shots.find(s => s.id === mine.id)
+  assert.ok(kept, 'a shot you logged yourself stays')
+  assert.equal(kept.bean, 'Finca Tamana', '…with its bean name')
+  assert.equal(kept.bean_id, null, '…but no link to the removed sample bean')
+  assert.ok(!shots.some(s => s.id === 's-42'), 'sample shots are gone')
+  assert.equal((await api.call<unknown[]>('GET', '/api/recipes')).body.length, recipesBefore, 'recipes stay')
+  assert.equal((await api.call<Settings>('GET', '/api/settings')).body.sampleData, 'cleared')
+  assert.equal((await api.call('POST', '/api/sample-data/clear')).status, CONFLICT, 'a second try is refused')
+})

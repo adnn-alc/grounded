@@ -8,6 +8,8 @@ All notable changes to Grounded are listed here. Versions follow [Semantic Versi
 
 ## [Unreleased]
 
+- New installs show a one-time banner on Home to remove the sample beans, shots, brews and gear in one go (recipes and anything you added stay). Existing installs never see it
+
 ## [1.1.0] — 2026-10-30
 
 Settings that follow you across devices, a font picker, shots linked to their bean bags, clearer errors, and a TypeScript rewrite under the hood. Your database is upgraded automatically on the first start, after a backup copy is saved next to it.

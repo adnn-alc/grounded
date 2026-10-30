@@ -4,8 +4,8 @@ import express from 'express'
 import type { NextFunction, Request, Response } from 'express'
 import path from 'path'
 import { fileURLToPath } from 'url'
-import db from './db.ts'
-import { HttpError, NOT_FOUND, FORBIDDEN, errorHandler, found } from './errors.ts'
+import db, { SAMPLE_IDS } from './db.ts'
+import { HttpError, NOT_FOUND, FORBIDDEN, CONFLICT, errorHandler, found } from './errors.ts'
 import {
   parseBody, shotSchema, brewSchema, beanSchema, gearSchema, recipeSchema, tipSchema,
   favoriteSchema, settingsSchema,
@@ -482,6 +482,28 @@ app.put('/api/settings', (req, res) => {
       .forEach(([key, value]) => upsert.run(key, JSON.stringify(value)))
   })()
   res.json(readSettings())
+})
+
+// ── SAMPLE DATA ──────────────────────────────────────────────────────
+// Removes the sample beans, shots, brews and gear a new install starts with.
+// Only works once, and only on an install marked as having sample data, so it
+// can never touch a database that started out without them.
+app.post('/api/sample-data/clear', (req, res) => {
+  if (readSettings().sampleData !== 'present') {
+    throw new HttpError(CONFLICT, 'There is no sample data to remove on this install')
+  }
+  const removed = db.transaction(() => {
+    const counts = Object.fromEntries(Object.entries(SAMPLE_IDS).map(([table, ids]) => [
+      table,
+      ids.reduce((sum, id) => sum + db.prepare(`DELETE FROM ${table} WHERE id = ?`).run(id).changes, 0),
+    ]))
+    // Shots you logged against a sample bean keep its name, just not the link
+    const marks = SAMPLE_IDS.beans.map(() => '?').join(', ')
+    BEAN_LINKED_TABLES.forEach(t => db.prepare(`UPDATE ${t} SET bean_id = NULL WHERE bean_id IN (${marks})`).run(...SAMPLE_IDS.beans))
+    db.prepare(`UPDATE settings SET value = '"cleared"', updated_at = datetime('now') WHERE key = 'sampleData'`).run()
+    return counts
+  })()
+  res.json({ removed })
 })
 
 // ── HEALTH ───────────────────────────────────────────────────────────

@@ -3,6 +3,7 @@ import { StatCard } from '../components/ui.tsx'
 import { WeekTrend } from '../components/charts.tsx'
 import { useUnits } from '../hooks/useUnits.ts'
 import Ico from '../components/Ico.tsx'
+import { SampleDataBanner } from '../components/SampleDataBanner.tsx'
 import type { Bean, Brew, Route, Shot, Units } from '../types.ts'
 
 const FAV_GAP = 8          // matches the favorites stack gap
@@ -14,9 +15,12 @@ interface HomeProps {
   beans: Bean[]
   units: Units
   goTo:  (route: Route, id?: string) => void
+  showSampleBanner?: boolean
+  onRemoveSampleData?: () => Promise<void>
+  onKeepSampleData?:   () => void
 }
 
-export default function Home({ shots, brews, beans, units, goTo }: HomeProps) {
+export default function Home({ shots, brews, beans, units, goTo, showSampleBanner, onRemoveSampleData, onKeepSampleData }: HomeProps) {
   const U = useUnits(units)
 
   const now = new Date()
@@ -150,6 +154,10 @@ export default function Home({ shots, brews, beans, units, goTo }: HomeProps) {
         <h1 className="page-title">{greeting}</h1>
         <span className="page-sub">{dateStr}</span>
       </div>
+
+      {showSampleBanner && onRemoveSampleData && onKeepSampleData && (
+        <SampleDataBanner onRemove={onRemoveSampleData} onKeep={onKeepSampleData} />
+      )}
 
       <div className="grid grid-4">
         <StatCard

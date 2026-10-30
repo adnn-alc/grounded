@@ -32,7 +32,7 @@ Then open **http://localhost:5555**.
 
 > **Note:** `docker-compose.yml` joins an external Docker network called `media_net` (used to sit behind a reverse proxy on the author's server). If you don't have that network, delete the two `networks:` blocks from `docker-compose.yml` before running, or create it first with `docker network create media_net`.
 
-The database is stored at `./data/grounded.db` next to `docker-compose.yml`, so it survives container rebuilds and updates. On first run it is created and filled with a few sample beans, shots and gear to explore — delete them from the UI once you start logging your own.
+The database is stored at `./data/grounded.db` next to `docker-compose.yml`, so it survives container rebuilds and updates. On first run it is created and filled with a few sample beans, shots and gear to explore. When you're ready to log your own, use **Remove sample data** in the banner on the Home page. It removes only the samples, never anything you added, and the banner disappears for good once you've removed or kept them.
 
 To use a different host port, change the left side of the mapping in `docker-compose.yml`:
 

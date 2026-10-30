@@ -207,6 +207,15 @@ export interface Settings {
   waterRecipes?:   string[]
   dialinDefaults?: DialinDefaults
   brewModes?:      string[]   // espresso machine buttons/programs; empty or missing = field hidden
+  sampleData?:     SampleDataState
+}
+
+/** Only set on installs that started with sample data: 'present' until removed ('cleared') or kept ('dismissed') */
+export type SampleDataState = 'present' | 'cleared' | 'dismissed'
+
+/** Response of POST /api/sample-data/clear: rows removed per table */
+export interface ClearSampleDataResponse {
+  removed: Record<'beans' | 'shots' | 'brews' | 'gear', number>
 }
 
 export type SettingKey = keyof Settings

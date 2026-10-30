@@ -147,6 +147,7 @@ export const settingsSchema = z.strictObject({
   waterRecipes:   z.array(text().min(1)).max(MAX_ITEMS).optional(),
   dialinDefaults: z.record(z.string().max(LEN.short), z.record(z.string().max(LEN.short), z.union([z.string().max(LEN.name), z.number(), z.null()]))).optional(),
   brewModes:      z.array(text(LEN.short).trim().min(1)).max(MAX_ITEMS).optional(),
+  sampleData:     z.enum(['present', 'cleared', 'dismissed']).optional(),
 })
 
 /** Returns the parsed body, or throws a 400 that lists what's wrong */

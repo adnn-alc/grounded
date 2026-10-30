@@ -59,6 +59,8 @@ The author's live database has a few leftovers that the code doesn't create or u
 
 App-wide preferences live in the `settings` table (one row per key, JSON value), so every browser sees the same ones: `theme`, `fonts`, `units`, `waterRecipes`, `dialinDefaults`, `brewModes`. API: `GET /api/settings` returns one object; `PUT /api/settings` takes a partial object and only accepts those keys (`settingsSchema` in `server/validation.ts`).
 
+`sampleData` is only ever set on a brand-new install (`'present'`, by `db.ts`). While it's `'present'`, Home shows a banner whose button calls `POST /api/sample-data/clear`. That deletes exactly the rows in `SAMPLE_IDS` (`db.ts`; recipes are kept), unlinks the user's own shots from removed sample beans and sets `'cleared'`; it answers 409 on any install not marked `'present'`. "Keep them" sets `'dismissed'`. Keep `SAMPLE_IDS` in sync with the seed data.
+
 `brewModes` (espresso machine buttons/programs) is optional: when it's empty or missing, Dial-in and the shot editor don't show a brew mode field at all. In the UI, `App.tsx` derives each value with a default and passes it down as props; changes go through `updateSettings()` in `useData`.
 
 Older versions kept theme, water recipes and dial-in defaults in `localStorage`. On first load, `useData` moves any of those the database doesn't have yet into it, then deletes the old keys.
