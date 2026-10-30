@@ -48,6 +48,8 @@ git pull
 docker compose up -d --build
 ```
 
+Grounded runs as the unprivileged `node` user (uid 1000) inside the container, not as root. On start it makes the `data/` folder belong to uid 1000 and then drops its root rights. So a folder created by an older version (which ran as root) keeps working, and you don't need to change ownership yourself. If you'd rather run it as your own user, set `user: "UID:GID"` in `docker-compose.yml` and make sure that user can write to `data/`.
+
 ---
 
 ## Local development

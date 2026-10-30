@@ -23,10 +23,15 @@ RUN npm prune --omit=dev
 FROM node:24-alpine@sha256:8a32c8cf649a49915a66e81e7a609223c708d0adabf288ee3f4077d765542f85
 WORKDIR /app
 
+# su-exec lets the entrypoint drop from root to the unprivileged node user
+RUN apk add --no-cache su-exec
+
 COPY package.json package-lock.json ./
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/dist         ./dist
 COPY --from=builder /app/server       ./server
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod 755 /usr/local/bin/docker-entrypoint.sh
 
 ENV DB_PATH=/app/data/grounded.db
 ENV NODE_ENV=production
@@ -38,4 +43,7 @@ EXPOSE 3001
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
   CMD node -e "fetch('http://localhost:' + (process.env.PORT || 3001) + '/api/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
 
+# The app runs as "node" (uid 1000), not root: the entrypoint gives the data
+# folder to node, then drops privileges (see docker-entrypoint.sh)
+ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["node", "server/index.ts"]

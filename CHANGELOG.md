@@ -8,6 +8,7 @@ All notable changes to Grounded are listed here. Versions follow [Semantic Versi
 
 ## [Unreleased]
 
+- The app no longer runs as root inside the container: it runs as the `node` user (uid 1000). On start it takes ownership of the `data/` folder, so existing installs keep working without manual steps
 - The bean archive is now split into pages (10, 20 or 50 per page)
 - Added CONTRIBUTING.md, issue templates (bug report, feature idea) and a pull request template
 - New installs show a one-time banner on Home to remove the sample beans, shots, brews and gear in one go (recipes and anything you added stay). Existing installs never see it

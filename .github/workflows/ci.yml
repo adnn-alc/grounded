@@ -69,3 +69,20 @@ jobs:
           curl -sf localhost:3001/api/health || { docker logs grounded-ci; exit 1; }
           curl -sf localhost:3001/ | grep -q 'id="root"' || { docker logs grounded-ci; exit 1; }
           docker rm -f grounded-ci
+
+      # Like an upgrade from a version that ran as root: the mounted data folder and
+      # database belong to root. The app must still run as node (uid 1000) and write.
+      - name: Run as non-root with a root-owned data folder
+        run: |
+          sudo mkdir -p ci-data && sudo touch ci-data/old-root-file && sudo chown -R 0:0 ci-data
+          docker run -d --name grounded-ci -p 3001:3001 -v "$PWD/ci-data:/app/data" grounded:ci
+          for i in $(seq 1 30); do curl -sf localhost:3001/api/health > /dev/null && break; sleep 1; done
+          fail() { echo "::error::$1"; docker logs grounded-ci; exit 1; }
+          [ "$(docker exec grounded-ci sh -c 'stat -c %u /proc/1')" = 1000 ] || fail "app is not running as uid 1000"
+          curl -sf -X POST -H 'Content-Type: application/json' -d '{"kind":"Scale","name":"CI scale"}' \
+            localhost:3001/api/gear > /dev/null || fail "could not write to the database"
+          [ "$(stat -c %u ci-data/grounded.db)" = 1000 ] || fail "database file not owned by uid 1000"
+          docker stop grounded-ci > /dev/null
+          [ ! -s ci-data/grounded.db-wal ] || fail "database not closed cleanly on stop"
+          docker rm grounded-ci > /dev/null
+          echo 'Runs as uid 1000 and writes to a formerly root-owned folder'

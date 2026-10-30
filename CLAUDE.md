@@ -81,6 +81,7 @@ Theme (`moody` by default) is applied as a `data-theme` attribute on `<html>`. F
 - In production (`NODE_ENV=production`) the Express server serves `dist/` as static files and handles `*` with the SPA index.
 - Vite proxies `/api/*` → `http://localhost:3001` in dev so there are no CORS issues locally.
 - The Dockerfile builds everything in the first stage, prunes dev dependencies there, and copies `node_modules` into a runtime stage that has no compilers. Both stages must use the same base image, because `better-sqlite3` is a native module.
+- The app runs as `node` (uid 1000), not root. `docker-entrypoint.sh` starts as root, `chown`s the data folder (the `DB_PATH` directory) to node, then `exec su-exec node …`. A compose `user:` override skips the chown and runs as that user. CI checks this with a root-owned bind mount. Keep `docker-entrypoint.sh` LF-only (`.gitattributes`).
 - `docker-compose.yml` joins the author's external `media_net` network. Leave that as is.
 
 ### ESM
