@@ -1,6 +1,7 @@
 import Database from 'better-sqlite3'
 import path from 'path'
 import { fileURLToPath } from 'url'
+import type { Settings, SettingRow } from '../src/types.ts'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const DB_PATH = process.env.DB_PATH || path.join(__dirname, '../data/grounded.db')
@@ -229,6 +230,32 @@ const MIGRATIONS: readonly { name: string, up: () => void }[] = [
   },
 ]
 
+/** The schema version this code creates and upgrades to (PRAGMA user_version) */
+export const SCHEMA_VERSION = MIGRATIONS.length
+
+/**
+ * Safety copy of the whole database next to it, as grounded.db.backup-<label>-<time>.
+ * VACUUM INTO writes a consistent snapshot even while the app is running.
+ * Returns the file name.
+ */
+export function snapshotDatabase(label: string): string {
+  const stamp = new Date().toISOString().replace(/[-:]/g, '').replace('T', '-').slice(0, 15)   // 20261030-140501
+  const file = unusedName(`${DB_PATH}.backup-${label}-${stamp}`)
+  db.exec(`VACUUM INTO '${file.replace(/'/g, "''")}'`)
+  return path.basename(file)
+}
+
+/** Adds -2, -3, … when two snapshots are taken within the same second */
+const unusedName = (file: string, n = 1): string => {
+  const candidate = n === 1 ? file : `${file}-${n}`
+  return fs.existsSync(candidate) ? unusedName(file, n + 1) : candidate
+}
+
+/** Deletes a snapshot that turned out not to be needed (by the file name snapshotDatabase returned) */
+export function deleteSnapshot(name: string): void {
+  fs.rmSync(path.join(path.dirname(DB_PATH), path.basename(name)), { force: true })
+}
+
 function runMigrations(): void {
   const current = db.pragma('user_version', { simple: true }) as number
   if (current > MIGRATIONS.length) {
@@ -243,11 +270,8 @@ function runMigrations(): void {
     return
   }
 
-  // Safety copy before changing an existing database (VACUUM INTO writes a consistent snapshot)
-  const stamp = new Date().toISOString().replace(/[-:]/g, '').replace('T', '-').slice(0, 15)
-  const backup = `${DB_PATH}.backup-v${current}-${stamp}`
-  db.exec(`VACUUM INTO '${backup.replace(/'/g, "''")}'`)
-  console.log(`  ✓ Backed up the database to ${path.basename(backup)} before updating it`)
+  const backup = snapshotDatabase(`v${current}`)
+  console.log(`  ✓ Backed up the database to ${backup} before updating it`)
 
   for (let i = current; i < MIGRATIONS.length; i++) {
     const m = MIGRATIONS[i]!
@@ -410,6 +434,16 @@ export const SAMPLE_IDS = {
 // the samples. Existing databases never get this setting.
 if (isNewDatabase) {
   db.prepare(`INSERT OR IGNORE INTO settings (key, value) VALUES ('sampleData', '"present"')`).run()
+}
+
+/** All saved settings as one object (each row's value is JSON) */
+export function readSettings(): Settings {
+  const parse = (value: string): unknown => { try { return JSON.parse(value) } catch { return undefined } }
+  return Object.fromEntries(
+    db.prepare<[], Pick<SettingRow, 'key' | 'value'>>('SELECT key, value FROM settings').all()
+      .map(row => [row.key, parse(row.value)])
+      .filter(([, value]) => value !== undefined)
+  )
 }
 
 export default db

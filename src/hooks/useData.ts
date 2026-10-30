@@ -3,7 +3,7 @@ import { api } from '../api/client.ts'
 import { showError, markShown } from '../components/Toast.tsx'
 import type {
   Shot, ShotInput, Brew, BrewInput, Bean, BeanInput, Gear, GearInput,
-  Recipe, RecipeInput, Tip, TipInput, Settings,
+  Recipe, RecipeInput, Tip, TipInput, Settings, Backup, ImportMode, ImportResult,
 } from '../types.ts'
 
 /** Shows a toast when a mutation fails, then rethrows so the caller stops (e.g. keeps its form open) */
@@ -280,20 +280,38 @@ export function useData() {
     }
   }
 
-  // ── Sample data ─────────────────────────────────────────────────
-  // Removes the sample beans/shots/brews/gear on a new install, then reloads
-  // what changed (quietly, without the full-page loading screen)
-  const clearSampleData = async () => {
-    await api.clearSampleData()
-    const [s, bw, b, ab, g, st] = await Promise.all([
-      api.getShots(), api.getBrews(), api.getBeans(), api.getArchivedBeans(), api.getGear(), api.getSettings(),
+  // Reloads everything quietly, without the full-page loading screen
+  const refreshAll = async () => {
+    const [s, bw, b, ab, g, r, ti, st] = await Promise.all([
+      api.getShots(), api.getBrews(), api.getBeans(), api.getArchivedBeans(),
+      api.getGear(), api.getRecipes(), api.getTips(), api.getSettings(),
     ])
     setShots(s)
     setBrews(bw)
     setBeans(b)
     setArchivedBeans(ab)
     setGear(g)
+    setRecipes(r)
+    setTips(ti)
     setSettings(st)
+  }
+
+  // ── Sample data ─────────────────────────────────────────────────
+  // Removes the sample beans/shots/brews/gear on a new install
+  const clearSampleData = async () => {
+    await api.clearSampleData()
+    await refreshAll()
+  }
+
+  // ── Backups ─────────────────────────────────────────────────────
+  // The preview is a dry run: the server reports what would change without changing it
+  const previewBackup = (backup: Backup, mode: ImportMode): Promise<ImportResult> =>
+    api.importBackup({ backup, mode, dryRun: true })
+
+  const restoreBackup = async (backup: Backup, mode: ImportMode): Promise<ImportResult> => {
+    const result = await api.importBackup({ backup, mode })
+    await refreshAll()
+    return result
   }
 
   return {
@@ -327,6 +345,8 @@ export function useData() {
     deleteTip:     reportErrors("Couldn't delete the note", deleteTip),
     updateSettings,
     clearSampleData: reportErrors("Couldn't remove the sample data", clearSampleData),
+    previewBackup:   reportErrors("Couldn't read the backup", previewBackup),
+    restoreBackup:   reportErrors("Couldn't restore the backup", restoreBackup),
   }
 }
 

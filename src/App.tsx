@@ -68,7 +68,7 @@ export default function App() {
     saveGear, updateGear, deleteGear,
     saveRecipe, updateRecipe, deleteRecipe,
     saveTip, updateTip, deleteTip,
-    updateSettings, clearSampleData,
+    updateSettings, clearSampleData, previewBackup, restoreBackup,
   } = useData()
 
   // Preferences live in the database (shared by every browser), with defaults
@@ -158,6 +158,7 @@ export default function App() {
         waterRecipes={waterRecipes} setWaterRecipes={w => updateSettings({ waterRecipes: w })}
         dialinDefaults={dialinDefaults} setDialinDefaults={d => updateSettings({ dialinDefaults: d })}
         brewModes={brewModes} setBrewModes={m => updateSettings({ brewModes: m })}
+        onPreviewBackup={previewBackup} onRestoreBackup={restoreBackup}
       />
       <Toaster />
     </div>

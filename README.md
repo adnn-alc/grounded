@@ -105,7 +105,19 @@ Everything is served from one port (3001 by default).
 
 ## Backup & restore
 
-All your data — logs, beans, gear, recipes and settings — is in the `data/` folder. SQLite runs in WAL mode, so stop the container before copying to get a consistent snapshot:
+The easiest way is in the app: **Settings → Backup & data**.
+
+- **Download a backup** saves everything (beans including archived ones, shots, brews, gear, recipes, notes and settings) in one `.json` file. Keep it somewhere other than the server.
+- **Restore from a backup** shows what the file would change before anything happens, then either:
+  - **Add missing**: keeps everything you have and adds what the backup has that this install doesn't. Nothing is overwritten. Handy for merging a second install into your main one.
+  - **Replace everything**: deletes what's there now and loads the backup, settings included. For a new server or a wiped install.
+
+  Before restoring, Grounded saves a copy of the current database next to it (`data/grounded.db.backup-import-…`), and the whole restore succeeds or changes nothing. Backups from older Grounded versions work; a backup from a newer version asks you to update first.
+- **Spreadsheet export** downloads your shots or brews as CSV for Excel, Numbers or Google Sheets.
+
+Stock amounts come from the backup as they were; restoring doesn't recount them from the shots.
+
+You can also copy the database file itself. Everything is in the `data/` folder. SQLite runs in WAL mode, so stop the container before copying to get a consistent snapshot:
 
 ```bash
 docker compose stop
@@ -113,9 +125,9 @@ cp data/grounded.db ~/grounded-backup-$(date +%F).db
 docker compose start
 ```
 
-When an update changes the database layout, Grounded first saves a copy next to it automatically (`data/grounded.db.backup-v…`). You can delete those once you're happy with the update.
+When an update changes the database layout, Grounded first saves a copy next to it automatically (`data/grounded.db.backup-v…`). You can delete those copies, and the `backup-import-…` ones, once you're happy.
 
-To restore, stop the container, put the backup back at `data/grounded.db` (and remove any `grounded.db-wal` / `grounded.db-shm` files next to it), then start it again.
+To restore a copied file, stop the container, put the backup back at `data/grounded.db` (and remove any `grounded.db-wal` / `grounded.db-shm` files next to it), then start it again.
 
 ---
 
@@ -143,9 +155,10 @@ grounded/
 │   ├── index.ts            # Starts the server, clean shutdown
 │   ├── app.ts              # Express API — all routes
 │   ├── db.ts               # SQLite schema, migrations, seed data
+│   ├── backup.ts           # Backup export/restore, CSV export
 │   ├── validation.ts       # Request checks (zod)
 │   ├── errors.ts           # Error handling
-│   ├── *.test.ts           # API and migration tests (npm test)
+│   ├── *.test.ts           # API, backup and migration tests (npm test)
 │   └── tsconfig.json       # Type-checking for the API
 ├── src/
 │   ├── types.ts            # Types shared by the API and the UI
@@ -177,6 +190,7 @@ All endpoints are JSON under `/api`.
 | Recipes  | `GET /recipes` · `POST /recipes` · `PUT /recipes/:id` · `DELETE /recipes/:id` |
 | Tips     | `GET /tips` · `POST /tips` · `PUT /tips/:id` · `DELETE /tips/:id` |
 | Settings | `GET /settings` · `PUT /settings` (partial update) |
+| Backup   | `GET /export` (JSON backup) · `GET /export/shots.csv` · `GET /export/brews.csv` · `POST /import` (`{ mode: "replace" \| "merge", dryRun?, backup }`) |
 | Health   | `GET /health` |
 
 ---

@@ -18,6 +18,7 @@ export interface ApiResponse<T = unknown> { status: number, headers: Headers, bo
 
 /** Starts the app on a random port and returns a small JSON client for it */
 export async function startApi(app: Express): Promise<{
+  base: string
   call: <T = unknown>(method: string, url: string, body?: unknown) => Promise<ApiResponse<T>>
   close: () => Promise<void>
 }> {
@@ -37,5 +38,5 @@ export async function startApi(app: Express): Promise<{
   }
 
   const close = (): Promise<void> => new Promise(resolve => server.close(() => resolve()))
-  return { call, close }
+  return { base, call, close }
 }

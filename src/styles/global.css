@@ -738,3 +738,9 @@ select {
 .sample-banner-actions { gap: 8px; flex-shrink: 0; }
 .ghost-btn.danger { color: var(--bitter); }
 .ghost-btn.danger:hover { border-color: var(--bitter); }
+
+/* Settings → Backup & data */
+.restore-preview { display: flex; align-items: center; gap: 14px; padding: 10px 12px; margin-top: 4px; border: 1px solid var(--border); border-radius: 6px; font-size: 12px; color: var(--text-2); line-height: 1.5; }
+.restore-preview > span { flex: 1; }
+.restore-preview code { font-family: var(--font-mono); font-size: 11px; word-break: break-all; }
+a.ghost-btn { text-decoration: none; }

@@ -4,7 +4,8 @@ import express from 'express'
 import type { NextFunction, Request, Response } from 'express'
 import path from 'path'
 import { fileURLToPath } from 'url'
-import db, { SAMPLE_IDS } from './db.ts'
+import db, { SAMPLE_IDS, readSettings } from './db.ts'
+import { createBackup, restoreBackup, shotsCsv, brewsCsv, today } from './backup.ts'
 import { HttpError, NOT_FOUND, FORBIDDEN, CONFLICT, errorHandler, found } from './errors.ts'
 import {
   parseBody, shotSchema, brewSchema, beanSchema, gearSchema, recipeSchema, tipSchema,
@@ -12,7 +13,7 @@ import {
 } from './validation.ts'
 import type {
   Shot, ShotRow, Brew, BrewRow, Bean, BeanRow, GearRow, Recipe, RecipeRow, TipRow,
-  Settings, SettingRow, StockLevel,
+  StockLevel,
 } from '../src/types.ts'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -43,6 +44,10 @@ if (allowedHosts.length) {
   })
 }
 
+// Backups can be several MB; every other request stays under the default 100 KB.
+// (The route-specific parser runs first, and the general one then skips that body.)
+const IMPORT_LIMIT = '50mb'
+app.use('/api/import', express.json({ limit: IMPORT_LIMIT }))
 app.use(express.json())
 
 // ── Helper: map a DB shot row → API shape ───────────────────────────
@@ -456,15 +461,6 @@ app.delete('/api/tips/:id', (req, res) => {
 // ── SETTINGS ─────────────────────────────────────────────────────────
 // Stored as one row per key with a JSON value, returned as a single object
 
-function readSettings(): Settings {
-  const parse = (value: string): unknown => { try { return JSON.parse(value) } catch { return undefined } }
-  return Object.fromEntries(
-    db.prepare<[], Pick<SettingRow, 'key' | 'value'>>('SELECT key, value FROM settings').all()
-      .map(row => [row.key, parse(row.value)])
-      .filter(([, value]) => value !== undefined)
-  )
-}
-
 app.get('/api/settings', (req, res) => {
   res.json(readSettings())
 })
@@ -504,6 +500,30 @@ app.post('/api/sample-data/clear', (req, res) => {
     return counts
   })()
   res.json({ removed })
+})
+
+// ── BACKUP & EXPORT ──────────────────────────────────────────────────
+// Downloads: a full JSON backup, and shots/brews as CSV for spreadsheets.
+// Restoring is in backup.ts (with a database snapshot first).
+const JSON_INDENT = 2
+
+app.get('/api/export', (req, res) => {
+  res.attachment(`grounded-backup-${today()}.json`)
+  res.send(JSON.stringify(createBackup(), null, JSON_INDENT))
+})
+
+app.get('/api/export/shots.csv', (req, res) => {
+  res.attachment(`grounded-shots-${today()}.csv`)
+  res.send(shotsCsv())
+})
+
+app.get('/api/export/brews.csv', (req, res) => {
+  res.attachment(`grounded-brews-${today()}.csv`)
+  res.send(brewsCsv())
+})
+
+app.post('/api/import', (req, res) => {
+  res.json(restoreBackup(req.body))
 })
 
 // ── HEALTH ───────────────────────────────────────────────────────────

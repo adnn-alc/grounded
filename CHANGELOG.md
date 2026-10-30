@@ -8,6 +8,8 @@ All notable changes to Grounded are listed here. Versions follow [Semantic Versi
 
 ## [Unreleased]
 
+- Backup & restore in **Settings → Backup & data**: download everything as one JSON file, and restore it on a new install (replace everything) or merge it into an existing one (add missing only). You see what a restore would change first, and a copy of the current database is saved before it runs
+- Export shots and brews as CSV for spreadsheets
 - Each release now also builds a ready-made Docker image for amd64 and arm64 and publishes it to GitHub Container Registry (`ghcr.io/adnn-alc/grounded`)
 
 ## [1.2.0] — 2026-10-30

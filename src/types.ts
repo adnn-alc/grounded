@@ -220,6 +220,46 @@ export interface ClearSampleDataResponse {
 
 export type SettingKey = keyof Settings
 
+// ── Backups ─────────────────────────────────────────────────────────
+
+/** The tables a backup holds, besides the settings */
+export type BackupTable = 'beans' | 'shots' | 'brews' | 'gear' | 'recipes' | 'tips'
+
+/** One database row as stored (taste as flat columns, lists as JSON strings) */
+export type BackupRow = { id: string } & Record<string, string | number | null>
+
+/** GET /api/export: the backup file. Rows are raw database rows, so nothing is lost. */
+export interface Backup {
+  app:           'grounded'
+  format:        1
+  version:       string   // Grounded version that wrote it
+  schemaVersion: number   // database schema (PRAGMA user_version) the rows are in
+  exportedAt:    string   // ISO timestamp
+  tables:        Record<BackupTable, BackupRow[]>
+  settings:      Settings
+}
+
+/** replace: wipe and load the backup. merge: keep everything, add rows whose id isn't here yet. */
+export type ImportMode = 'replace' | 'merge'
+
+/** POST /api/import. With dryRun the server works out the result without changing anything. */
+export interface ImportRequest {
+  mode:    ImportMode
+  dryRun?: boolean
+  backup:  Backup
+}
+
+export type TableCounts = Record<BackupTable, number>
+
+export interface ImportResult {
+  mode:     ImportMode
+  dryRun:   boolean
+  removed:  TableCounts      // rows that were here before (replace only)
+  added:    TableCounts
+  skipped:  TableCounts      // already here (merge only)
+  snapshot: string | null    // file name of the safety copy written first (not on a dry run)
+}
+
 // ── Database rows (server only) ─────────────────────────────────────
 // What `SELECT *` returns before the rowTo*() helpers in server/app.ts
 // turn JSON strings into arrays and taste columns into a nested object.

@@ -47,6 +47,14 @@ jobs:
             -d '{"units":{"mass":"g","temp":"C"}}' \
             localhost:3001/api/settings > /dev/null || fail "PUT /api/settings failed"
           curl -sf localhost:3001/ | grep -q 'id="root"' || fail "frontend not served"
+          # Backups: export, both CSVs, and a dry-run restore of the export
+          for path in export export/shots.csv export/brews.csv; do
+            curl -sf "localhost:3001/api/$path" > /dev/null || fail "GET /api/$path failed"
+          done
+          curl -sf localhost:3001/api/export -o "$RUNNER_TEMP/backup.json"
+          jq '{mode: "merge", dryRun: true, backup: .}' "$RUNNER_TEMP/backup.json" |
+            curl -sf -X POST -H 'Content-Type: application/json' --data-binary @- localhost:3001/api/import > /dev/null ||
+            fail "dry-run import of the export failed"
           # Bad input and unknown ids answer 400/404 with a JSON error, not a crash
           status() { curl -s -o /dev/null -w '%{http_code}' -H 'Content-Type: application/json' "$@"; }
           [ "$(status -X POST -d '{"name":""}' localhost:3001/api/beans)" = 400 ] || fail "invalid bean not rejected with 400"

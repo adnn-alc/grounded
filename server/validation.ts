@@ -150,6 +150,30 @@ export const settingsSchema = z.strictObject({
   sampleData:     z.enum(['present', 'cleared', 'dismissed']).optional(),
 })
 
+// A backup's rows are checked loosely here (an id, plain values only) because
+// they're raw database rows; columns this version doesn't have are dropped on import
+const LEN_CELL        = 1_000_000
+const MAX_BACKUP_ROWS = 1_000_000
+const backupCell = z.union([z.string().max(LEN_CELL), z.number(), z.null()])
+const backupRows = z.array(z.object({ id: z.string().min(1).max(LEN.name) }).catchall(backupCell)).max(MAX_BACKUP_ROWS).default([])
+
+export const importSchema = z.object({
+  mode:   z.enum(['replace', 'merge']),
+  dryRun: z.boolean().optional(),
+  backup: z.object({
+    app:           z.literal('grounded'),
+    format:        z.literal(1),
+    version:       z.string().max(LEN.short).optional(),
+    schemaVersion: z.number().int().min(0),
+    exportedAt:    z.string().max(LEN.short).optional(),
+    tables: z.object({
+      beans: backupRows, shots: backupRows, brews: backupRows, gear: backupRows, recipes: backupRows, tips: backupRows,
+    }),
+    // Checked key by key against settingsSchema on import; unknown or invalid keys are skipped
+    settings: z.record(z.string(), z.unknown()).optional(),
+  }),
+})
+
 /** Returns the parsed body, or throws a 400 that lists what's wrong */
 export function parseBody<T>(schema: z.ZodType<T>, body: unknown): T {
   const result = schema.safeParse(body)

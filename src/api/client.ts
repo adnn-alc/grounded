@@ -1,6 +1,7 @@
 import type {
   Shot, ShotInput, Brew, BrewInput, Bean, BeanInput, Gear, GearInput,
   Recipe, RecipeInput, Tip, TipInput, Settings, OkResponse, ClearSampleDataResponse,
+  ImportRequest, ImportResult,
 } from '../types.ts'
 
 const BASE = '/api'
@@ -70,4 +71,14 @@ export const api = {
 
   // Sample data a new install starts with
   clearSampleData: () => req<ClearSampleDataResponse>('POST', '/sample-data/clear'),
+
+  // Restore a backup (dryRun: only report what would change)
+  importBackup: (r: ImportRequest) => req<ImportResult>('POST', '/import', r),
 }
+
+/** Downloads are plain links, so the browser saves the file the server names */
+export const EXPORT_URLS = {
+  backup:   `${BASE}/export`,
+  shotsCsv: `${BASE}/export/shots.csv`,
+  brewsCsv: `${BASE}/export/brews.csv`,
+} as const

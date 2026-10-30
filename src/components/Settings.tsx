@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react'
 import Ico from './Ico.tsx'
+import DataSettings from './DataSettings.tsx'
+import type { DataSettingsProps } from './DataSettings.tsx'
 import { FONT_ROLES, FONT_OPTIONS, fontStack } from '../data/fonts.ts'
 import { RPM_OPTIONS } from '../data/grinderRpm.ts'
 import type { DialinDefaults, EspressoDefaults, FilterDefaults, FontRole, Fonts, Units } from '../types.ts'
@@ -31,9 +33,11 @@ interface SettingsProps {
   setDialinDefaults: (defaults: DialinDefaults) => void
   brewModes:         string[]
   setBrewModes:      (modes: string[]) => void
+  onPreviewBackup:   DataSettingsProps['onPreview']
+  onRestoreBackup:   DataSettingsProps['onRestore']
 }
 
-export default function Settings({ open, onClose, theme, setTheme, fonts, setFonts, units, setUnits, waterRecipes, setWaterRecipes, dialinDefaults, setDialinDefaults, brewModes, setBrewModes }: SettingsProps) {
+export default function Settings({ open, onClose, theme, setTheme, fonts, setFonts, units, setUnits, waterRecipes, setWaterRecipes, dialinDefaults, setDialinDefaults, brewModes, setBrewModes, onPreviewBackup, onRestoreBackup }: SettingsProps) {
   const [tab, setTab]   = useState('preferences')
   const [defs, setDefs] = useState(dialinDefaults)
   const [newRecipe, setNewRecipe] = useState('')
@@ -87,7 +91,7 @@ export default function Settings({ open, onClose, theme, setTheme, fonts, setFon
         </div>
 
         <div className="row" style={{ gap: 4, padding: '0 20px', borderBottom: '1px solid var(--border)' }}>
-          {[['preferences', 'Preferences'], ['defaults', 'Dial-in defaults']].map(([t, label]) => (
+          {[['preferences', 'Preferences'], ['defaults', 'Dial-in defaults'], ['data', 'Backup & data']].map(([t, label]) => (
             <button key={t}
               className={`ghost-btn${tab === t ? ' active' : ''}`}
               style={{ fontSize: 12, borderRadius: 0, borderBottom: tab === t ? '2px solid var(--crema)' : '2px solid transparent', marginBottom: -1 }}
@@ -96,7 +100,8 @@ export default function Settings({ open, onClose, theme, setTheme, fonts, setFon
         </div>
 
         <div className="modal-body scroll">
-          {tab === 'preferences' ? (
+          {tab === 'data' && <DataSettings onPreview={onPreviewBackup} onRestore={onRestoreBackup} />}
+          {tab === 'preferences' && (
             <>
               <div className="settings-section">
                 <h3>Appearance · Theme</h3>
@@ -180,7 +185,8 @@ export default function Settings({ open, onClose, theme, setTheme, fonts, setFon
                 </div>
               </div>
             </>
-          ) : (
+          )}
+          {tab === 'defaults' && (
             <>
               <div className="settings-section">
                 <h3>Water recipes</h3>
