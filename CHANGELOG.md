@@ -8,6 +8,10 @@ All notable changes to Grounded are listed here. Versions follow [Semantic Versi
 
 ## [Unreleased]
 
+## [1.2.0] — 2026-10-30
+
+Safer by default: the container no longer runs as root. Also a paged bean archive, a one-time option to clear the sample data on new installs, and guides for contributors. No database changes.
+
 - The app no longer runs as root inside the container: it runs as the `node` user (uid 1000). On start it takes ownership of the `data/` folder, so existing installs keep working without manual steps
 - The bean archive is now split into pages (10, 20 or 50 per page)
 - Added CONTRIBUTING.md, issue templates (bug report, feature idea) and a pull request template
