@@ -1,10 +1,15 @@
 import { useState, type FormEvent } from 'react'
+import { Backdrop } from '../components/ui.tsx'
 import Ico from '../components/Ico.tsx'
+import { Field } from '../components/Fields.tsx'
+import { PageHead } from '../components/Shell.tsx'
 import type { Gear, GearInput } from '../types.ts'
 
 // ── GEAR ──────────────────────────────────────────────────────────────
 const STATUS_OPTIONS = ['Primary', 'In use', 'Active', 'Travel', 'Retired']
 const ACTIVE_STATUSES = new Set(['Primary', 'In use', 'Active'])
+const CENTS = 2
+const ICON = 14
 
 /** Form fields are the inputs' strings until saved */
 interface GearForm {
@@ -12,6 +17,12 @@ interface GearForm {
 }
 
 const EMPTY_FORM: GearForm = { kind: '', name: '', meta: '', status: 'Active', owned: '', price: '' }
+
+// Details are a list split on commas or middle dots: "SSP MP, 64mm flat" or "58mm · dual boiler"
+// https://regex101.com/?regex=%5B%2C%C2%B7%5D
+const DETAIL_SEPARATOR = /[,·]/
+
+const money = (n: number): string => n % 1 === 0 ? String(n) : n.toFixed(CENTS)
 
 interface GearPageProps {
   gear?:        Gear[]
@@ -21,268 +32,116 @@ interface GearPageProps {
 }
 
 export function GearPage({ gear = [], onSaveGear, onUpdateGear, onDeleteGear }: GearPageProps) {
-  const [adding,  setAdding]  = useState(false)
-  const [editing, setEditing] = useState<Gear | null>(null)
-  const [form, setForm]       = useState(EMPTY_FORM)
-  const [saving, setSaving]   = useState(false)
+  // null: closed, 'new': adding, otherwise the item being edited
+  const [open, setOpen]     = useState<Gear | 'new' | null>(null)
+  const [form, setForm]     = useState(EMPTY_FORM)
+  const [saving, setSaving] = useState(false)
 
   const kinds = [...new Set(gear.map(g => g.kind))].sort()
+  const set = (k: keyof GearForm, v: string) => setForm(f => ({ ...f, [k]: v }))
 
+  const openAdd = () => { setForm(EMPTY_FORM); setOpen('new') }
   const openEdit = (g: Gear) => {
-    setEditing(g)
     setForm({ kind: g.kind, name: g.name, meta: g.meta || '', status: g.status || 'Active', owned: g.owned || '', price: g.price != null ? String(g.price) : '' })
+    setOpen(g)
   }
+  const close = () => setOpen(null)
+  const isNew = open === 'new'
+  const saveLabel = isNew ? 'Add gear' : 'Save changes'
 
-  const handleAdd = async (e: FormEvent) => {
+  const handleSave = async (e: FormEvent) => {
     e.preventDefault()
-    if (!form.kind.trim() || !form.name.trim()) return
+    if (!open || !form.kind.trim() || !form.name.trim()) return
     setSaving(true)
     try {
-      await onSaveGear({ ...form, price: parseFloat(form.price) || null, id: 'gear-' + Date.now() })
-      setForm(EMPTY_FORM)
-      setAdding(false)
+      const data = { ...form, price: parseFloat(form.price) || 0 }
+      if (open === 'new') await onSaveGear({ ...data, id: 'gear-' + Date.now() })
+      else await onUpdateGear(open.id, data)
+      close()
     } finally {
       setSaving(false)
     }
   }
 
-  const handleEdit = async (e: FormEvent) => {
-    e.preventDefault()
-    if (!editing || !form.kind.trim() || !form.name.trim()) return
-    setSaving(true)
-    try {
-      await onUpdateGear(editing.id, { ...form, price: parseFloat(form.price) || null })
-      setEditing(null)
-      setForm(EMPTY_FORM)
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const handleDelete = async (id: string) => {
-    if (!confirm('Remove this item?')) return
-    await onDeleteGear(id)
+  const handleDelete = async (g: Gear) => {
+    if (!confirm(`Remove ${g.name} from your gear? Shots that used it keep its name.`)) return
+    await onDeleteGear(g.id)
   }
 
   return (
     <div className="stack">
-      <div className="page-head">
-        <h1 className="page-title">Gear.</h1>
-        <span className="page-sub">{gear.length} items</span>
-        <button className="primary-btn" style={{ marginLeft: 'auto' }} onClick={() => setAdding(true)}>
-          <Ico name="plus" size={13} /> Add item
-        </button>
-      </div>
+      <PageHead title="Gear." sub={`${gear.length} ${gear.length === 1 ? 'item' : 'items'}`}>
+        <button className="primary-btn" onClick={openAdd}><Ico name="plus" size={ICON} /> Add gear</button>
+      </PageHead>
 
-      {kinds.map(kind => (
-        <div key={kind} className="card" style={{ padding: 0, overflow: 'hidden' }}>
-          <div style={{
-            padding: '12px 18px',
-            background: 'var(--bg-2)',
-            borderBottom: '1px solid var(--border)',
-            display: 'flex', alignItems: 'center', gap: 10,
-          }}>
-            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.14em', color: 'var(--text-3)', fontWeight: 500 }}>{kind}</span>
-            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-4)' }}>{gear.filter(g => g.kind === kind).length}</span>
-          </div>
-          <div style={{ padding: '0 18px' }}>
-            {gear.filter(g => g.kind === kind).map((g, i, arr) => (
-              <div key={g.id} className="gear-row" style={{ borderBottom: i < arr.length - 1 ? '1px solid var(--border)' : 'none' }}>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 500 }}>{g.name}</div>
-                  {g.meta && <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 2, fontFamily: 'var(--font-mono)' }}>{g.meta.split(',').map(s => s.trim()).filter(Boolean).join(' · ')}</div>}
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginLeft: 'auto' }}>
-                  <span className={`badge ${ACTIVE_STATUSES.has(g.status) ? 'good' : ''}`}>{g.status}</span>
-                  {g.price != null && g.price > 0 && <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-4)' }}>€{g.price % 1 === 0 ? g.price : g.price.toFixed(2)}</div>}
-                  {g.owned && <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-4)' }}>{g.owned}</div>}
-                  <button className="icon-btn" style={{ width: 24, height: 24, borderColor: 'transparent' }}
-                    onClick={() => openEdit(g)} title="Edit">
-                    <Ico name="pencil" size={11} />
-                  </button>
-                  <button className="icon-btn" style={{ width: 24, height: 24, borderColor: 'transparent', color: 'oklch(0.60 0.18 20)' }}
-                    onClick={() => handleDelete(g.id)} title="Remove">
-                    <Ico name="trash" size={11} />
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      ))}
-
-      {adding && (
-        <div className="modal-backdrop" onClick={() => setAdding(false)}>
-          <div className="modal" onClick={e => e.stopPropagation()}>
-            <div className="modal-head">
-              <h2>Add gear</h2>
-              <button className="icon-btn" style={{ marginLeft: 'auto' }} onClick={() => setAdding(false)}>
-                <Ico name="x" size={14} />
-              </button>
-            </div>
-            <form className="modal-body stack" onSubmit={handleAdd}>
-              <div className="grid grid-2" style={{ gap: 12 }}>
-                <div className="dial-input">
-                  <label>Category</label>
-                  <input
-                    style={{ fontSize: 14, width: '100%' }}
-                    placeholder="e.g. Grinder"
-                    value={form.kind}
-                    onChange={e => setForm(f => ({ ...f, kind: e.target.value }))}
-                    list="gear-kinds"
-                    required
-                  />
-                  <datalist id="gear-kinds">
-                    {kinds.map(k => <option key={k} value={k} />)}
-                  </datalist>
-                </div>
-                <div className="dial-input">
-                  <label>Name</label>
-                  <input
-                    style={{ fontSize: 14, width: '100%' }}
-                    placeholder="e.g. DF64 Gen 2"
-                    value={form.name}
-                    onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-                    required
-                  />
-                </div>
-                <div className="dial-input">
-                  <label>Details</label>
-                  <input
-                    style={{ fontSize: 14, width: '100%' }}
-                    placeholder="e.g. SSP MP · 64mm flat"
-                    value={form.meta}
-                    onChange={e => setForm(f => ({ ...f, meta: e.target.value }))}
-                  />
-                </div>
-                <div className="dial-input">
-                  <label>Price (€)</label>
-                  <input
-                    type="number"
-                    style={{ fontSize: 14, width: '100%' }}
-                    placeholder="e.g. 299"
-                    min="0"
-                    step="0.01"
-                    value={form.price}
-                    onChange={e => setForm(f => ({ ...f, price: e.target.value }))}
-                  />
-                </div>
-                <div className="dial-input">
-                  <label>Status</label>
-                  <select
-                    style={{ fontSize: 14, background: 'none', padding: 0, color: 'var(--text)' }}
-                    value={form.status}
-                    onChange={e => setForm(f => ({ ...f, status: e.target.value }))}
-                  >
-                    {STATUS_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
-                  </select>
-                </div>
-                <div className="dial-input">
-                  <label>Owned since</label>
-                  <input
-                    style={{ fontSize: 14, width: '100%' }}
-                    placeholder="e.g. 2024-03"
-                    value={form.owned}
-                    onChange={e => setForm(f => ({ ...f, owned: e.target.value }))}
-                  />
-                </div>
-              </div>
-              <div className="row" style={{ marginTop: 8, justifyContent: 'flex-end', gap: 8 }}>
-                <button type="button" className="ghost-btn" onClick={() => setAdding(false)}>Cancel</button>
-                <button type="submit" className="primary-btn" disabled={saving}>
-                  {saving ? 'Saving…' : 'Add item'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+      {gear.length === 0 && (
+        <div className="card"><div className="empty">No gear yet. Add your machine, grinder and baskets, and Dial-in offers them when you log a shot.</div></div>
       )}
 
-      {editing && (
-        <div className="modal-backdrop" onClick={() => { setEditing(null); setForm(EMPTY_FORM) }}>
+      <div className="gear-grid-page">
+        {kinds.map(kind => {
+          const items = gear.filter(g => g.kind === kind)
+          return (
+            <div key={kind} className="card">
+              <div className="card-head"><span className="card-title">{kind}</span><span>{items.length}</span></div>
+              {items.map(g => (
+                <div key={g.id} className={`gear-item${g.status === 'Retired' ? ' retired' : ''}`}>
+                  <div className="gi-main">
+                    <div className="gi-name">{g.name}</div>
+                    {g.meta && <div className="gi-meta">{g.meta.split(DETAIL_SEPARATOR).map(s => s.trim()).filter(Boolean).join(', ')}</div>}
+                    {g.owned && <div className="gi-meta">Since {g.owned}</div>}
+                  </div>
+                  {/* No price means free or included with another item */}
+                  <span className="gi-price">€{money(g.price ?? 0)}</span>
+                  <span className={`status-pill${ACTIVE_STATUSES.has(g.status) ? ' on' : ''}`}>{g.status}</span>
+                  <button className="icon-btn plain sm" aria-label={`Edit ${g.name}`} title="Edit" onClick={() => openEdit(g)}><Ico name="pencil" size={ICON} /></button>
+                  <button className="icon-btn plain sm danger" aria-label={`Remove ${g.name}`} title="Remove" onClick={() => handleDelete(g)}><Ico name="trash" size={ICON} /></button>
+                </div>
+              ))}
+            </div>
+          )
+        })}
+      </div>
+
+      {open && (
+        <Backdrop onClose={close}>
           <div className="modal" onClick={e => e.stopPropagation()}>
             <div className="modal-head">
-              <h2>Edit gear</h2>
-              <button className="icon-btn" style={{ marginLeft: 'auto' }} onClick={() => { setEditing(null); setForm(EMPTY_FORM) }}>
-                <Ico name="x" size={14} />
-              </button>
+              <h2>{isNew ? 'Add gear' : 'Edit gear'}</h2>
+              <button type="button" className="icon-btn" style={{ marginLeft: 'auto' }} aria-label="Close" onClick={close}><Ico name="x" size={ICON} /></button>
             </div>
-            <form className="modal-body stack" onSubmit={handleEdit}>
-              <div className="grid grid-2" style={{ gap: 12 }}>
-                <div className="dial-input">
-                  <label>Category</label>
-                  <input
-                    style={{ fontSize: 14, width: '100%' }}
-                    placeholder="e.g. Grinder"
-                    value={form.kind}
-                    onChange={e => setForm(f => ({ ...f, kind: e.target.value }))}
-                    list="gear-kinds"
-                    required
-                  />
-                  <datalist id="gear-kinds">
-                    {kinds.map(k => <option key={k} value={k} />)}
-                  </datalist>
-                </div>
-                <div className="dial-input">
-                  <label>Name</label>
-                  <input
-                    style={{ fontSize: 14, width: '100%' }}
-                    placeholder="e.g. DF64 Gen 2"
-                    value={form.name}
-                    onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-                    required
-                  />
-                </div>
-                <div className="dial-input">
-                  <label>Details</label>
-                  <input
-                    style={{ fontSize: 14, width: '100%' }}
-                    placeholder="e.g. SSP MP · 64mm flat"
-                    value={form.meta}
-                    onChange={e => setForm(f => ({ ...f, meta: e.target.value }))}
-                  />
-                </div>
-                <div className="dial-input">
-                  <label>Price (€)</label>
-                  <input
-                    type="number"
-                    style={{ fontSize: 14, width: '100%' }}
-                    placeholder="e.g. 299"
-                    min="0"
-                    step="0.01"
-                    value={form.price}
-                    onChange={e => setForm(f => ({ ...f, price: e.target.value }))}
-                  />
-                </div>
-                <div className="dial-input">
-                  <label>Status</label>
-                  <select
-                    style={{ fontSize: 14, background: 'none', padding: 0, color: 'var(--text)' }}
-                    value={form.status}
-                    onChange={e => setForm(f => ({ ...f, status: e.target.value }))}
-                  >
+            <form onSubmit={handleSave}>
+              <div className="modal-body form-grid">
+                <Field label="Category">
+                  <input className="text-input" placeholder="Grinder" list="gear-kinds" required
+                    value={form.kind} onChange={e => set('kind', e.target.value)} />
+                  <datalist id="gear-kinds">{kinds.map(k => <option key={k} value={k} />)}</datalist>
+                </Field>
+                <Field label="Name">
+                  <input className="text-input" placeholder="DF64 Gen 2" required value={form.name} onChange={e => set('name', e.target.value)} />
+                </Field>
+                <Field label="Details" wide>
+                  <input className="text-input" placeholder="SSP MP burrs, 64 mm flat" value={form.meta} onChange={e => set('meta', e.target.value)} />
+                </Field>
+                <Field label="Status">
+                  <select className="select" value={form.status} onChange={e => set('status', e.target.value)}>
                     {STATUS_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
                   </select>
-                </div>
-                <div className="dial-input">
-                  <label>Owned since</label>
-                  <input
-                    style={{ fontSize: 14, width: '100%' }}
-                    placeholder="e.g. 2024-03"
-                    value={form.owned}
-                    onChange={e => setForm(f => ({ ...f, owned: e.target.value }))}
-                  />
-                </div>
+                </Field>
+                <Field label="Owned since">
+                  <input className="text-input" placeholder="2024-03" value={form.owned} onChange={e => set('owned', e.target.value)} />
+                </Field>
+                <Field label="Price (€)">
+                  <input className="text-input mono" type="number" min="0" step="0.01" placeholder="0" value={form.price} onChange={e => set('price', e.target.value)} />
+                </Field>
               </div>
-              <div className="row" style={{ marginTop: 8, justifyContent: 'flex-end', gap: 8 }}>
-                <button type="button" className="ghost-btn" onClick={() => { setEditing(null); setForm(EMPTY_FORM) }}>Cancel</button>
-                <button type="submit" className="primary-btn" disabled={saving}>
-                  {saving ? 'Saving…' : 'Save changes'}
-                </button>
+              <div className="modal-foot">
+                <button type="button" className="ghost-btn lg" onClick={close}>Cancel</button>
+                <button type="submit" className="primary-btn" disabled={saving}>{saving ? 'Saving…' : saveLabel}</button>
               </div>
             </form>
           </div>
-        </div>
+        </Backdrop>
       )}
     </div>
   )

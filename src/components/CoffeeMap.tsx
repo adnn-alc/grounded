@@ -47,7 +47,7 @@ const ALIASES: Record<string, string> = {
 // Origins with no outline at this scale — marker only
 const POINT_ONLY: Record<string, Point> = { 'Hawaii': [-155.6, 19.6] }
 
-// Put markers in the coffee-growing area rather than the geographic centre
+// Put markers in the coffee-growing area rather than the geographic center
 const COFFEE_ANCHORS: Record<string, Point> = {
   'Brazil': [-45, -19], 'Mexico': [-93, 16.5], 'India': [76, 13], 'China': [100.5, 23.5],
   'Yemen': [44, 15], 'Vietnam': [108, 12.5],
@@ -127,6 +127,7 @@ const fillFor = (o: { bagsActive: number } | undefined) => !o ? 'var(--surface)'
 
 const MONO = 'var(--font-mono)'
 const SERIF = 'var(--font-serif)'
+const SANS = 'var(--font-sans)'
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
@@ -150,11 +151,11 @@ function CoffeeBelt() {
 
 // Labels sit over open ocean, drawn above the countries
 function BeltLabels() {
-  const label: CSSProperties = { fontFamily: MONO, fontSize: 7, letterSpacing: '0.12em', textTransform: 'uppercase', pointerEvents: 'none' }
+  const label: CSSProperties = { fontFamily: SANS, fontSize: '8px', pointerEvents: 'none' }
   return (
     <g>
-      <text x={project(180, 23.4)[0] - 14} y={Y_CANCER - 4} textAnchor="end" style={{ ...label, fill: 'var(--crema)' }} opacity="0.7">Tropic of Cancer · 23.4°N</text>
-      <text x={project(-180, -23.4)[0] + 14} y={Y_CAPRICORN + 10} style={{ ...label, fill: 'var(--crema)' }} opacity="0.7">Tropic of Capricorn · 23.4°S</text>
+      <text x={project(180, 23.4)[0] - 14} y={Y_CANCER - 4} textAnchor="end" style={{ ...label, fill: 'var(--crema)' }} opacity="0.7">Tropic of Cancer, 23.4°N</text>
+      <text x={project(-180, -23.4)[0] + 14} y={Y_CAPRICORN + 10} style={{ ...label, fill: 'var(--crema)' }} opacity="0.7">Tropic of Capricorn, 23.4°S</text>
       <text x={project(-180, 0)[0] + 10} y={Y_EQUATOR - 4} style={{ ...label, fill: 'var(--text-4)' }}>Equator</text>
     </g>
   )
@@ -178,22 +179,22 @@ function HoverCard({ origin }: { origin: Origin }) {
       pointerEvents: 'none',
       zIndex: 10,
     }}>
-      <div style={{ fontFamily: MONO, fontSize: 9, letterSpacing: '0.14em', color: 'var(--text-3)', textTransform: 'uppercase' }}>{origin.region}</div>
+      <div className="map-card-k">{origin.region}</div>
       <div style={{ fontFamily: SERIF, fontStyle: 'italic', fontSize: 22, lineHeight: 1.1, marginTop: 2, color: 'var(--text)' }}>{origin.label}</div>
       <div style={{ height: 1, background: 'var(--border)', margin: '10px 0' }} />
       <div style={{ display: 'grid', gridTemplateColumns: 'auto auto', gap: '4px 14px' }}>
-        <Tag>Active</Tag>
+        <Tag>Open</Tag>
         <Val color={origin.bagsActive > 0 ? 'var(--crema)' : 'var(--text-3)'}>{origin.bagsActive} bags</Val>
-        <Tag>All-time</Tag>
+        <Tag>All time</Tag>
         <Val>{origin.bagsTotal} bags</Val>
         {origin.regions.length > 0 && (<><Tag>Regions</Tag><Val>{origin.regions.join(', ')}</Val></>)}
       </div>
       {origin.beans.length > 0 && (
         <>
           <div style={{ height: 1, background: 'var(--border)', margin: '10px 0' }} />
-          <div style={{ fontFamily: MONO, fontSize: 9, letterSpacing: '0.14em', color: 'var(--text-3)', textTransform: 'uppercase', marginBottom: 4 }}>On the shelf</div>
+          <div className="map-card-k">On the shelf</div>
           {origin.beans.map(b => (
-            <div key={b} style={{ fontSize: 13, fontFamily: SERIF, fontStyle: 'italic', lineHeight: 1.3, color: 'var(--text)' }}>→ {b}</div>
+            <div key={b} style={{ fontSize: 13, fontFamily: SERIF, fontStyle: 'italic', lineHeight: 1.3, color: 'var(--text)' }}>{b}</div>
           ))}
         </>
       )}
@@ -202,7 +203,7 @@ function HoverCard({ origin }: { origin: Origin }) {
 }
 
 function Tag({ children }: { children: ReactNode }) {
-  return <span style={{ fontFamily: MONO, fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-3)' }}>{children}</span>
+  return <span className="map-card-k">{children}</span>
 }
 function Val({ children, color }: { children: ReactNode; color?: string }) {
   return <span style={{ fontFamily: MONO, fontSize: 12, color: color || 'var(--text)' }}>{children}</span>
@@ -271,7 +272,7 @@ export default function CoffeeMap({ beans = [], showRegionStrip = true }: { bean
               )
             })}
           </g>
-          {/* re-draw hovered outline on top so neighbours don't cover it */}
+          {/* re-draw hovered outline on top so neighbors don't cover it */}
           {hovered && BY_NAME[hovered.name] && (
             <path d={BY_NAME[hovered.name].d} fill="none" style={{ stroke: 'var(--crema)', pointerEvents: 'none' }} strokeWidth="1.1" />
           )}
@@ -310,11 +311,11 @@ export default function CoffeeMap({ beans = [], showRegionStrip = true }: { bean
 
           {/* top-right stat */}
           <g transform={`translate(${W - 150}, 18)`} style={{ pointerEvents: 'none' }}>
-            <text y="8" style={{ fill: 'var(--text-3)', fontFamily: MONO, fontSize: 7.5, letterSpacing: '0.14em', textTransform: 'uppercase' }}>origin diversity</text>
+            <text y="8" style={{ fill: 'var(--text-3)', fontFamily: SANS, fontSize: '9px' }}>Origins</text>
             <text y="36" style={{ fill: 'var(--text)', fontFamily: MONO, fontSize: 28, letterSpacing: '-0.03em' }}>
               {origins.length}<tspan style={{ fontSize: 12, fill: 'var(--text-3)' }}> countries</tspan>
             </text>
-            <text y="50" style={{ fill: 'var(--text-3)', fontFamily: MONO, fontSize: 9 }}>{mappedBags} bags · all-time</text>
+            <text y="50" style={{ fill: 'var(--text-3)', fontFamily: SANS, fontSize: '9px' }}>{mappedBags} bags in all</text>
           </g>
 
           {/* legend */}
@@ -322,10 +323,10 @@ export default function CoffeeMap({ beans = [], showRegionStrip = true }: { bean
             <rect width="118" height="46" rx="5" style={{ fill: 'var(--bg-2)', stroke: 'var(--border)' }} opacity="0.94" />
             <rect x="10" y="10" width="14" height="9" rx="2" style={{ fill: fillFor({ bagsActive: 1 }), stroke: 'var(--crema-2)' }} strokeWidth="0.5" />
             <circle cx="17" cy="14.5" r="2.2" style={{ fill: 'var(--crema)' }} />
-            <text x="32" y="18" style={{ fill: 'var(--text)', fontFamily: MONO, fontSize: 9 }}>Active bags</text>
+            <text x="32" y="18" style={{ fill: 'var(--text)', fontFamily: SANS, fontSize: '9px' }}>Open bags</text>
             <rect x="10" y="27" width="14" height="9" rx="2" style={{ fill: fillFor({ bagsActive: 0 }), stroke: 'var(--crema-2)' }} strokeWidth="0.5" />
             <circle cx="17" cy="31.5" r="1.6" style={{ fill: 'var(--bg)', stroke: 'var(--crema-2)' }} strokeWidth="0.8" />
-            <text x="32" y="35" style={{ fill: 'var(--text-2)', fontFamily: MONO, fontSize: 9 }}>Tried before</text>
+            <text x="32" y="35" style={{ fill: 'var(--text-2)', fontFamily: SANS, fontSize: '9px' }}>Tried before</text>
           </g>
         </svg>
 
@@ -333,26 +334,19 @@ export default function CoffeeMap({ beans = [], showRegionStrip = true }: { bean
       </div>
 
       {showRegionStrip && regions.length > 0 && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 10, marginTop: 14 }}>
+        <div className="map-regions">
           {regions.map(([name, r]) => (
-            <div key={name} style={{ padding: '10px 12px', background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: 8 }}>
-              <div style={{ fontFamily: MONO, fontSize: 9, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--text-3)' }}>{name}</div>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginTop: 4 }}>
-                <span style={{ fontFamily: MONO, fontSize: 18, color: r.active > 0 ? 'var(--crema)' : 'var(--text)' }}>{r.total}</span>
-                <span style={{ fontFamily: MONO, fontSize: 10, color: 'var(--text-4)' }}>bags · {r.countries} {r.countries === 1 ? 'country' : 'countries'}</span>
-              </div>
-              {r.active > 0 && (
-                <div style={{ fontFamily: MONO, fontSize: 10, color: 'var(--crema)', marginTop: 2 }}>{r.active} active now</div>
-              )}
+            <div key={name} className="map-region">
+              <div className="mr-name">{name}</div>
+              <div className="mr-num"><b className={r.active > 0 ? 'on' : ''}>{r.total}</b> {r.total === 1 ? 'bag' : 'bags'} from {r.countries} {r.countries === 1 ? 'country' : 'countries'}</div>
+              {r.active > 0 && <div className="mr-active">{r.active} open now</div>}
             </div>
           ))}
         </div>
       )}
 
       {unmapped.length > 0 && (
-        <div style={{ fontFamily: MONO, fontSize: 10, color: 'var(--text-4)', marginTop: 10 }}>
-          Not on map (origin isn't a country): {unmapped.join(' · ')}
-        </div>
+        <div className="map-unmapped">Not on the map, because the origin isn't a country: {unmapped.join(', ')}</div>
       )}
     </div>
   )

@@ -4,6 +4,7 @@
 // Unknown fields are dropped, so a client echoing back a whole row is fine.
 import { z } from 'zod'
 import { HttpError, BAD_REQUEST } from './errors.ts'
+import { LANDED_MAX } from './taste.ts'
 
 // ── Limits ──────────────────────────────────────────────────────────
 const LEN_SHORT = 60       // ids of themes/fonts, dates, ratios, times like '3:30'
@@ -32,7 +33,7 @@ const optNum  = (max: number, min = 0) => z.number().min(min).max(max).nullish()
 const optId   = z.string().min(1).max(LEN.name).optional()
 const grind   = optNum(GRIND_RANGE, -GRIND_RANGE)
 
-const verdict = z.enum(['good', 'under', 'over', 'bad', '']).nullish()
+const verdict = z.enum(['good', 'under', 'over', 'bad', '']).nullish()   // older clients; see server/taste.ts
 const taste = z.object({
   acidity:    optNum(MAX_TASTE),
   sweetness:  optNum(MAX_TASTE),
@@ -59,6 +60,8 @@ const shotOrBrewCommon = {
   taste,
   notes:         optText(LEN.notes),
   verdict,
+  landed:        optNum(LANDED_MAX),
+  bad:           z.boolean().nullish(),
   grinder_model: optText(),
   grinder_rpm:   rpm,
   water_recipe:  optText(),

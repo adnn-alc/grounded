@@ -1,156 +1,132 @@
-import { FlavorRadar } from '../components/charts.tsx'
+import { useState } from 'react'
 import { useUnits, type UnitHelpers } from '../hooks/useUnits.ts'
 import CoffeeMap from '../components/CoffeeMap.tsx'
-import type { Bean, Brew, Gear, Shot, Taste, TasteAxis, Units } from '../types.ts'
+import { PageHead } from '../components/Shell.tsx'
+import { daysAgo } from '../data/dates.ts'
+import { LANDED_MAX, landedLabel, mmss } from '../data/taste.ts'
+import type { Bean, Brew, Gear, Shot, Units } from '../types.ts'
 
 // ── STATS ─────────────────────────────────────────────────────────────
+type Period = '30' | '90' | 'all'
+const PERIODS: { id: Period; label: string }[] = [{ id: '30', label: '30 days' }, { id: '90', label: '90 days' }, { id: 'all', label: 'All time' }]
 
-/** What the espresso and filter panels read from a shot or brew */
-type StatItem = Pick<Shot, 'rating' | 'dose' | 'time' | 'verdict' | 'taste'> & { yield?: number; water?: number }
+const HALF = 2
+const CENTS = 2   // decimals for money
+const BINS = 10
+const HALF_BINS = BINS / HALF
+const PERCENT = 100
+const MIX_STEP = PERCENT / HALF_BINS
+const DECIMALS = 1
+const TOP_ROWS = 5
+const MONTHS = 6          // months in the bean spending chart
+const MONTH_DIGITS = 2
+const KG = 1000
+const LB = 453.592        // grams in a pound
+const OZ_PER_LB = 16
+const OZ = 28.3495        // grams in an ounce
 
-function verdictColor(v: string) {
-  if (v === 'good')  return 'var(--good)'
-  if (v === 'under') return 'var(--under)'
-  if (v === 'over')  return 'var(--over)'
-  if (v === 'bad')   return 'var(--bad)'
-  return 'var(--text-2)'
-}
+/** What the summary cards read from a shot or a brew */
+interface Entry { date: string; rating: number; dose: number; out: number; time: number; landed: number | null; bad: boolean }
 
-function avgTasteFrom(items: StatItem[]): Taste | null {
-  if (!items.length) return null
-  const taste = {} as Taste
-  ;(['acidity', 'sweetness', 'body', 'bitterness', 'balance', 'aftertaste'] as TasteAxis[]).forEach(k => {
-    taste[k] = items.reduce((a, s) => a + (s.taste[k] || 0), 0) / items.length
-  })
-  return taste
-}
+/** '113' or '12.50' */
+const money = (n: number): string => n % 1 === 0 ? String(n) : n.toFixed(CENTS)
 
-interface StatsPanelProps {
-  label:       string
-  items:       StatItem[]
-  U:           UnitHelpers
-  doseLabel?:  string
-  yieldLabel?: string
-}
-
-function StatsPanel({ label, items, U, doseLabel = 'Avg dose', yieldLabel = 'Avg yield' }: StatsPanelProps) {
-  if (!items.length) {
-    return (
-      <div className="card">
-        <div className="card-head"><span className="card-title">{label}</span></div>
-        <div className="text-muted" style={{ fontSize: 13, padding: '8px 0' }}>No data yet.</div>
-      </div>
-    )
+/** '1.24 kg' or '640 g'; '2.7 lb' or '12.4 oz' */
+function bigMass(grams: number, units: Units): string {
+  if (units.mass === 'oz') {
+    const oz = grams / OZ
+    return oz >= OZ_PER_LB ? `${(oz / OZ_PER_LB).toFixed(DECIMALS)} lb` : `${oz.toFixed(DECIMALS)} oz`
   }
-  const avgRating = (items.reduce((a, s) => a + s.rating, 0) / items.length).toFixed(1)
-  const avgDose   = (items.reduce((a, s) => a + s.dose, 0) / items.length).toFixed(1)
-  const avgYield  = yieldLabel ? (items.reduce((a, s) => a + (s.yield ?? s.water ?? 0), 0) / items.length).toFixed(1) : null
-  const avgTime   = Math.round(items.reduce((a, s) => a + s.time, 0) / items.length)
-  const taste     = avgTasteFrom(items)
-  const verdicts: Record<string, number> = {}
-  items.forEach(s => { verdicts[s.verdict] = (verdicts[s.verdict] || 0) + 1 })
+  return grams >= KG ? `${(grams / KG).toFixed(CENTS)} kg` : `${Math.round(grams)} g`
+}
 
+/** The most common values, most first */
+function topCounts<T>(items: T[], pick: (item: T) => string | undefined): [string, number][] {
+  const counts = new Map<string, number>()
+  items.forEach(i => { const v = pick(i)?.trim(); if (v) counts.set(v, (counts.get(v) ?? 0) + 1) })
+  return [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, TOP_ROWS)
+}
+
+function Bars({ rows }: { rows: [string, number][] }) {
+  const max = Math.max(1, ...rows.map(r => r[1]))
+  return <>{rows.map(([label, n]) => (
+    <div key={label} className="hbar-row"><span>{label}</span><i style={{ width: `${(n / max) * PERCENT}%` }} /><b>{n}</b></div>
+  ))}</>
+}
+
+/** Bean spending per month for the last few months, by when each bag was added */
+function MonthBars({ beans }: { beans: Bean[] }) {
+  const [now] = useState(() => new Date())
+  const months = Array.from({ length: MONTHS }, (_, i) => {
+    const d = new Date(now.getFullYear(), now.getMonth() - (MONTHS - 1 - i), 1)
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(MONTH_DIGITS, '0')}`
+    const total = beans.filter(b => b.created_at?.startsWith(key)).reduce((a, b) => a + (b.price || 0), 0)
+    return { key, label: d.toLocaleDateString('en-US', { month: 'short' }), total }
+  })
+  const max = Math.max(1, ...months.map(m => m.total))
   return (
-    <div className="card">
-      <div className="card-head">
-        <span className="card-title">{label}</span>
-        <span className="card-more">{items.length} logged</span>
-      </div>
-
-      {/* top row: key numbers */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 0, borderBottom: '1px solid var(--border)', paddingBottom: 20, marginBottom: 20 }}>
-        <div>
-          <div className="micro" style={{ marginBottom: 6 }}>Avg rating</div>
-          <div className="mono" style={{ fontSize: 32, color: 'var(--crema)' }}>{avgRating}</div>
+    <div className="month-bars">
+      {months.map(m => (
+        <div key={m.key} className="mb-col" title={`€${money(m.total)}`}>
+          <span className="mb-v">{m.total > 0 ? `€${Math.round(m.total)}` : ''}</span>
+          <i style={{ height: `${(m.total / max) * PERCENT}%` }} />
+          <span className="mb-l">{m.label}</span>
         </div>
-        <div>
-          <div className="micro" style={{ marginBottom: 6 }}>{doseLabel}</div>
-          <div className="mono" style={{ fontSize: 32 }}>{U.m(avgDose)}<span style={{ fontSize: 14, color: 'var(--text-3)', marginLeft: 2 }}>{U.mU()}</span></div>
-        </div>
-        {avgYield !== null && (
-          <div>
-            <div className="micro" style={{ marginBottom: 6 }}>{yieldLabel}</div>
-            <div className="mono" style={{ fontSize: 32 }}>{U.m(avgYield)}<span style={{ fontSize: 14, color: 'var(--text-3)', marginLeft: 2 }}>{U.mU()}</span></div>
-          </div>
-        )}
-        <div>
-          <div className="micro" style={{ marginBottom: 6 }}>Avg time</div>
-          <div className="mono" style={{ fontSize: 32 }}>{avgTime}<span style={{ fontSize: 14, color: 'var(--text-3)', marginLeft: 2 }}>s</span></div>
-        </div>
-      </div>
-
-      {/* bottom: radar left, verdicts right */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, alignItems: 'center' }}>
-        {taste && (
-          <div style={{ display: 'flex', justifyContent: 'center' }}>
-            <FlavorRadar taste={taste} size={180} />
-          </div>
-        )}
-        <div>
-          <div className="micro" style={{ marginBottom: 16 }}>Verdicts</div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px 24px' }}>
-            {['good', 'bad', 'under', 'over'].map(v => (
-              <div key={v}>
-                <div className="mono" style={{ fontSize: 36, lineHeight: 1, color: verdictColor(v) }}>{verdicts[v] || 0}</div>
-                <div className="micro" style={{ marginTop: 4 }}>{v}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
+      ))}
     </div>
   )
 }
 
-function BasketStats({ shots, U }: { shots: Shot[]; U: UnitHelpers }) {
-  const groups: Record<string, Shot[]> = {}
-  shots.forEach(s => {
-    if (!s.basket) return
-    if (!groups[s.basket]) groups[s.basket] = []
-    groups[s.basket].push(s)
-  })
-  const rows = Object.entries(groups).map(([name, items]) => {
-    const avg = (f: (s: Shot) => number) => items.reduce((a, s) => a + (f(s) || 0), 0) / items.length
-    return {
-      name,
-      count:  items.length,
-      rating: avg(s => s.rating),
-      dose:   avg(s => s.dose),
-      yield:  avg(s => s.yield),
-      time:   avg(s => s.time),
-      good:   items.filter(s => s.verdict === 'good').length / items.length,
-    }
-  }).sort((a, b) => b.count - a.count)
-  if (!rows.length) return null
+const avg = (xs: number[]) => xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0
 
-  const unassigned = shots.length - rows.reduce((a, r) => a + r.count, 0)
-  const best = rows.reduce((a, r) => r.rating > a.rating ? r : a)
-  const cols = { display: 'grid', gridTemplateColumns: '2fr repeat(6, 1fr)', gap: 12, alignItems: 'baseline' }
+/** Histogram color along the sour → balanced → bitter gauge */
+const binColor = (i: number): string => i < HALF_BINS
+  ? `color-mix(in srgb, var(--sour) ${PERCENT - i * MIX_STEP}%, var(--crema))`
+  : `color-mix(in srgb, var(--bitter) ${(i - HALF_BINS + 1) * MIX_STEP}%, var(--crema))`
 
+function LandedHistogram({ entries, noun }: { entries: Entry[]; noun: string }) {
+  const placed = entries.filter(e => !e.bad && e.landed != null)
+  const bad = entries.filter(e => e.bad).length
+  const bins = Array.from({ length: BINS }, () => 0)
+  placed.forEach(e => { bins[Math.min(BINS - 1, Math.floor((e.landed! / LANDED_MAX) * BINS))]! += 1 })
+  const max = Math.max(1, bad, ...bins)
+  const modeBin = bins.indexOf(Math.max(...bins))
+  const modeLabel = landedLabel(((modeBin + 1 / HALF) / BINS) * LANDED_MAX).toLowerCase()
   return (
-    <div className="card">
-      <div className="card-head">
-        <span className="card-title">Espresso by basket</span>
-        {unassigned > 0 && <span className="card-more">{unassigned} shots without basket</span>}
-      </div>
-      <div className="scroll" style={{ overflowX: 'auto' }}>
-        <div style={{ minWidth: 560 }}>
-          <div className="micro" style={{ ...cols, paddingBottom: 8, borderBottom: '1px solid var(--border)' }}>
-            <div>Basket</div><div>Shots</div><div>Avg rating</div><div>Dose → yield</div><div>Ratio</div><div>Avg time</div><div>Good</div>
-          </div>
-          {rows.map(r => (
-            <div key={r.name} className="mono" style={{ ...cols, fontSize: 13, padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
-              <div style={{ fontFamily: 'var(--font-serif)', fontStyle: 'italic', fontSize: 18 }}>{r.name}</div>
-              <div>{r.count}</div>
-              <div style={{ color: r === best && rows.length > 1 ? 'var(--crema)' : undefined }}>{r.rating.toFixed(1)}</div>
-              <div>{U.m(r.dose)} → {U.m(r.yield)}{U.mU()}</div>
-              <div>1:{(r.yield / r.dose).toFixed(2)}</div>
-              <div>{Math.round(r.time)}s</div>
-              <div style={{ color: 'var(--good)' }}>{Math.round(r.good * 100)}%</div>
-            </div>
-          ))}
+    <>
+      <div className="hist">
+        <div className="bars">
+          {bins.map((n, i) => <i key={i} title={`${n}`} style={{ height: `${(n / max) * PERCENT}%`, background: binColor(i) }} />)}
+        </div>
+        <div className="badbar" title={`${bad} bad`}>
+          <i style={{ height: `${(bad / max) * PERCENT}%` }} />
         </div>
       </div>
+      <div className="hist-ends"><span>Sour</span><span>Balanced</span><span>Bitter</span></div>
+      <div className="stats-note">
+        {placed.length
+          ? `Where your ${noun} landed. Most were ${modeLabel}${bad ? `, and ${bad} went wrong` : ''}.`
+          : `Place your ${noun} on the sour-to-bitter slider when you save them, and they show up here.`}
+      </div>
+    </>
+  )
+}
+
+function SummaryCard({ title, entries, noun, U, outLabel, timeText }: { title: string; entries: Entry[]; noun: string; U: UnitHelpers; outLabel: string; timeText: (s: number) => string }) {
+  return (
+    <div className="card">
+      <div className="card-head"><span className="card-title">{title}</span><span>{entries.length} {noun}</span></div>
+      {entries.length === 0 ? <div className="empty">Nothing logged in this period.</div> : (
+        <>
+          <div className="num-row fit">
+            <div className="kv"><span className="k">Avg rating</span><span className="v accent">{avg(entries.map(e => e.rating)).toFixed(DECIMALS)}</span></div>
+            <div className="kv"><span className="k">Avg dose</span><span className="v">{U.m(avg(entries.map(e => e.dose)))}<small>{U.mU()}</small></span></div>
+            <div className="kv"><span className="k">{outLabel}</span><span className="v">{U.m(avg(entries.map(e => e.out)))}<small>{U.mU()}</small></span></div>
+            <div className="kv"><span className="k">Avg time</span><span className="v">{timeText(Math.round(avg(entries.map(e => e.time))))}</span></div>
+          </div>
+          <LandedHistogram entries={entries} noun={noun} />
+        </>
+      )}
     </div>
   )
 }
@@ -158,96 +134,115 @@ function BasketStats({ shots, U }: { shots: Shot[]; U: UnitHelpers }) {
 interface StatsProps {
   shots:  Shot[]
   brews?: Brew[]
-  beans?: Bean[]   // active and archived
+  beans?: Bean[]   // open and finished
   gear?:  Gear[]
   units:  Units
 }
 
 export function Stats({ shots, brews = [], beans = [], gear = [], units }: StatsProps) {
   const U = useUnits(units)
-  const hasData = shots.length || brews.length
-  if (!hasData) return <div className="page-head"><h1 className="page-title">Stats.</h1></div>
+  const [period, setPeriod] = useState<Period>('30')
+  const inPeriod = (date: string | null | undefined) => period === 'all' || (date ? daysAgo(date) <= Number(period) : false)
 
-  // price stats
-  const beansWithPrice = beans.filter(b => b.price > 0)
-  const totalBeanSpend = beansWithPrice.reduce((a, b) => a + b.price, 0)
-  const avgBeanPrice   = beansWithPrice.length ? totalBeanSpend / beansWithPrice.length : 0
-  const mostExpBean    = beansWithPrice.length ? beansWithPrice.reduce((a, b) => b.price > a.price ? b : a) : null
-  const totalGearSpend = gear.filter(g => (g.price ?? 0) > 0).reduce((a, g) => a + (g.price ?? 0), 0)
+  const pShots = shots.filter(s => inPeriod(s.date))
+  const pBrews = brews.filter(b => inPeriod(b.date))
+  const shotEntries: Entry[] = pShots.map(s => ({ date: s.date, rating: s.rating, dose: s.dose, out: s.yield, time: s.time, landed: s.landed, bad: s.bad }))
+  const brewEntries: Entry[] = pBrews.map(b => ({ date: b.date, rating: b.rating, dose: b.dose, out: b.water, time: b.time, landed: b.landed, bad: b.bad }))
 
-  // consumed coffee — sum weight of all archived bags
-  const totalConsumedG = beans.filter(b => b.archived && b.weight > 0).reduce((a, b) => a + b.weight, 0)
-  const consumedDisplay = totalConsumedG >= 1000
-    ? `${(totalConsumedG / 1000).toFixed(2).replace(/\.?0+$/, '')} kg`
-    : `${totalConsumedG} g`
+  const bags = beans.filter(b => inPeriod(b.created_at))
+  const countries = topCounts(bags, b => b.origin?.split('·')[0])
+  const processes = topCounts(bags, b => b.process)
+  const roasters  = topCounts(bags, b => b.roaster)
+  const periodText = period === 'all' ? 'in all' : `in ${period} days`
 
+  const priced    = bags.filter(b => b.price > 0)
+  const beanSpend = Math.round(priced.reduce((a, b) => a + b.price, 0) * PERCENT) / PERCENT   // no float dust like 113.00000001
+  const perBag    = priced.length ? beanSpend / priced.length : 0
+  const weighed   = priced.filter(b => b.weight > 0)
+  const perMass   = units.mass === 'oz' ? { label: 'Per lb', grams: LB } : { label: 'Per kg', grams: KG }
+  const perMassPrice = weighed.length ? weighed.reduce((a, b) => a + b.price, 0) / weighed.reduce((a, b) => a + b.weight, 0) * perMass.grams : 0
+  const priciest  = priced.length ? priced.reduce((a, b) => b.price > a.price ? b : a) : null
+  const used      = [...pShots, ...pBrews].reduce((a, x) => a + (x.dose || 0), 0)
+  const usedCount = pShots.length + pBrews.length
+  const pricedGear = gear.filter(g => (g.price ?? 0) > 0)
+  const gearSpend = pricedGear.reduce((a, g) => a + (g.price ?? 0), 0)
+  const openBags  = beans.filter(b => !b.archived)
+  const left      = openBags.reduce((a, b) => a + (b.remaining || 0), 0)
+
+  const originsCard = (
+    <div className="card">
+      <div className="card-head"><span className="card-title">Origins</span><span>{bags.length} {bags.length === 1 ? 'bag' : 'bags'} {periodText}</span></div>
+      {countries.length === 0 ? <div className="empty">No bags with an origin {periodText}.</div> : <Bars rows={countries} />}
+      {processes.length > 0 && (
+        <div className="stats-sub">
+          <div className="stats-sub-k">Process</div>
+          <Bars rows={processes} />
+        </div>
+      )}
+      {roasters.length > 0 && (
+        <div className="stats-sub">
+          <div className="stats-sub-k">Roasters</div>
+          <Bars rows={roasters} />
+        </div>
+      )}
+    </div>
+  )
+  const spendingCard = (
+    <div className="card">
+      <div className="card-head"><span className="card-title">Spending</span><span>bags {periodText}</span></div>
+      {priced.length === 0 ? <div className="empty">No bags with a price {periodText}.</div> : (
+        <>
+          <div className="num-row fit">
+            <div className="kv"><span className="k">On beans</span><span className="v accent">€{money(beanSpend)}</span></div>
+            <div className="kv"><span className="k">Bags</span><span className="v">{priced.length}</span></div>
+            <div className="kv"><span className="k">Per bag</span><span className="v">€{perBag.toFixed(CENTS)}</span></div>
+            <div className="kv"><span className="k">{perMass.label}</span><span className="v">{perMassPrice > 0 ? `€${Math.round(perMassPrice)}` : '–'}</span></div>
+          </div>
+          {priciest && (
+            <div className="stats-sub">
+              <div className="stats-sub-k">Most expensive bag</div>
+              <div className="priciest">
+                <div className="pr-main">
+                  <div className="pr-name">{priciest.name}</div>
+                  <div className="pr-sub">{[priciest.roaster, priciest.weight > 0 && `${U.m(priciest.weight)} ${U.mU()}`].filter(Boolean).join(', ')}</div>
+                </div>
+                <span className="pr-price">€{money(priciest.price)}</span>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+      <div className="stats-sub">
+        <div className="stats-sub-k">Beans, last {MONTHS} months</div>
+        <MonthBars beans={beans} />
+      </div>
+      <div className="stats-sub spend-foot">
+        <div className="kv"><span className="k">On gear</span><span className="v">{gearSpend > 0 ? `€${money(gearSpend)}` : '–'}</span><span className="kv-note">{pricedGear.length} {pricedGear.length === 1 ? 'item' : 'items'}, all time</span></div>
+        <div className="kv"><span className="k">Coffee used</span><span className="v">{bigMass(used, units)}</span><span className="kv-note">{usedCount} {usedCount === 1 ? 'shot or brew' : 'shots and brews'}</span></div>
+        <div className="kv"><span className="k">Coffee left</span><span className="v">{bigMass(left, units)}</span><span className="kv-note">{openBags.length} open {openBags.length === 1 ? 'bag' : 'bags'}</span></div>
+      </div>
+    </div>
+  )
 
   return (
     <div className="stack">
-      <div className="page-head">
-        <h1 className="page-title">Stats.</h1>
-        <span className="page-sub">{shots.length} espresso · {brews.length} filter</span>
-      </div>
-
-      <div className="grid grid-2">
-        <StatsPanel label="Espresso" items={shots} U={U} doseLabel="Avg dose" yieldLabel="Avg yield" />
-        <StatsPanel label="Filter" items={brews} U={U} doseLabel="Avg dose" yieldLabel="Avg water" />
-      </div>
-
-      <BasketStats shots={shots} U={U} />
-
-      {beansWithPrice.length > 0 && (
-        <div className="card">
-          <div className="card-head"><span className="card-title">Spending</span></div>
-          <div className="grid grid-4" style={{ gap: 8, marginBottom: mostExpBean ? 16 : 0 }}>
-            <div>
-              <div className="mono" style={{ fontSize: 26, color: 'var(--crema)' }}>€{totalBeanSpend.toFixed(2)}</div>
-              <div className="micro" style={{ marginTop: 4 }}>total on beans</div>
-            </div>
-            <div>
-              <div className="mono" style={{ fontSize: 26, color: 'var(--crema)' }}>€{avgBeanPrice.toFixed(2)}</div>
-              <div className="micro" style={{ marginTop: 4 }}>avg per bag</div>
-            </div>
-            <div>
-              <div className="mono" style={{ fontSize: 26, color: 'var(--crema)' }}>{beansWithPrice.length}</div>
-              <div className="micro" style={{ marginTop: 4 }}>bags tracked</div>
-            </div>
-            <div>
-              <div className="mono" style={{ fontSize: 26, color: 'var(--crema)' }}>
-                {totalGearSpend > 0 ? `€${totalGearSpend.toFixed(2)}` : '—'}
-              </div>
-              <div className="micro" style={{ marginTop: 4 }}>total on gear</div>
-            </div>
-          </div>
-          {(mostExpBean || totalConsumedG > 0) && (
-            <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-              {mostExpBean ? (
-                <div>
-                  <div className="micro" style={{ marginBottom: 6 }}>most expensive bag</div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <div style={{ fontFamily: 'var(--font-serif)', fontStyle: 'italic', fontSize: 20 }}>{mostExpBean.name}</div>
-                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-3)' }}>{mostExpBean.roaster}</div>
-                    <div style={{ marginLeft: 'auto', fontFamily: 'var(--font-mono)', fontSize: 16, color: 'var(--crema)' }}>€{mostExpBean.price.toFixed(2)}</div>
-                  </div>
-                </div>
-              ) : <div />}
-              {totalConsumedG > 0 && (
-                <div style={{ borderLeft: '1px solid var(--border)', paddingLeft: 16 }}>
-                  <div className="micro" style={{ marginBottom: 6 }}>beans consumed</div>
-                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-                    <div className="mono" style={{ fontSize: 26, color: 'var(--crema)' }}>{consumedDisplay}</div>
-                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-3)' }}>from {beans.filter(b => b.archived && b.weight > 0).length} bags</div>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
+      <PageHead title="Stats." sub={`${shots.length} shots and ${brews.length} brews`}>
+        <div className="seg">
+          {PERIODS.map(p => <button key={p.id} className={period === p.id ? 'on' : ''} onClick={() => setPeriod(p.id)}>{p.label}</button>)}
         </div>
-      )}
+      </PageHead>
+
+      {/* Filter only gets its half once there are brews at all */}
+      <div className={brews.length > 0 ? 'stats-low' : ''}>
+        <SummaryCard title="Espresso" entries={shotEntries} noun="shots" U={U} outLabel="Avg yield" timeText={s => `${s} s`} />
+        {brews.length > 0 && <SummaryCard title="Filter" entries={brewEntries} noun="brews" U={U} outLabel="Avg water" timeText={mmss} />}
+      </div>
+
+      <div className="stats-low">{originsCard}{spendingCard}</div>
 
       {beans.some(b => b.origin?.trim()) && (
         <div className="card">
-          <div className="card-head"><span className="card-title">Bean origins</span></div>
+          <div className="card-head"><span className="card-title">Where your coffee comes from</span><span>all bags</span></div>
           <CoffeeMap beans={beans} />
         </div>
       )}

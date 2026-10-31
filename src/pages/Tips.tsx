@@ -1,9 +1,14 @@
 import { useState, type FormEvent } from 'react'
+import { Backdrop } from '../components/ui.tsx'
 import Ico from '../components/Ico.tsx'
+import { Field } from '../components/Fields.tsx'
+import { PageHead } from '../components/Shell.tsx'
 import type { Tip, TipInput, TipSection } from '../types.ts'
 
 // ── TIPS PAGE ─────────────────────────────────────────────────────────
 const EMPTY_TIP = { category: '', body: '' }
+
+const ICON = 14
 
 interface TipsColumnProps {
   section:  TipSection
@@ -18,57 +23,29 @@ function TipsColumn({ section, label, tips, onAdd, onEdit, onDelete }: TipsColum
   const categories = [...new Set(tips.map(t => t.category))].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }))
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.14em', color: 'var(--text-2)', fontWeight: 600 }}>{label}</span>
-        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-4)' }}>{tips.length}</span>
-        <button className="icon-btn" style={{ width: 24, height: 24, borderColor: 'transparent', marginLeft: 'auto' }} onClick={() => onAdd(section)} title={`Add ${label} note`}>
-          <Ico name="plus" size={11} />
-        </button>
+    <div className="card">
+      <div className="card-head">
+        <span className="card-title">{label}</span><span>{tips.length}</span>
+        <button className="link-btn" onClick={() => onAdd(section)}>+ Add a note</button>
       </div>
 
-      {tips.length === 0 && (
-        <div className="card" style={{ padding: '28px 18px', textAlign: 'center', color: 'var(--text-4)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>
-          No notes yet — add your first one
-        </div>
-      )}
+      {tips.length === 0 && <div className="empty">No {label.toLowerCase()} notes yet. Keep what works for you here: water, grind, temperature, anything.</div>}
 
-      {categories.map(cat => (
-        <div key={cat} className="card" style={{ padding: 0, overflow: 'hidden' }}>
-          <div style={{
-            padding: '10px 18px',
-            background: 'var(--bg-2)',
-            borderBottom: '1px solid var(--border)',
-            display: 'flex', alignItems: 'center', gap: 10,
-          }}>
-            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.14em', color: 'var(--text-3)', fontWeight: 500 }}>{cat}</span>
-            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-4)' }}>{tips.filter(t => t.category === cat).length}</span>
-          </div>
-          <div style={{ padding: '0 18px' }}>
-            {tips.filter(t => t.category === cat).map((tip, i, arr) => (
-              <div key={tip.id} style={{
-                padding: '12px 0',
-                borderBottom: i < arr.length - 1 ? '1px solid var(--border)' : 'none',
-                display: 'flex', gap: 12, alignItems: 'flex-start',
-              }}>
-                <div style={{ flex: 1, minWidth: 0, fontSize: 12, color: 'var(--text-2)', lineHeight: 1.6, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-                  {tip.body || <span style={{ color: 'var(--text-4)', fontStyle: 'italic' }}>No notes</span>}
-                </div>
-                <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
-                  <button className="icon-btn" style={{ width: 24, height: 24, borderColor: 'transparent' }}
-                    onClick={() => onEdit(tip)} title="Edit">
-                    <Ico name="pencil" size={11} />
-                  </button>
-                  <button className="icon-btn" style={{ width: 24, height: 24, borderColor: 'transparent', color: 'oklch(0.60 0.18 20)' }}
-                    onClick={() => onDelete(tip.id)} title="Delete">
-                    <Ico name="trash" size={11} />
-                  </button>
-                </div>
+      {categories.map(cat => {
+        const inCat = tips.filter(t => t.category === cat)
+        return (
+          <div key={cat} className="tip-group">
+            <div className="tip-cat">{cat}<span>{inCat.length}</span></div>
+            {inCat.map(tip => (
+              <div key={tip.id} className="tip-item">
+                <div className="tip-body">{tip.body || <span className="tip-none">No text</span>}</div>
+                <button className="icon-btn plain sm" aria-label="Edit note" title="Edit" onClick={() => onEdit(tip)}><Ico name="pencil" size={ICON} /></button>
+                <button className="icon-btn plain sm danger" aria-label="Delete note" title="Delete" onClick={() => onDelete(tip.id)}><Ico name="trash" size={ICON} /></button>
               </div>
             ))}
           </div>
-        </div>
-      ))}
+        )
+      })}
     </div>
   )
 }
@@ -122,73 +99,51 @@ export function TipsPage({ tips = [], onSaveTip, onUpdateTip, onDeleteTip }: Tip
   }
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Delete this note?')) return
+    if (!confirm('Delete this note? This can’t be undone.')) return
     await onDeleteTip(id)
   }
 
+  const isAdd = modal?.mode === 'add'
+  const saveLabel = isAdd ? 'Add note' : 'Save changes'
+
   return (
     <div className="stack">
-      <div className="page-head">
-        <h1 className="page-title">Tips.</h1>
-        <span className="page-sub">{tips.length} notes</span>
-      </div>
+      <PageHead title="Tips." sub={`${tips.length} ${tips.length === 1 ? 'note' : 'notes'}`} />
 
-      <div className="grid grid-2" style={{ gap: 28, alignItems: 'start' }}>
-        <TipsColumn
-          section="espresso" label="Espresso"
-          tips={espressoTips}
-          onAdd={openAdd} onEdit={openEdit} onDelete={handleDelete}
-        />
-        <TipsColumn
-          section="filter" label="Filter"
-          tips={filterTips}
-          onAdd={openAdd} onEdit={openEdit} onDelete={handleDelete}
-        />
+      <div className="tips-cols">
+        <TipsColumn section="espresso" label="Espresso" tips={espressoTips} onAdd={openAdd} onEdit={openEdit} onDelete={handleDelete} />
+        <TipsColumn section="filter" label="Filter" tips={filterTips} onAdd={openAdd} onEdit={openEdit} onDelete={handleDelete} />
       </div>
 
       {modal && (
-        <div className="modal-backdrop" onClick={closeModal}>
+        <Backdrop onClose={closeModal}>
           <div className="modal" onClick={e => e.stopPropagation()}>
             <div className="modal-head">
-              <h2>{modal.mode === 'add' ? 'Add' : 'Edit'} {modal.section} note</h2>
-              <button className="icon-btn" style={{ marginLeft: 'auto' }} onClick={closeModal}>
-                <Ico name="x" size={14} />
-              </button>
+              <h2>{isAdd ? 'Add' : 'Edit'} {modal.section} note</h2>
+              <button type="button" className="icon-btn" style={{ marginLeft: 'auto' }} aria-label="Close" onClick={closeModal}><Ico name="x" size={ICON} /></button>
             </div>
-            <form className="modal-body stack" onSubmit={handleSubmit}>
-              <div className="dial-input">
-                <label>Category</label>
-                <input
-                  style={{ fontSize: 14, width: '100%' }}
-                  placeholder="e.g. Water, Grind, Temperature"
-                  value={form.category}
-                  onChange={e => setForm(f => ({ ...f, category: e.target.value }))}
-                  list={`tip-cats-${modal.section}`}
-                  required
-                  autoFocus
-                />
-                <datalist id={`tip-cats-${modal.section}`}>
-                  {allCategories(modal.section).map(c => <option key={c} value={c} />)}
-                </datalist>
+            <form onSubmit={handleSubmit}>
+              <div className="modal-body form-grid">
+                <Field label="Category" wide>
+                  <input className="text-input" placeholder="Water, grind, temperature…" required autoFocus
+                    list={`tip-cats-${modal.section}`}
+                    value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))} />
+                  <datalist id={`tip-cats-${modal.section}`}>
+                    {allCategories(modal.section).map(c => <option key={c} value={c} />)}
+                  </datalist>
+                </Field>
+                <Field label="Note" wide>
+                  <textarea rows={5} placeholder="What you do and why…"
+                    value={form.body} onChange={e => setForm(f => ({ ...f, body: e.target.value }))} />
+                </Field>
               </div>
-              <div className="dial-input">
-                <label>Notes</label>
-                <textarea
-                  style={{ fontSize: 13, width: '100%', minHeight: 100, resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.55 }}
-                  placeholder="Your hack, value, reasoning…"
-                  value={form.body}
-                  onChange={e => setForm(f => ({ ...f, body: e.target.value }))}
-                />
-              </div>
-              <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', paddingTop: 4 }}>
-                <button type="button" className="ghost-btn" onClick={closeModal}>Cancel</button>
-                <button type="submit" className="primary-btn" disabled={saving}>
-                  {saving ? 'Saving…' : modal.mode === 'add' ? 'Add note' : 'Save changes'}
-                </button>
+              <div className="modal-foot">
+                <button type="button" className="ghost-btn lg" onClick={closeModal}>Cancel</button>
+                <button type="submit" className="primary-btn" disabled={saving}>{saving ? 'Saving…' : saveLabel}</button>
               </div>
             </form>
           </div>
-        </div>
+        </Backdrop>
       )}
     </div>
   )

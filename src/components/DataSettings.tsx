@@ -130,7 +130,7 @@ export default function DataSettings({ onPreview, onRestore }: DataSettingsProps
   return (
     <>
       <div className="settings-section">
-        <h3>Backup</h3>
+        <h4>Backup</h4>
         <div className="settings-row">
           <div>
             <div className="label">Download a backup</div>
@@ -146,7 +146,7 @@ export default function DataSettings({ onPreview, onRestore }: DataSettingsProps
       </div>
 
       <div className="settings-section">
-        <h3>Restore from a backup</h3>
+        <h4>Restore from a backup</h4>
         <div className="settings-row">
           <div>
             <div className="label">{chosen ? chosen.name : 'Backup file'}</div>
@@ -196,7 +196,7 @@ export default function DataSettings({ onPreview, onRestore }: DataSettingsProps
       </div>
 
       <div className="settings-section">
-        <h3>Spreadsheet export</h3>
+        <h4>Spreadsheet export</h4>
         <div className="settings-row">
           <div>
             <div className="label">Shots</div>

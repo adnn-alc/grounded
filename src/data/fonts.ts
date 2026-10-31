@@ -37,25 +37,25 @@ const SANS_FALLBACK  = "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-seri
 const MONO_FALLBACK  = 'ui-monospace, SFMono-Regular, Menlo, monospace'
 const SERIF_FALLBACK = 'Georgia, serif'
 
-// Three font roles, each mapped to a CSS variable in global.css
+// Three font roles, each mapped to a CSS variable in global.css (listed in the order Settings shows them)
 export const FONT_ROLES: { role: FontRole; label: string; desc: string }[] = [
-  { role: 'sans',  label: 'Text',             desc: 'Body text, buttons and forms.' },
-  { role: 'mono',  label: 'Numbers & labels', desc: 'Doses, times, stats and small caps labels.' },
-  { role: 'serif', label: 'Headings',         desc: 'Page titles and big italic numbers.' },
+  { role: 'serif', label: 'Headings', desc: 'Page titles, bean names' },
+  { role: 'sans',  label: 'Text',     desc: 'Body, buttons, forms' },
+  { role: 'mono',  label: 'Numbers',  desc: 'Doses, times, ratings' },
 ]
 
 export const FONT_OPTIONS: Record<FontRole, FontOption[]> = {
   sans: [
-    { id: 'inter',         name: 'Inter',         stack: `'Inter Variable', ${SANS_FALLBACK}` },
     { id: 'geist',         name: 'Geist',         stack: `'Geist Variable', ${SANS_FALLBACK}` },
+    { id: 'inter',         name: 'Inter',         stack: `'Inter Variable', ${SANS_FALLBACK}` },
     { id: 'dm-sans',       name: 'DM Sans',       stack: `'DM Sans Variable', ${SANS_FALLBACK}` },
     { id: 'manrope',       name: 'Manrope',       stack: `'Manrope Variable', ${SANS_FALLBACK}` },
     { id: 'ibm-plex-sans', name: 'IBM Plex Sans', stack: `'IBM Plex Sans Variable', ${SANS_FALLBACK}` },
     { id: 'system',        name: 'System',        stack: `system-ui, ${SANS_FALLBACK}` },
   ],
   mono: [
-    { id: 'jetbrains-mono', name: 'JetBrains Mono', stack: `'JetBrains Mono Variable', ${MONO_FALLBACK}` },
     { id: 'geist-mono',     name: 'Geist Mono',     stack: `'Geist Mono Variable', ${MONO_FALLBACK}` },
+    { id: 'jetbrains-mono', name: 'JetBrains Mono', stack: `'JetBrains Mono Variable', ${MONO_FALLBACK}` },
     { id: 'fira-code',      name: 'Fira Code',      stack: `'Fira Code Variable', ${MONO_FALLBACK}` },
     { id: 'ibm-plex-mono',  name: 'IBM Plex Mono',  stack: `'IBM Plex Mono', ${MONO_FALLBACK}` },
     { id: 'system',         name: 'System',         stack: MONO_FALLBACK },
@@ -70,7 +70,7 @@ export const FONT_OPTIONS: Record<FontRole, FontOption[]> = {
   ],
 }
 
-export const DEFAULT_FONTS: Fonts = { sans: 'inter', mono: 'jetbrains-mono', serif: 'instrument-serif' }
+export const DEFAULT_FONTS: Fonts = { sans: 'geist', mono: 'geist-mono', serif: 'instrument-serif' }
 
 export const fontStack = (role: FontRole, id: string): string =>
   (FONT_OPTIONS[role].find(f => f.id === id) || FONT_OPTIONS[role].find(f => f.id === DEFAULT_FONTS[role])!).stack

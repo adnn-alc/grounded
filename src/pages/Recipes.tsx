@@ -1,10 +1,15 @@
-import { useState, useRef, useEffect, type FormEvent } from 'react'
-import { Meta } from '../components/ui.tsx'
+import { useState, type FormEvent } from 'react'
+import { Backdrop } from '../components/ui.tsx'
+import { Field } from '../components/Fields.tsx'
+import { PageHead } from '../components/Shell.tsx'
+import { ratioText } from '../data/taste.ts'
 import { useUnits } from '../hooks/useUnits.ts'
 import Ico from '../components/Ico.tsx'
 import type { Recipe, RecipeInput, RecipeStep, Units } from '../types.ts'
 
 // ── RECIPES ───────────────────────────────────────────────────────────
+const ICON = 14
+
 /** Form fields are the inputs' strings until saved */
 interface RecipeForm {
   name: string; type: string; dose: string; water: string; ratio: string
@@ -27,21 +32,10 @@ interface RecipesPageProps {
 
 export function RecipesPage({ recipes = [], units, onSaveRecipe, onUpdateRecipe, onDeleteRecipe }: RecipesPageProps) {
   const U = useUnits(units)
-  const [activeTimer, setActiveTimer] = useState<string | null>(null)
-  const [timerEl, setTimerEl]         = useState(0)
-  const timerRef = useRef<ReturnType<typeof setInterval>>()
   const [adding,   setAdding]  = useState(false)
   const [editing,  setEditing] = useState<Recipe | null>(null)
   const [form, setForm]        = useState(EMPTY_RECIPE)
   const [saving, setSaving]    = useState(false)
-
-  const startTimer = (id: string) => {
-    clearInterval(timerRef.current)
-    setActiveTimer(id); setTimerEl(0)
-    timerRef.current = setInterval(() => setTimerEl(e => e + 1), 1000)
-  }
-  const stopTimer = () => { clearInterval(timerRef.current); setActiveTimer(null); setTimerEl(0) }
-  useEffect(() => () => clearInterval(timerRef.current), [])
 
   const setField = (k: keyof RecipeForm, v: string) => setForm(f => ({ ...f, [k]: v }))
   const setStep  = (i: number, k: keyof RecipeStep, v: string) => setForm(f => {
@@ -60,7 +54,7 @@ export function RecipesPage({ recipes = [], units, onSaveRecipe, onUpdateRecipe,
     type:  form.type.trim(),
     dose,
     water,
-    ratio: dose && water ? `1:${(water / dose).toFixed(1)}` : '',
+    ratio: dose && water ? ratioText(dose, water, 'filter') : '',
     temp:  parseFloat(form.temp)  || 0,
     time:  form.time.trim(),
     grind: form.grind.trim(),
@@ -111,205 +105,125 @@ export function RecipesPage({ recipes = [], units, onSaveRecipe, onUpdateRecipe,
     setEditing(r)
   }
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Delete this recipe?')) return
-    await onDeleteRecipe(id)
+  const handleDelete = async (r: Recipe) => {
+    if (!confirm(`Delete ${r.name}? This can’t be undone.`)) return
+    await onDeleteRecipe(r.id)
   }
 
   const closeModal = () => { setAdding(false); setEditing(null); setForm(EMPTY_RECIPE) }
 
+  const isEdit = editing != null
+  const formRatio = ratioText(parseFloat(form.dose) || 0, parseFloat(form.water) || 0, 'filter')
+
   return (
     <div className="stack">
-      <div className="page-head">
-        <h1 className="page-title">Recipes.</h1>
-        <span className="page-sub">{recipes.length} saved</span>
-        <button className="primary-btn" style={{ marginLeft: 'auto' }} onClick={() => setAdding(true)}>
-          <Ico name="plus" size={13} /> Add recipe
-        </button>
-      </div>
+      <PageHead title="Recipes." sub={`${recipes.length} saved`}>
+        <button className="primary-btn" onClick={() => setAdding(true)}><Ico name="plus" size={ICON} /> Add recipe</button>
+      </PageHead>
 
-      <div className="grid grid-2">
+      {recipes.length === 0 && (
+        <div className="card"><div className="empty">No recipes yet. Save the ones you like to follow, step by step.</div></div>
+      )}
+
+      <div className="recipe-grid">
       {recipes.map(r => (
-        <div key={r.id} className="card" style={{ display: 'flex', flexDirection: 'column' }}>
+        <div key={r.id} className="card recipe">
           <div className="card-head">
             <span className="card-title">{r.type}</span>
-            <div className="row" style={{ marginLeft: 'auto', gap: 6 }}>
-              {r.tags.map(t => <span key={t} className="badge">{t}</span>)}
-              <button className="icon-btn" style={{ width: 24, height: 24, borderColor: 'transparent' }}
-                onClick={() => openEdit(r)} title="Edit recipe">
-                <Ico name="pencil" size={11} />
-              </button>
-              <button className="icon-btn" style={{ width: 24, height: 24, borderColor: 'transparent', color: 'oklch(0.60 0.18 20)' }}
-                onClick={() => handleDelete(r.id)} title="Delete recipe">
-                <Ico name="trash" size={11} />
-              </button>
-            </div>
+            <div className="recipe-tags">{r.tags.map(t => <span key={t} className="tag-pill">{t}</span>)}</div>
+            <button className="icon-btn plain sm" aria-label={`Edit ${r.name}`} title="Edit recipe" onClick={() => openEdit(r)}><Ico name="pencil" size={ICON} /></button>
+            <button className="icon-btn plain sm danger" aria-label={`Delete ${r.name}`} title="Delete recipe" onClick={() => handleDelete(r)}><Ico name="trash" size={ICON} /></button>
           </div>
-          <div style={{ fontFamily: 'var(--font-serif)', fontStyle: 'italic', fontSize: 30, lineHeight: 1 }}>{r.name}</div>
-          <div className="divider" />
-          <div className="grid" style={{ gridTemplateColumns: 'repeat(5,1fr)', gap: 4, marginBottom: 14 }}>
-            <Meta k="Dose"  v={`${U.m(r.dose)}${U.mU()}`} />
-            <Meta k="Water" v={`${U.m(r.water)}${U.mU()}`} />
-            <Meta k="Ratio" v={r.ratio} />
-            <Meta k="Temp"  v={`${U.t(r.temp)}${U.tU()}`} />
-            <Meta k="Time"  v={r.time} />
+          <div className="recipe-name">{r.name}</div>
+          <div className="recipe-nums">
+            <div className="kv"><span className="k">Dose</span><span className="v">{U.m(r.dose)}<small>{U.mU()}</small></span></div>
+            <div className="kv"><span className="k">Water</span><span className="v">{U.m(r.water)}<small>{U.mU()}</small></span></div>
+            <div className="kv"><span className="k">Ratio</span><span className="v">{r.ratio || '–'}</span></div>
+            <div className="kv"><span className="k">Temp</span><span className="v">{U.t(r.temp)}<small>{U.tU()}</small></span></div>
+            <div className="kv"><span className="k">Time</span><span className="v">{r.time || '–'}</span></div>
           </div>
-          <div className="mono" style={{ fontSize: 10, color: 'var(--text-3)', marginBottom: 12, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-            Grind · {r.grind}
-          </div>
-          <div style={{ flex: 1 }}>
-          {r.steps.map((step, i) => (
-            <div key={i} className="step-row">
-              <div className="step-num">{i + 1}</div>
-              <div className="step-time">{step.t}</div>
-              <div>
-                <div style={{ fontSize: 13 }}>{step.name}</div>
-                {step.desc && <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 1 }}>{step.desc}</div>}
-              </div>
-              <div className="step-water">{step.water || ''}</div>
-            </div>
-          ))}
-          </div>
-          <div className="row" style={{ marginTop: 14, gap: 12 }}>
-            {activeTimer === r.id ? (
-              <>
-                <div className="mono" style={{ fontSize: 26, color: 'var(--crema)', letterSpacing: '-0.03em' }}>
-                  {String(Math.floor(timerEl / 60)).padStart(2, '0')}:{String(timerEl % 60).padStart(2, '0')}
+          {r.grind && <div className="recipe-grind">Grind: {r.grind}</div>}
+          <div className="recipe-steps">
+            {r.steps.map((step, i) => (
+              <div key={i} className="rstep">
+                <span className="rs-t">{step.t}</span>
+                <div className="rs-main">
+                  <div className="rs-name">{step.name}</div>
+                  {step.desc && <div className="rs-desc">{step.desc}</div>}
                 </div>
-                <button className="ghost-btn" onClick={stopTimer}><Ico name="stop" size={13} /> Stop</button>
-              </>
-            ) : (
-              <button className="primary-btn" onClick={() => startTimer(r.id)}>
-                <Ico name="play" size={13} /> Start timer
-              </button>
-            )}
+                <span className="rs-w">{step.water || ''}</span>
+              </div>
+            ))}
           </div>
         </div>
       ))}
       </div>
 
       {(adding || editing) && (
-        <div className="modal-backdrop" onClick={closeModal}>
-          <div className="modal" style={{ width: 720 }} onClick={e => e.stopPropagation()}>
+        <Backdrop onClose={closeModal}>
+          <div className="modal recipe-modal" onClick={e => e.stopPropagation()}>
             <div className="modal-head">
-              <h2>{editing ? 'Edit recipe' : 'New recipe'}</h2>
-              <button className="icon-btn" style={{ marginLeft: 'auto' }} onClick={closeModal}>
-                <Ico name="x" size={14} />
-              </button>
+              <h2>{isEdit ? 'Edit recipe' : 'New recipe'}</h2>
+              <button type="button" className="icon-btn" style={{ marginLeft: 'auto' }} aria-label="Close" onClick={closeModal}><Ico name="x" size={ICON} /></button>
             </div>
-            <form className="modal-body scroll" onSubmit={editing ? handleEdit : handleAdd}>
-              <div className="stack" style={{ gap: 18 }}>
-
-                {/* Basic info */}
-                <div className="grid grid-2" style={{ gap: 12 }}>
-                  <div className="dial-input" style={{ gridColumn: '1 / -1' }}>
-                    <label>Recipe name</label>
-                    <input style={{ fontSize: 14, width: '100%' }} placeholder="e.g. Tetsu 4:6 — Balanced"
-                      value={form.name} onChange={e => setField('name', e.target.value)} required />
-                  </div>
-                  <div className="dial-input">
-                    <label>Type / method</label>
-                    <input style={{ fontSize: 14, width: '100%' }} placeholder="e.g. V60, AeroPress"
-                      value={form.type} onChange={e => setField('type', e.target.value)} />
-                  </div>
-                  <div className="dial-input">
-                    <label>Tags (comma-separated)</label>
-                    <input style={{ fontSize: 14, width: '100%' }} placeholder="e.g. light roast, easy"
-                      value={form.tags} onChange={e => setField('tags', e.target.value)} />
-                  </div>
+            <form onSubmit={isEdit ? handleEdit : handleAdd}>
+              <div className="modal-body scroll stack">
+                <div className="form-grid">
+                  <Field label="Name" wide>
+                    <input className="text-input" placeholder="Tetsu 4:6, balanced" required value={form.name} onChange={e => setField('name', e.target.value)} />
+                  </Field>
+                  <Field label="Brewer">
+                    <input className="text-input" placeholder="V60, AeroPress…" value={form.type} onChange={e => setField('type', e.target.value)} />
+                  </Field>
+                  <Field label="Tags, separated by commas">
+                    <input className="text-input" placeholder="light roast, easy" value={form.tags} onChange={e => setField('tags', e.target.value)} />
+                  </Field>
                 </div>
 
-                {/* Parameters */}
-                <div>
-                  <div className="micro" style={{ marginBottom: 10 }}>Parameters</div>
-                  <div className="grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
-                    <div className="dial-input">
-                      <label>Dose (g)</label>
-                      <input type="number" step="0.1" style={{ fontSize: 14, width: '100%' }} placeholder="20"
-                        value={form.dose} onChange={e => setField('dose', e.target.value)} />
-                    </div>
-                    <div className="dial-input">
-                      <label>Water (g)</label>
-                      <input type="number" step="1" style={{ fontSize: 14, width: '100%' }} placeholder="300"
-                        value={form.water} onChange={e => setField('water', e.target.value)} />
-                    </div>
-                    <div className="dial-input" style={{ justifyContent: 'center' }}>
-                      <label>Ratio</label>
-                      <div style={{ fontSize: 14, color: parseFloat(form.dose) && parseFloat(form.water) ? 'var(--text-1)' : 'var(--text-4)' }}>
-                        {parseFloat(form.dose) && parseFloat(form.water)
-                          ? `1:${(parseFloat(form.water) / parseFloat(form.dose)).toFixed(1)}`
-                          : '–'}
-                      </div>
-                    </div>
-                    <div className="dial-input">
-                      <label>Temp (°C)</label>
-                      <input type="number" step="0.5" style={{ fontSize: 14, width: '100%' }} placeholder="92"
-                        value={form.temp} onChange={e => setField('temp', e.target.value)} />
-                    </div>
-                    <div className="dial-input">
-                      <label>Total time</label>
-                      <input style={{ fontSize: 14, width: '100%' }} placeholder="3:30"
-                        value={form.time} onChange={e => setField('time', e.target.value)} />
-                    </div>
-                    <div className="dial-input">
-                      <label>Grind</label>
-                      <input style={{ fontSize: 14, width: '100%' }} placeholder="Medium-coarse"
-                        value={form.grind} onChange={e => setField('grind', e.target.value)} />
-                    </div>
-                  </div>
+                <div className="form-grid three">
+                  <Field label="Dose (g)">
+                    <input className="text-input mono" type="number" step="0.1" placeholder="20" value={form.dose} onChange={e => setField('dose', e.target.value)} />
+                  </Field>
+                  <Field label="Water (g)">
+                    <input className="text-input mono" type="number" step="1" placeholder="300" value={form.water} onChange={e => setField('water', e.target.value)} />
+                  </Field>
+                  <Field label="Ratio">
+                    <span className="text-input mono readonly-input">{formRatio}</span>
+                  </Field>
+                  <Field label="Temp (°C)">
+                    <input className="text-input mono" type="number" step="0.5" placeholder="92" value={form.temp} onChange={e => setField('temp', e.target.value)} />
+                  </Field>
+                  <Field label="Total time">
+                    <input className="text-input mono" placeholder="3:30" value={form.time} onChange={e => setField('time', e.target.value)} />
+                  </Field>
+                  <Field label="Grind">
+                    <input className="text-input" placeholder="Medium-coarse" value={form.grind} onChange={e => setField('grind', e.target.value)} />
+                  </Field>
                 </div>
 
-                {/* Steps */}
                 <div>
-                  <div className="row" style={{ marginBottom: 10 }}>
-                    <div className="micro">Steps</div>
-                    <button type="button" className="ghost-btn" style={{ marginLeft: 'auto', fontSize: 11 }} onClick={addStep}>
-                      <Ico name="plus" size={11} /> Add step
-                    </button>
-                  </div>
-                  <div className="stack" style={{ gap: 8 }}>
+                  <div className="step-form-row step-form-cols"><span>Time</span><span>Step</span><span>Note</span><span>Water</span><span /></div>
+                  <div className="stack step-form">
                     {form.steps.map((step, i) => (
-                      <div key={i} style={{ display: 'grid', gridTemplateColumns: '60px 1fr 1fr 70px 24px', gap: 8, alignItems: 'center' }}>
-                        <div className="dial-input" style={{ padding: '8px 10px' }}>
-                          <label>Time</label>
-                          <input style={{ fontSize: 13, width: '100%' }} placeholder="0:00"
-                            value={step.t} onChange={e => setStep(i, 't', e.target.value)} />
-                        </div>
-                        <div className="dial-input" style={{ padding: '8px 10px' }}>
-                          <label>Step name</label>
-                          <input style={{ fontSize: 13, width: '100%' }} placeholder="Bloom"
-                            value={step.name} onChange={e => setStep(i, 'name', e.target.value)} />
-                        </div>
-                        <div className="dial-input" style={{ padding: '8px 10px' }}>
-                          <label>Description</label>
-                          <input style={{ fontSize: 13, width: '100%' }} placeholder="Optional note"
-                            value={step.desc} onChange={e => setStep(i, 'desc', e.target.value)} />
-                        </div>
-                        <div className="dial-input" style={{ padding: '8px 10px' }}>
-                          <label>Water</label>
-                          <input style={{ fontSize: 13, width: '100%' }} placeholder="60g"
-                            value={step.water} onChange={e => setStep(i, 'water', e.target.value)} />
-                        </div>
-                        <button type="button" className="icon-btn"
-                          style={{ width: 24, height: 24, borderColor: 'transparent', color: 'var(--text-4)', alignSelf: 'center' }}
-                          onClick={() => removeStep(i)} disabled={form.steps.length === 1}>
-                          <Ico name="x" size={11} />
-                        </button>
+                      <div key={i} className="step-form-row">
+                        <input className="text-input mono" placeholder="0:00" aria-label="Time" value={step.t} onChange={e => setStep(i, 't', e.target.value)} />
+                        <input className="text-input" placeholder="Bloom" aria-label="Step" value={step.name} onChange={e => setStep(i, 'name', e.target.value)} />
+                        <input className="text-input" placeholder="Optional" aria-label="Note" value={step.desc} onChange={e => setStep(i, 'desc', e.target.value)} />
+                        <input className="text-input mono" placeholder="60g" aria-label="Water" value={step.water} onChange={e => setStep(i, 'water', e.target.value)} />
+                        <button type="button" className="icon-btn plain sm" aria-label="Remove step" onClick={() => removeStep(i)} disabled={form.steps.length === 1}><Ico name="x" size={ICON} /></button>
                       </div>
                     ))}
                   </div>
+                  <button type="button" className="link-btn dmodal-add" onClick={addStep}>+ Add a step</button>
                 </div>
-
-                <div className="row" style={{ justifyContent: 'flex-end', gap: 8 }}>
-                  <button type="button" className="ghost-btn" onClick={closeModal}>Cancel</button>
-                  <button type="submit" className="primary-btn" disabled={saving}>
-                    {saving ? 'Saving…' : editing ? 'Update recipe' : 'Save recipe'}
-                  </button>
-                </div>
+              </div>
+              <div className="modal-foot">
+                <button type="button" className="ghost-btn lg" onClick={closeModal}>Cancel</button>
+                <button type="submit" className="primary-btn" disabled={saving}>{saving ? 'Saving…' : 'Save recipe'}</button>
               </div>
             </form>
           </div>
-        </div>
+        </Backdrop>
       )}
     </div>
   )

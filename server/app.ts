@@ -5,6 +5,7 @@ import type { NextFunction, Request, Response } from 'express'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import db, { SAMPLE_IDS, readSettings } from './db.ts'
+import { tasteResult } from './taste.ts'
 import { createBackup, restoreBackup, shotsCsv, brewsCsv, today } from './backup.ts'
 import { HttpError, NOT_FOUND, FORBIDDEN, CONFLICT, errorHandler, found } from './errors.ts'
 import {
@@ -75,6 +76,8 @@ function rowToShot(row: ShotRow): Shot {
     },
     notes:         row.notes,
     verdict:       row.verdict,
+    landed:        row.landed ?? null,
+    bad:           Boolean(row.bad),
     machine:       row.machine,
     grinder_model: row.grinder_model,
     grinder_rpm:   row.grinder_rpm,
@@ -113,6 +116,8 @@ function rowToBrew(row: BrewRow): Brew {
     },
     notes:        row.notes,
     verdict:      row.verdict,
+    landed:       row.landed ?? null,
+    bad:          Boolean(row.bad),
     grinder_rpm:  row.grinder_rpm,
     water_recipe: row.water_recipe,
     favorited:    Boolean(row.favorited),
@@ -196,16 +201,17 @@ app.post('/api/shots', (req, res) => {
   const s = parseBody(shotSchema, req.body)
   const id = s.id || 'shot-' + Date.now()
   const ref = resolveBean(s)
+  const t = tasteResult(s)
   db.transaction(() => {
     db.prepare(`
       INSERT INTO shots (id, date, bean_id, bean, roaster, dose, yield, time, preinf, temp, grind, rating,
         taste_acidity, taste_sweetness, taste_body, taste_bitterness, taste_balance, taste_aftertaste,
-        notes, verdict, machine, grinder_model, grinder_rpm, water_recipe, basket, brew_mode)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        notes, verdict, landed, bad, machine, grinder_model, grinder_rpm, water_recipe, basket, brew_mode)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       id, s.date, ref.bean_id, ref.bean, ref.roaster, s.dose, s.yield, s.time, s.preinf, s.temp, s.grind, s.rating,
       s.taste?.acidity, s.taste?.sweetness, s.taste?.body, s.taste?.bitterness, s.taste?.balance, s.taste?.aftertaste,
-      s.notes, s.verdict, s.machine, s.grinder_model, s.grinder_rpm == null ? null : String(s.grinder_rpm),
+      s.notes, t.verdict, t.landed, t.bad, s.machine, s.grinder_model, s.grinder_rpm == null ? null : String(s.grinder_rpm),
       s.water_recipe ?? null, s.basket ?? null, s.brew_mode ?? null
     )
     adjustStock(ref.bean_id, s.dose == null ? null : -s.dose)
@@ -217,17 +223,18 @@ app.put('/api/shots/:id', (req, res) => {
   const s = parseBody(shotSchema, req.body)
   const before = getShot(req.params.id)
   const ref = resolveBean(s)
+  const t = tasteResult(s)
   db.transaction(() => {
     db.prepare(`
       UPDATE shots SET
         date=?, bean_id=?, bean=?, roaster=?, dose=?, yield=?, time=?, preinf=?, temp=?, grind=?, rating=?,
         taste_acidity=?, taste_sweetness=?, taste_body=?, taste_bitterness=?, taste_balance=?, taste_aftertaste=?,
-        notes=?, verdict=?, machine=?, grinder_model=?, grinder_rpm=?, water_recipe=?, basket=?, brew_mode=?
+        notes=?, verdict=?, landed=?, bad=?, machine=?, grinder_model=?, grinder_rpm=?, water_recipe=?, basket=?, brew_mode=?
       WHERE id=?
     `).run(
       s.date, ref.bean_id, ref.bean, ref.roaster, s.dose, s.yield, s.time, s.preinf, s.temp, s.grind, s.rating,
       s.taste?.acidity, s.taste?.sweetness, s.taste?.body, s.taste?.bitterness, s.taste?.balance, s.taste?.aftertaste,
-      s.notes, s.verdict, s.machine, s.grinder_model, s.grinder_rpm == null ? null : String(s.grinder_rpm),
+      s.notes, t.verdict, t.landed, t.bad, s.machine, s.grinder_model, s.grinder_rpm == null ? null : String(s.grinder_rpm),
       s.water_recipe ?? null, s.basket ?? null, s.brew_mode ?? null, req.params.id
     )
     restock(before, { bean_id: ref.bean_id, dose: s.dose ?? null })
@@ -261,18 +268,19 @@ app.post('/api/brews', (req, res) => {
   const b = parseBody(brewSchema, req.body)
   const id = b.id || 'brew-' + Date.now()
   const ref = resolveBean(b)
+  const t = tasteResult(b)
   db.transaction(() => {
     db.prepare(`
       INSERT INTO brews (id, date, bean_id, bean, roaster, dripper, grinder_model, dose, water, temp, grind,
         bloom_time, num_pours, pours, time, rating,
         taste_acidity, taste_sweetness, taste_body, taste_bitterness, taste_balance, taste_aftertaste,
-        notes, verdict, grinder_rpm, water_recipe)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        notes, verdict, landed, bad, grinder_rpm, water_recipe)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       id, b.date, ref.bean_id, ref.bean, ref.roaster, b.dripper, b.grinder_model, b.dose, b.water, b.temp, b.grind,
       b.bloom_time, b.num_pours, JSON.stringify(b.pours || []), b.time, b.rating,
       b.taste?.acidity, b.taste?.sweetness, b.taste?.body, b.taste?.bitterness, b.taste?.balance, b.taste?.aftertaste,
-      b.notes, b.verdict, b.grinder_rpm == null ? null : String(b.grinder_rpm), b.water_recipe ?? null
+      b.notes, t.verdict, t.landed, t.bad, b.grinder_rpm == null ? null : String(b.grinder_rpm), b.water_recipe ?? null
     )
     adjustStock(ref.bean_id, b.dose == null ? null : -b.dose)
   })()
@@ -283,19 +291,20 @@ app.put('/api/brews/:id', (req, res) => {
   const b = parseBody(brewSchema, req.body)
   const before = getBrew(req.params.id)
   const ref = resolveBean(b)
+  const t = tasteResult(b)
   db.transaction(() => {
     db.prepare(`
       UPDATE brews SET
         date=?, bean_id=?, bean=?, roaster=?, dripper=?, grinder_model=?, dose=?, water=?, temp=?, grind=?,
         bloom_time=?, num_pours=?, pours=?, time=?, rating=?,
         taste_acidity=?, taste_sweetness=?, taste_body=?, taste_bitterness=?, taste_balance=?, taste_aftertaste=?,
-        notes=?, verdict=?, grinder_rpm=?, water_recipe=?
+        notes=?, verdict=?, landed=?, bad=?, grinder_rpm=?, water_recipe=?
       WHERE id=?
     `).run(
       b.date, ref.bean_id, ref.bean, ref.roaster, b.dripper, b.grinder_model, b.dose, b.water, b.temp, b.grind,
       b.bloom_time, b.num_pours, JSON.stringify(b.pours || []), b.time, b.rating,
       b.taste?.acidity, b.taste?.sweetness, b.taste?.body, b.taste?.bitterness, b.taste?.balance, b.taste?.aftertaste,
-      b.notes, b.verdict, b.grinder_rpm == null ? null : String(b.grinder_rpm), b.water_recipe ?? null, req.params.id
+      b.notes, t.verdict, t.landed, t.bad, b.grinder_rpm == null ? null : String(b.grinder_rpm), b.water_recipe ?? null, req.params.id
     )
     restock(before, { bean_id: ref.bean_id, dose: b.dose ?? null })
   })()

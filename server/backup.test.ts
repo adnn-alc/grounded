@@ -99,13 +99,14 @@ test('a backup from an older version without some columns still imports', async 
   const old = {
     ...backup,
     schemaVersion: 1,
-    tables: { ...backup.tables, shots: backup.tables.shots.map(({ bean_id: _id, brew_mode: _mode, ...rest }) => rest) },
+    tables: { ...backup.tables, shots: backup.tables.shots.map(({ bean_id: _id, brew_mode: _mode, landed: _l, bad: _b, ...rest }) => rest) },
   }
   const res = await restore(old, 'replace')
   assert.equal(res.status, OK)
   const shots = (await api.call<Shot[]>('GET', '/api/shots')).body
   assert.equal(shots.length, backup.tables.shots.length)
   assert.ok(shots.every(s => s.bean_id === null), 'missing columns get their defaults')
+  assert.ok(shots.filter(s => s.verdict && s.verdict !== 'bad').every(s => s.landed !== null), 'old verdicts are placed on the slider')
 })
 
 test('large backups are accepted', async () => {

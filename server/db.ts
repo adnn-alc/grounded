@@ -2,6 +2,7 @@ import Database from 'better-sqlite3'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import type { Settings, SettingRow } from '../src/types.ts'
+import { fillFromVerdictsSql } from './taste.ts'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const DB_PATH = process.env.DB_PATH || path.join(__dirname, '../data/grounded.db')
@@ -64,7 +65,9 @@ db.exec(`
     taste_balance    REAL,
     taste_aftertaste REAL,
     notes       TEXT,
-    verdict     TEXT,
+    verdict     TEXT,          -- worked out from landed/bad (server/taste.ts), for older versions
+    landed      INTEGER,       -- 0 sour … 50 balanced … 100 bitter; NULL = not placed
+    bad         INTEGER DEFAULT 0,
     machine       TEXT,
     grinder_model TEXT,
     grinder_rpm   TEXT,
@@ -136,6 +139,8 @@ db.exec(`
     taste_aftertaste REAL,
     notes        TEXT,
     verdict      TEXT,
+    landed       INTEGER,
+    bad          INTEGER DEFAULT 0,
     grinder_rpm  TEXT,
     water_recipe TEXT,
     favorited    INTEGER DEFAULT 0,
@@ -225,6 +230,18 @@ const MIGRATIONS: readonly { name: string, up: () => void }[] = [
       `).all().map(r => r.brew_mode)
       if (used.length) {
         db.prepare(`INSERT OR IGNORE INTO settings (key, value) VALUES ('brewModes', ?)`).run(JSON.stringify(used))
+      }
+    },
+  },
+  {
+    // The Sour/Good/Bitter/Bad buttons became a sour-to-bitter slider plus a "bad" checkbox.
+    // Old verdicts are placed on the slider; verdict itself stays for older versions.
+    name: 'taste slider and bad flag',
+    up: () => {
+      for (const t of ['shots', 'brews'] as const) {
+        addColumn(t, 'landed', 'INTEGER')
+        addColumn(t, 'bad', 'INTEGER DEFAULT 0')
+        db.exec(fillFromVerdictsSql(t))
       }
     },
   },
@@ -323,6 +340,7 @@ seedIfEmpty('shots', () => {
     { id:'s-38', date:'2026-04-16 18:15', bean:'Finca Tamana',roaster:'Square Mile',   dose:18.5, yield:36.5, time:33, preinf:10, temp:94.0, grind:3.1, rating:7.0, taste_acidity:4, taste_sweetness:7, taste_body:8, taste_bitterness:6, taste_balance:6, taste_aftertaste:5, notes:'Slight bitterness at the back. Drop temp?',            verdict:'over' },
   ]
   shots.forEach(s => insert.run(s))
+  db.exec(fillFromVerdictsSql('shots'))   // the sample rows are written with verdicts
   console.log('  ✓ Seeded shots')
 })
 
@@ -374,6 +392,7 @@ seedIfEmpty('brews', () => {
     },
   ]
   brews.forEach(b => insert.run(b))
+  db.exec(fillFromVerdictsSql('brews'))   // the sample rows are written with verdicts
   console.log('  ✓ Seeded brews')
 })
 

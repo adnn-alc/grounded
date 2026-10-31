@@ -21,16 +21,20 @@ const BAD_REQUEST = 400
 const NOT_FOUND = 404
 const CONFLICT = 409
 
-const LATEST_SCHEMA = 3
+const LATEST_SCHEMA = 4
 const DOSE = 18
 const NEW_DOSE = 20
 const YIELD = 36
 const SECONDS = 28
 const MID = 5   // middle of the 1–10 taste scale
+const BALANCED = 50       // the middle of the sour-to-bitter slider
+const A_TOUCH_SOUR = 42
+const SOUR = 20
+const OLD_UNDER = 25      // where an old 'under' verdict lands
 
 const taste = { acidity: MID, sweetness: MID, body: MID, bitterness: MID, balance: MID, aftertaste: MID }
 const shotBody = (beanId: string, dose: number): Record<string, unknown> =>
-  ({ date: '2026-10-30 08:00', bean_id: beanId, dose, yield: YIELD, time: SECONDS, rating: MID, taste, verdict: 'good' })
+  ({ date: '2026-10-30 08:00', bean_id: beanId, dose, yield: YIELD, time: SECONDS, rating: MID, taste, landed: BALANCED, bad: false })
 
 const bean = async (id: string): Promise<Bean> => {
   const all = (await api.call<Bean[]>('GET', '/api/beans')).body
@@ -55,6 +59,18 @@ test('saving a shot links its bean and takes the dose off that bean', async () =
   assert.equal(res.body.bean, 'Finca Tamana')
   assert.equal(res.body.roaster, 'Square Mile')
   assert.equal((await bean('b-finca')).remaining, before.remaining - DOSE)
+})
+
+test('a shot keeps where it landed, works out the old verdict, and a bad shot is not placed', async () => {
+  const placed = await api.call<Shot>('POST', '/api/shots', { ...shotBody('b-finca', DOSE), landed: A_TOUCH_SOUR })
+  assert.deepEqual([placed.body.landed, placed.body.bad, placed.body.verdict], [A_TOUCH_SOUR, false, 'good'])
+  const bad = await api.call<Shot>('POST', '/api/shots', { ...shotBody('b-finca', DOSE), landed: SOUR, bad: true })
+  assert.deepEqual([bad.body.landed, bad.body.bad, bad.body.verdict], [null, true, 'bad'])
+  const { landed: _l, bad: _b, ...legacy } = shotBody('b-finca', DOSE)
+  const old = await api.call<Shot>('POST', '/api/shots', { ...legacy, verdict: 'under' })
+  assert.deepEqual([old.body.landed, old.body.bad, old.body.verdict], [OLD_UNDER, false, 'under'], 'an older client sending only a verdict')
+  const fresh = (await api.call<Shot[]>('GET', '/api/shots')).body.filter(s => s.id.startsWith('s-'))
+  assert.ok(fresh.every(s => s.landed !== null || s.bad), 'sample shots are placed on the slider')
 })
 
 test('editing a shot moves its dose from the old bean to the new one', async () => {

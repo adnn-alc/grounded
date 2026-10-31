@@ -8,15 +8,16 @@ React + Express + SQLite in a single Docker container. No accounts, no cloud, no
 
 ## Features
 
-- **Dial-in** — espresso and filter modes. Log dose, yield, time, temperature, grind, pre-infusion, grinder RPM, basket, water recipe and brew mode, then rate the cup on six taste axes (acidity, sweetness, body, bitterness, balance, aftertaste) with a live flavor radar.
+- **Dial-in** — espresso and filter modes. Log dose, yield, time, temperature, grind, pre-infusion, grinder RPM, basket, water recipe and brew mode, enter the time by hand (no timer), mark where the cup landed between sour and bitter (or check **Bad shot**), and rate it on six taste axes with a live flavor radar.
 - **Basket doses** — save the dose you measured for each basket per bean, along with the grind setting it was measured at, and apply it with one click.
-- **Shot & brew history** — browse, edit, favorite and re-use past shots and brews as a starting point for the next one.
-- **Beans** — roaster, origin, process, variety, roast date, tasting notes, price and remaining stock. Archive finished bags.
-- **Inventory** — open bags, low-stock warnings and spending.
+- **Shots & brews** — grouped by day, filtered by bag, period and notes; edit, favorite and re-use past ones as a starting point for the next.
+- **Beans** — roaster, origin, process, variety, roast date, tasting notes, price and remaining stock. Move finished bags to **Finished bags**.
+- **Stock** — open bags, low-stock warnings and spending.
 - **Recipes & tips** — store your own brew recipes and notes.
 - **Gear** — machines, grinders, baskets, drippers, scales and kettles. Active gear feeds the dial-in dropdowns.
-- **Stats** — 14-day trend, bean origins world map, espresso stats per basket, and more.
-- **Settings** — four themes (Moody, Midnight, Parchment, Terminal), a choice of bundled fonts, g/oz and °C/°F units, default dial-in values and custom water recipes. Settings are stored on the server, so every browser and device sees the same ones.
+- **Stats** — where your shots landed between sour and bitter, rating per day, espresso per basket, origins (with a world map) and spending.
+- **Works on a phone** — the same page in your phone's browser, with a tab bar at the bottom.
+- **Settings** — six themes (Moody, Midnight, Terminal, Parchment, Oat, Ember), a choice of bundled fonts, g/oz and °C/°F units, default dial-in values and custom water recipes. Settings are stored on the server, so every browser and device sees the same ones.
 
 ---
 
@@ -205,7 +206,7 @@ All endpoints are JSON under `/api`.
 | Database | SQLite via better-sqlite3                   |
 | Styling  | Plain CSS with custom properties            |
 | Charts   | Hand-rolled SVG                             |
-| Fonts    | Bundled via Fontsource (Inter, JetBrains Mono, Instrument Serif by default) |
+| Fonts    | Bundled via Fontsource (Geist, Geist Mono, Instrument Serif by default) |
 | Deploy   | Docker / Docker Compose                     |
 
 ---

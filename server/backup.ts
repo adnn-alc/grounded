@@ -8,6 +8,7 @@ import type { Statement } from 'better-sqlite3'
 import db, { SCHEMA_VERSION, snapshotDatabase, deleteSnapshot, readSettings } from './db.ts'
 import { HttpError, BAD_REQUEST } from './errors.ts'
 import { parseBody, importSchema, settingsSchema } from './validation.ts'
+import { fillFromVerdictsSql } from './taste.ts'
 import type {
   Backup, BackupRow, BackupTable, ImportMode, ImportResult, Settings, TableCounts,
 } from '../src/types.ts'
@@ -88,6 +89,9 @@ function applyBackup(backup: Pick<Backup, 'tables'> & { settings?: Record<string
     added[t] = result.added
     skipped[t] = result.skipped
   })
+  // Rows from a backup made before the taste slider only have a verdict
+  db.exec(fillFromVerdictsSql('shots'))
+  db.exec(fillFromVerdictsSql('brews'))
 
   // Replace takes the backup's settings; merge only fills in the ones not set here
   if (replace) db.prepare('DELETE FROM settings').run()
@@ -137,12 +141,12 @@ const TASTE_COLUMNS = ['taste_acidity', 'taste_sweetness', 'taste_body', 'taste_
 
 const SHOT_CSV_COLUMNS = [
   'date', 'bean', 'roaster', 'dose', 'yield', 'time', 'preinf', 'temp', 'grind', 'rating', ...TASTE_COLUMNS,
-  'verdict', 'notes', 'machine', 'grinder_model', 'grinder_rpm', 'water_recipe', 'basket', 'brew_mode', 'favorited', 'id',
+  'landed', 'bad', 'verdict', 'notes', 'machine', 'grinder_model', 'grinder_rpm', 'water_recipe', 'basket', 'brew_mode', 'favorited', 'id',
 ]
 
 const BREW_CSV_COLUMNS = [
   'date', 'bean', 'roaster', 'dripper', 'grinder_model', 'dose', 'water', 'temp', 'grind', 'bloom_time', 'num_pours', 'pours',
-  'time', 'rating', ...TASTE_COLUMNS, 'verdict', 'notes', 'grinder_rpm', 'water_recipe', 'favorited', 'id',
+  'time', 'rating', ...TASTE_COLUMNS, 'landed', 'bad', 'verdict', 'notes', 'grinder_rpm', 'water_recipe', 'favorited', 'id',
 ]
 
 // Text starting with one of these would run as a formula when opened in a spreadsheet,

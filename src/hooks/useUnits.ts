@@ -15,6 +15,3 @@ export function useUnits(units: Units): UnitHelpers {
     tU: ()  => units.temp === 'C' ? '°C' : '°F',
   }
 }
-
-export const flavColor = (k: string): string =>
-  ({ acidity: 'var(--sour)', sweetness: 'var(--sweet)', body: 'var(--crema)', bitterness: 'var(--bitter)', balance: 'var(--good)', aftertaste: 'var(--crema-2)' } as Record<string, string>)[k] || 'var(--crema)'

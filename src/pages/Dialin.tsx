@@ -1,13 +1,33 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import Ico from '../components/Ico.tsx'
 import { FlavorRadar, FlavSliders } from '../components/charts.tsx'
-import { useUnits } from '../hooks/useUnits.ts'
+import { LandedSlider, MiniLanded } from '../components/Landed.tsx'
+import { NumField, Readout, TimeField } from '../components/Fields.tsx'
+import { BasketChips } from '../components/BeanDoses.tsx'
+import { PageHead } from '../components/Shell.tsx'
+import { useUnits, type UnitHelpers } from '../hooks/useUnits.ts'
 import { DEFAULT_WATER_RECIPES } from '../data/waterRecipes.ts'
-import { BeanDosesCard } from '../components/BeanDoses.tsx'
-import type { Bean, BeanInput, Brew, BrewInput, DialinDefaults, DialinPreset, Gear, Shot, ShotInput, Taste, Units, Verdict } from '../types.ts'
-import { beanLabel } from '../data/beans.ts'
+import { RPM_OPTIONS } from '../data/grinderRpm.ts'
+import { beanLabel, daysOffRoast } from '../data/beans.ts'
+import { activeGear, BASKET_KIND, DRIPPER_KIND, GRINDER_KIND, MACHINE_KIND, withCurrent } from '../data/gear.ts'
+import { clampRating, landedLabel, mmss, parseMmss, RATING_STEP, ratioText, tasteAverage } from '../data/taste.ts'
+import type { Bean, BeanInput, Brew, BrewInput, DialinDefaults, DialinPreset, DialinStart, Gear, Shot, ShotInput, Taste, Units } from '../types.ts'
 
-const DEFAULT_TASTE: Taste = { acidity: 5, sweetness: 5, body: 5, bitterness: 5, balance: 5, aftertaste: 5 }
+const MID = 5   // middle of the 1–10 taste scale
+const DEFAULT_TASTE: Taste = { acidity: MID, sweetness: MID, body: MID, bitterness: MID, balance: MID, aftertaste: MID }
+
+const SHOT_SLIDER_MAX   = 60    // seconds; typing more is fine
+const BREW_SLIDER_MAX   = 180   // 3 min; typing more is fine
+const BREW_TIME_STEP    = 5
+const MAX_POURS         = 8
+const BLOOM_PER_GRAM    = 3     // a first guess at the bloom: 3 g of water per gram of coffee
+const ROUND_POUR_TO     = 5
+const RADAR_SIZE        = 150
+const DEFAULT_POURS     = 3
+const PERCENT           = 100
+const ICON_SM           = 15
+const ICON_XS           = 12
 
 // Dial-in default from Settings (stored in the database), or the built-in fallback
 function dd(defaults: DialinDefaults, mode: 'espresso' | 'filter', key: string, fallback: string): string {
@@ -19,9 +39,11 @@ const DRIPPERS           = ['V60', 'Chemex', 'Kalita Wave', 'AeroPress', 'Clever
 const ESPRESSO_MACHINES  = ['Bianca', 'Lelit Mara X', 'ECM Synchronika', 'Rocket Appartamento', 'La Marzocco Linea Mini', 'Gaggia Classic', 'Breville Barista Express']
 const ESPRESSO_GRINDERS  = ['DF64 Gen 2', 'Niche Zero', 'Lagom P64', 'Fellow Ode', 'Baratza Vario', 'Comandante C40']
 
-const activeGear = (gear: Gear[], re: RegExp) => gear.filter(g => re.test(g.kind) && g.status !== 'Retired')
-// Keep a preset value selectable even if that gear was since retired or removed
-const withCurrent = (opts: string[], cur: string) => cur && !opts.includes(cur) ? [cur, ...opts] : opts
+// A grinder whose details say "manual" (as a word) has no RPM: "Manual, 48 mm" matches, "Manually tuned" doesn't:
+// https://regex101.com/?regex=%5Cbmanual%5Cb&flags=i&testString=Manual%2C%2048%20mm
+const MANUAL_WORD = /\bmanual\b/i
+
+const isManualGrinder = (g: Gear | undefined) => Boolean(g?.meta && MANUAL_WORD.test(g.meta))
 
 // Bean of a preset (a past shot/brew loaded via Re-pull): by id, or by name for very old entries
 function presetBeanId(beans: Bean[], ref: { bean_id: string | null, bean: string }): string | undefined {
@@ -29,727 +51,605 @@ function presetBeanId(beans: Bean[], ref: { bean_id: string | null, bean: string
   return beans.find(b => b.name === ref.bean)?.id
 }
 
-// ── Espresso mode ─────────────────────────────────────────────────────
-interface EspressoDialinProps {
-  shots:             Shot[]
-  beans:             Bean[]
-  gear?:             Gear[]
-  units:             Units
-  waterRecipes:      string[]
-  dialinDefaults:    DialinDefaults
-  brewModes:         string[]
-  onSaveShot:        (shot: ShotInput) => void
-  onUpdateBean:      (id: string, data: BeanInput) => Promise<Bean>
-  preset:            Shot | null
-  onPresetConsumed?: () => void
+const nowStamp = () => {
+  const now = new Date()
+  return now.toISOString().slice(0, 'YYYY-MM-DD'.length) + ' ' + now.toTimeString().slice(0, 'HH:MM'.length)
 }
 
-function EspressoDialin({ shots, beans, gear = [], units, waterRecipes, dialinDefaults, brewModes, onSaveShot, onUpdateBean, preset, onPresetConsumed }: EspressoDialinProps) {
-  const U = useUnits(units)
+// ── Cards used by both modes ──────────────────────────────────────────
+interface BagCardProps {
+  beans:       Bean[]
+  bean:        Bean | undefined
+  onPick:      (id: string) => void
+  U:           UnitHelpers
+  lastLine?:   ReactNode
+  onUseLast?:  () => void
+  children?:   ReactNode
+}
 
-  const machineGear   = activeGear(gear, /machine/i)
-  const grinderGear   = activeGear(gear, /grinder/i)
-  const basketGear    = activeGear(gear, /basket/i)
-  const machineOpts   = machineGear.length ? machineGear.map(g => g.name) : ESPRESSO_MACHINES
-  const grinderOpts   = grinderGear.length ? grinderGear.map(g => g.name) : ESPRESSO_GRINDERS
-  const basketOpts    = basketGear.map(g => g.name)
-  const primaryMachine = (machineGear.find(g => g.status === 'Primary') || machineGear[0])?.name || machineOpts[0] || ''
-  const primaryGrinder = (grinderGear.find(g => g.status === 'Primary') || grinderGear[0])?.name || grinderOpts[0] || ''
-  const primaryBasket  = (basketGear.find(g => g.status === 'Primary') || basketGear[0])?.name || ''
-
-  const [shotTime,     setShotTime]     = useState('')
-  const [dose,        setDose]         = useState(() => dd(dialinDefaults, 'espresso', 'dose', '18'))
-  const [yieldG,       setYieldG]       = useState(() => dd(dialinDefaults, 'espresso', 'yield', '36'))
-  const [grind,        setGrind]        = useState(() => dd(dialinDefaults, 'espresso', 'grind', '3'))
-  const [temp,         setTemp]         = useState(() => dd(dialinDefaults, 'espresso', 'temp', '92'))
-  const [preinf,       setPreinf]       = useState(() => dd(dialinDefaults, 'espresso', 'preinf', '0'))
-  const [selectedBean, setSelectedBean] = useState(beans[0]?.id || '')  // bean id
-  const [machine,      setMachine]      = useState(primaryMachine)
-  const [grinderModel, setGrinderModel] = useState(primaryGrinder)
-  const [grinderRpm,   setGrinderRpm]   = useState(() => dd(dialinDefaults, 'espresso', 'grinderRpm', '800'))
-  const [basket,       setBasket]       = useState(primaryBasket)
-  // Carry over the last shot's brew mode, if it's still one of the configured modes
-  const [brewMode,     setBrewMode]     = useState(() => {
-    const last = shots[0]?.brew_mode
-    return last && brewModes.includes(last) ? last : ''
-  })
-  const [waterRecipe,  setWaterRecipe]  = useState(() => dd(dialinDefaults, 'espresso', 'waterRecipe', waterRecipes[0]))
-
-  const [taste,   setTaste]   = useState<Taste>({ ...DEFAULT_TASTE })
-  const [notes,   setNotes]   = useState('')
-  const [verdict, setVerdict] = useState('')
-
-  const doseNum   = parseFloat(dose)   || 18
-  const grindNum  = parseFloat(grind)  || 2.4
-  const tempNum   = parseFloat(temp)   || 93
-  const preinfNum = parseInt(preinf, 10) || 0
-  const timeNum   = parseInt(shotTime, 10) || 0
-  const canSave   = timeNum > 0
-
-  const ratio = Number(yieldG) > 0 ? (parseFloat(yieldG) / doseNum).toFixed(2) : '–'
-
-  useEffect(() => {
-    if (!preset) return
-    setDose(String(preset.dose ?? 18))
-    setYieldG(String(preset.yield ?? 36))
-    setGrind(String(preset.grind ?? 3))
-    setTemp(String(preset.temp ?? 92))
-    setPreinf(String(preset.preinf ?? 0))
-    const presetBean = presetBeanId(beans, preset)
-    if (presetBean) setSelectedBean(presetBean)
-    if (preset.machine) setMachine(preset.machine)
-    if (preset.grinder_model) setGrinderModel(preset.grinder_model)
-    if (preset.grinder_rpm) setGrinderRpm(String(preset.grinder_rpm))
-    if (preset.water_recipe) setWaterRecipe(preset.water_recipe)
-    if (preset.basket) setBasket(preset.basket)
-    if (preset.brew_mode) setBrewMode(preset.brew_mode)
-    onPresetConsumed?.()
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => {
-    const grinder = grinderGear.find(g => g.name === grinderModel)
-    if (grinder?.meta && /\bmanual\b/i.test(grinder.meta)) setGrinderRpm('manual')
-  }, [grinderModel])
-
-  const saveShot = () => {
-    if (!canSave) return
-    const now = new Date()
-    const avgRating = parseFloat((Object.values(taste).reduce((a, b) => a + b, 0) / 6).toFixed(1))
-    onSaveShot({
-      id:      's-' + Date.now(),
-      date:    now.toISOString().slice(0, 10) + ' ' + now.toTimeString().slice(0, 5),
-      bean_id:    selectedBean || null,
-      bean:    beans.find(b => b.id === selectedBean)?.name || '',
-      roaster: beans.find(b => b.id === selectedBean)?.roaster || '',
-      dose: doseNum, yield: parseFloat(yieldG) || doseNum * 2.2,
-      time: timeNum, preinf: preinfNum, temp: tempNum, grind: grindNum,
-      machine, grinder_model: grinderModel, grinder_rpm: grinderRpm,
-      basket: basket || null,
-      brew_mode: brewMode || null,
-      water_recipe: waterRecipe,
-      rating: avgRating,
-      taste:   { ...taste },
-      notes,
-      verdict: (verdict || 'good') as Verdict,
-    })
+function BagCard({ beans, bean, onPick, U, lastLine, onUseLast, children }: BagCardProps) {
+  const [picking, setPicking] = useState(false)
+  const days = bean ? daysOffRoast(bean) : null
+  if (!beans.length) {
+    return <div className="card"><div className="empty">No open bags. Add one in Beans to link your shots to it.</div></div>
   }
-
   return (
-    <div className="grid grid-2" style={{ gap: 16 }}>
-      {/* LEFT COLUMN */}
-      <div className="stack">
-        <div className="card">
-          <div className="card-head"><span className="card-title">Shot</span></div>
-          <div className="dial-pad" style={{ gridTemplateColumns: '1fr 1fr' }}>
-            <div className="dial-input">
-              <label>Shot time</label>
-              <div style={{ display: 'flex', alignItems: 'baseline' }}>
-                <input autoFocus type="number" inputMode="numeric" value={shotTime} step="1" min="0" max="120" placeholder="0"
-                  onChange={e => setShotTime(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter') saveShot() }} />
-                <span className="unit">s</span>
-              </div>
-            </div>
-            <div className="dial-input">
-              <label>Pre-inf</label>
-              <div style={{ display: 'flex', alignItems: 'baseline' }}>
-                <input type="number" inputMode="numeric" value={preinf} step="1" min="0" max="20"
-                  onChange={e => setPreinf(e.target.value)}
-                  onBlur={e => !e.target.value.trim() && setPreinf('0')} />
-                <span className="unit">s</span>
-              </div>
-            </div>
-          </div>
-          <div className="row" style={{ marginTop: 16 }}>
-            <button className="primary-btn" onClick={saveShot} disabled={!canSave}>
-              <Ico name="check" size={13} /> Save shot
-            </button>
-          </div>
-        </div>
-
-        <div className="card">
-          <div className="card-head"><span className="card-title">Parameters</span></div>
-          <div className="dial-pad">
-            <div className="dial-input">
-              <label>Dose</label>
-              <div style={{ display: 'flex', alignItems: 'baseline' }}>
-                <input type="number" value={dose} step="1" min="10" max="25"
-                  onChange={e => setDose(e.target.value)}
-                  onBlur={e => !e.target.value.trim() && setDose('18')} />
-                <span className="unit">{U.mU()}</span>
-              </div>
-            </div>
-            <div className="dial-input">
-              <label>Yield</label>
-              <div style={{ display: 'flex', alignItems: 'baseline' }}>
-                <input type="number" value={yieldG} step="1" min="0" max="100" placeholder="0"
-                  onChange={e => setYieldG(e.target.value)} />
-                <span className="unit">{U.mU()}</span>
-              </div>
-              <div className="hint">ratio 1:{ratio}</div>
-            </div>
-            <div className="dial-input">
-              <label>Temp</label>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
-                <input type="number" value={temp} step="1" min="80" max="100"
-                  onChange={e => setTemp(e.target.value)}
-                  onBlur={e => !e.target.value.trim() && setTemp('93')} />
-                <span className="unit">{U.tU()}</span>
-              </div>
-            </div>
-            <div className="dial-input">
-              <label>Grind</label>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
-                <input type="number" value={grind} step="0.1" min="0" max="10"
-                  onChange={e => setGrind(e.target.value)}
-                  onBlur={e => !e.target.value.trim() && setGrind('2.4')} />
-              </div>
-            </div>
-            <div className="dial-input">
-              <label>Water recipe</label>
-              <select value={waterRecipe} onChange={e => setWaterRecipe(e.target.value)} style={{ marginTop: 4 }}>
-                {waterRecipes.map(r => <option key={r} value={r}>{r}</option>)}
-              </select>
-            </div>
-            <div className="dial-input">
-              <label>Beans</label>
-              <select value={selectedBean} onChange={e => setSelectedBean(e.target.value)} style={{ marginTop: 4 }}>
-                {beans.map(b => <option key={b.id} value={b.id}>{beanLabel(b, beans)}</option>)}
-              </select>
-            </div>
-          </div>
-        </div>
-
-        <div className="card">
-          <div className="card-head"><span className="card-title">Gear</span></div>
-          <div className="dial-pad" style={{ gridTemplateColumns: '1fr 1fr' }}>
-            <div className="dial-input">
-              <label>Machine</label>
-              <select value={machine} onChange={e => setMachine(e.target.value)} style={{ marginTop: 4 }}>
-                {withCurrent(machineOpts, machine).map(m => <option key={m} value={m}>{m}</option>)}
-              </select>
-            </div>
-            <div className="dial-input">
-              <label>Basket</label>
-              <select value={basket} onChange={e => setBasket(e.target.value)} style={{ marginTop: 4 }}>
-                {!basketOpts.length && !basket && <option value="">No baskets in gear</option>}
-                {withCurrent(basketOpts, basket).map(b => <option key={b} value={b}>{b}</option>)}
-              </select>
-            </div>
-            <div className="dial-input">
-              <label>Grinder</label>
-              <select value={grinderModel} onChange={e => setGrinderModel(e.target.value)} style={{ marginTop: 4 }}>
-                {withCurrent(grinderOpts, grinderModel).map(g => <option key={g} value={g}>{g}</option>)}
-              </select>
-            </div>
-            <div className="dial-input">
-              <label>Grinder RPM</label>
-              <select value={grinderRpm} onChange={e => setGrinderRpm(e.target.value)} style={{ marginTop: 4 }}>
-                <option value="manual">Manual</option>
-                {[500, 600, 700, 800, 900, 1000, 1100, 1200, 1300, 1400, 1500, 1600].map(r => (
-                  <option key={r} value={String(r)}>{r} RPM</option>
-                ))}
-              </select>
-            </div>
-          </div>
-        </div>
-
+    <div className="card">
+      <div className="card-head">
+        <span className="card-title">Bag</span>
+        <button className="link-btn" onClick={() => setPicking(p => !p)}>{picking ? 'Done' : 'Change bag'}</button>
       </div>
-
-      {/* RIGHT COLUMN */}
-      <div className="stack">
-        <div className="card">
-          <div className="card-head">
-            <span className="card-title">Tasting notes</span>
-            <span className="card-more">drag to adjust</span>
+      {picking && (
+        <select className="select" style={{ marginBottom: '12px' }} value={bean?.id ?? ''} aria-label="Bag"
+          onChange={e => { onPick(e.target.value); setPicking(false) }}>
+          {beans.map(b => <option key={b.id} value={b.id}>{beanLabel(b, beans)}</option>)}
+        </select>
+      )}
+      {bean && (
+        <div className="row bag-head" style={{ alignItems: 'flex-start' }}>
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <div className="bag-name">{bean.name}</div>
+            <div className="bag-sub">{[bean.roaster, bean.origin?.split('·')[0]?.trim()].filter(Boolean).join(', ')}</div>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 14, alignItems: 'start' }}>
-            <FlavSliders taste={taste} onChange={setTaste} />
-            <FlavorRadar taste={taste} size={180} />
-          </div>
+          {days != null && <span className="pill">day {days}</span>}
+          <span className="pill">{U.m(bean.remaining)} {U.mU()} left</span>
         </div>
-
-        <div className="card">
-          <div className="card-head"><span className="card-title">Notes</span></div>
-          <textarea
-            placeholder="Bright, syrupy, lemon zest…"
-            value={notes}
-            onChange={e => setNotes(e.target.value)}
-            style={{ height: 80 }}
-          />
-          <div className="row" style={{ marginTop: 10, gap: 6, flexWrap: 'wrap' }}>
-            <div className="micro">Verdict</div>
-            {[['good','--good'],['under','--under'],['over','--over'],['bad','--bad']].map(([v, cv]) => (
-              <button key={v}
-                className={`ghost-btn${verdict === v ? ' active' : ''}`}
-                style={verdict === v ? { borderColor: `var(${cv})`, color: `var(${cv})` } : {}}
-                onClick={() => setVerdict(p => p === v ? '' : v)}
-              >{v}</button>
-            ))}
-          </div>
+      )}
+      {children && <div className="split">{children}</div>}
+      {lastLine && (
+        <div className="split last-line">
+          <span>Last time</span> {lastLine}
+          {onUseLast && <button className="link-btn" style={{ marginLeft: 'auto' }} onClick={onUseLast}>Start from this</button>}
         </div>
-
-        <BeanDosesCard
-          bean={beans.find(b => b.id === selectedBean)}
-          basketOpts={basketOpts}
-          currentBasket={basket}
-          U={U}
-          onUpdateBean={onUpdateBean}
-          onApply={d => { setDose(String(d.dose)); setBasket(d.basket) }}
-          onSelectBasket={setBasket}
-        />
-
-        {/* Only shown when brew modes are set up in Settings */}
-        {brewModes.length > 0 && (
-          <div className="card">
-            <div className="card-head">
-              <span className="card-title">Brew mode</span>
-              {machine && <span className="card-more">{machine}</span>}
-            </div>
-            <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
-              {brewModes.map(m => (
-                <button key={m}
-                  className={`ghost-btn${brewMode === m ? ' active' : ''}`}
-                  onClick={() => setBrewMode(p => p === m ? '' : m)}
-                >{m}</button>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
+      )}
     </div>
   )
 }
 
-// ── Filter mode ───────────────────────────────────────────────────────
-interface FilterDialinProps {
-  beans:             Bean[]
-  gear?:             Gear[]
-  units:             Units
-  waterRecipes:      string[]
-  dialinDefaults:    DialinDefaults
-  onSaveBrew:        (brew: BrewInput) => void
-  preset:            Brew | null
-  onPresetConsumed?: () => void
+interface TasteCardProps {
+  taste:       Taste
+  setTaste:    (t: Taste) => void
+  landed:      number | null
+  setLanded:   (n: number) => void
+  bad:         boolean
+  setBad:      (b: boolean) => void
+  badLabel:    string
+  notes:       string
+  setNotes:    (n: string) => void
+  bagNotes:    string[]
+  placeholder: string
 }
 
-function FilterDialin({ beans, gear = [], units, waterRecipes, dialinDefaults, onSaveBrew, preset, onPresetConsumed }: FilterDialinProps) {
+function TasteCard({ taste, setTaste, landed, setLanded, bad, setBad, badLabel, notes, setNotes, bagNotes, placeholder }: TasteCardProps) {
+  // Bag notes are added to the notes as comma-separated words, and removed again
+  const parts = notes.split(',').map(p => p.trim()).filter(Boolean)
+  const same = (a: string, b: string) => a.toLowerCase() === b.toLowerCase()
+  const has = (n: string) => parts.some(p => same(p, n))
+  const toggleNote = (n: string) => setNotes((has(n) ? parts.filter(p => !same(p, n)) : [...parts, n]).join(', '))
+  return (
+    <div className="card stack" style={{ gap: '18px' }}>
+      <div>
+        <div className="card-head"><span className="card-title">Taste</span><span>drag to adjust</span></div>
+        <div className="taste-wrap">
+          <FlavSliders taste={taste} onChange={setTaste} />
+          <div className="desk-only"><FlavorRadar taste={taste} size={RADAR_SIZE} /></div>
+        </div>
+      </div>
+      <LandedSlider landed={landed} bad={bad} onChange={setLanded} onBadChange={setBad} badLabel={badLabel} />
+      {bagNotes.length > 0 && (
+        <div>
+          <div className="card-head" style={{ marginBottom: '8px' }}><span className="card-title">Did you taste these?</span><span>from the bag</span></div>
+          <div className="row" style={{ gap: '8px', flexWrap: 'wrap' }}>
+            {bagNotes.map(n => (
+              <button key={n} type="button" className={`tag-chip${has(n) ? ' on' : ''}`} onClick={() => toggleNote(n)}>{n}</button>
+            ))}
+          </div>
+        </div>
+      )}
+      <textarea placeholder={placeholder} value={notes} onChange={e => setNotes(e.target.value)} rows={2} aria-label="Notes" />
+    </div>
+  )
+}
+
+/** Phone only: a row that opens a folded section (Taste and notes) */
+function DrawerRow({ title, open, onToggle, children }: { title: string; open: boolean; onToggle: () => void; children: ReactNode }) {
+  return (
+    <button type="button" className="card drawer-row" onClick={onToggle}>
+      {title}
+      <span className="r">{children}<Ico name={open ? 'chevronD' : 'chevronR'} size={ICON_SM} /></span>
+    </button>
+  )
+}
+
+/** The bar with the summary and Save. On a wider screen it sits below the scrolling page, so nothing hides behind it */
+function SaveBar({ footer, children }: { footer: HTMLElement | null; children: ReactNode }) {
+  const bar = <div className="savebar">{children}</div>
+  return footer ? createPortal(bar, footer) : bar
+}
+
+function RatingStepper({ value, onChange }: { value: number; onChange: (r: number) => void }) {
+  return (
+    <div className="rating">
+      Rating
+      <button type="button" className="icon-btn" aria-label="Lower rating" onClick={() => onChange(clampRating(value - RATING_STEP))}>−</button>
+      <output>{value.toFixed(1)}</output>
+      <button type="button" className="icon-btn" aria-label="Higher rating" onClick={() => onChange(clampRating(value + RATING_STEP))}>+</button>
+    </div>
+  )
+}
+
+function SelectField({ label, value, onChange, options, render = (o: string) => o }: { label: string; value: string; onChange: (v: string) => void; options: string[]; render?: (o: string) => string }) {
+  return (
+    <label style={{ minWidth: 0 }}>
+      <span className="field-label">{label}</span>
+      <select className="select" value={value} onChange={e => onChange(e.target.value)}>
+        {options.map(o => <option key={o} value={o}>{render(o)}</option>)}
+      </select>
+    </label>
+  )
+}
+
+const rpmLabel = (r: string) => r === 'manual' ? 'Manual' : `${r} RPM`
+
+// ── Espresso ──────────────────────────────────────────────────────────
+interface EspressoDialinProps {
+  shots:          Shot[]
+  beans:          Bean[]
+  gear:           Gear[]
+  units:          Units
+  waterRecipes:   string[]
+  dialinDefaults: DialinDefaults
+  brewModes:      string[]
+  onSaveShot:     (shot: ShotInput) => void
+  onUpdateBean:   (id: string, data: BeanInput) => Promise<Bean>
+  preset:         Shot | null
+  startBeanId?:   string
+  modeSwitch:     ReactNode
+  onBack:         () => void
+  footer:         HTMLElement | null
+}
+
+function EspressoDialin({ shots, beans, gear, units, waterRecipes, dialinDefaults, brewModes, onSaveShot, onUpdateBean, preset, startBeanId, modeSwitch, onBack, footer }: EspressoDialinProps) {
   const U = useUnits(units)
 
-  const dripperGear    = activeGear(gear, /dripper|pour.?over|v60|chemex|aeropress|kalita|clever|origami|melitta/i)
-  const filterGrinders = activeGear(gear, /grinder/i)
-  const dripperOpts    = dripperGear.length    ? dripperGear.map(g => g.name)    : DRIPPERS
-  const grinderOpts    = filterGrinders.length ? filterGrinders.map(g => g.name) : ESPRESSO_GRINDERS
-  const primaryDripper = (dripperGear.find(g => g.status === 'Primary') || dripperGear[0])?.name || dripperOpts[0] || 'V60'
-  const primaryGrinder = (filterGrinders.find(g => g.status === 'Primary') || filterGrinders[0])?.name || grinderOpts[0] || ''
+  const machineGear    = activeGear(gear, MACHINE_KIND)
+  const grinderGear    = activeGear(gear, GRINDER_KIND)
+  const basketGear     = activeGear(gear, BASKET_KIND)
+  const machineOpts    = machineGear.length ? machineGear.map(g => g.name) : ESPRESSO_MACHINES
+  const grinderOpts    = grinderGear.length ? grinderGear.map(g => g.name) : ESPRESSO_GRINDERS
+  const basketOpts     = basketGear.map(g => g.name)
+  const primaryOf = (list: Gear[], fallback: string) => (list.find(g => g.status === 'Primary') || list[0])?.name || fallback
 
-  const [elapsed,    setElapsed]    = useState(0)
-  const [running,    setRunning]    = useState(false)
-  const [manualMode, setManualMode] = useState(false)
-  const [manualM,    setManualM]    = useState('0')
-  const [manualS,    setManualS]    = useState('0')
-  const intervalRef = useRef<ReturnType<typeof setInterval>>()
-
-  const [dose,         setDose]         = useState(() => dd(dialinDefaults, 'filter', 'dose', '15'))
-  const [waterTarget,  setWaterTarget]  = useState(() => dd(dialinDefaults, 'filter', 'water', '250'))
-  const [temp,         setTemp]         = useState(() => dd(dialinDefaults, 'filter', 'temp', '92'))
-  const [grind,        setGrind]        = useState(() => dd(dialinDefaults, 'filter', 'grind', '10'))
-  const numPoursNum    = parseInt(dd(dialinDefaults, 'filter', 'numPours', '3')) || 3
-  const [waterRecipe,  setWaterRecipe]  = useState(() => dd(dialinDefaults, 'filter', 'waterRecipe', waterRecipes[0]))
-  const [dripper,      setDripper]      = useState(primaryDripper)
-  const [grinderModel, setGrinderModel] = useState(primaryGrinder)
-  const [grinderRpm,   setGrinderRpm]   = useState(() => dd(dialinDefaults, 'filter', 'grinderRpm', '800'))
-  const [selectedBean, setSelectedBean] = useState(beans[0]?.id || '')  // bean id
-
-  const doseNum        = parseFloat(dose)        || 15
-  const waterTargetNum = parseFloat(waterTarget) || 250
-  const tempNum        = parseFloat(temp)        || 92
-  const grindNum       = parseFloat(grind)       || 18
-
-  const initPours = () => Array.from({ length: numPoursNum }, (_, i) => i === 0 ? 50 : 100)
-  // Numbers until edited, then the input's string
-  const [pours, setPours] = useState<(number | string)[]>(() => initPours())
-
-  const totalPoured = pours.reduce<number>((a, b) => a + (parseFloat(String(b)) || 0), 0)
-  const ratio = waterTargetNum > 0 && doseNum > 0 ? (waterTargetNum / doseNum).toFixed(1) : '–'
-
-  const updatePour = (i: number, val: string) => setPours(prev => {
-    const next = [...prev]
-    next[i] = val
-    return next
+  const [selectedBean, setSelectedBean] = useState(() => (startBeanId && beans.some(b => b.id === startBeanId) ? startBeanId : beans[0]?.id) || '')
+  const [shotTime, setShotTime] = useState('')
+  const [dose,     setDose]     = useState(() => dd(dialinDefaults, 'espresso', 'dose', '18'))
+  const [yieldG,   setYieldG]   = useState(() => dd(dialinDefaults, 'espresso', 'yield', '36'))
+  const [grind,    setGrind]    = useState(() => dd(dialinDefaults, 'espresso', 'grind', '3'))
+  const [temp,     setTemp]     = useState(() => dd(dialinDefaults, 'espresso', 'temp', '92'))
+  const [preinf,   setPreinf]   = useState(() => dd(dialinDefaults, 'espresso', 'preinf', '0'))
+  const [machine,      setMachine]      = useState(() => primaryOf(machineGear, machineOpts[0] || ''))
+  const [grinderModel, setGrinderModel] = useState(() => primaryOf(grinderGear, grinderOpts[0] || ''))
+  const [grinderRpm,   setGrinderRpm]   = useState(() => dd(dialinDefaults, 'espresso', 'grinderRpm', '800'))
+  const [basket,       setBasket]       = useState(() => primaryOf(basketGear, ''))
+  const [waterRecipe,  setWaterRecipe]  = useState(() => dd(dialinDefaults, 'espresso', 'waterRecipe', waterRecipes[0]))
+  // Carry over the last shot's brew mode, if it's still one of the configured modes
+  const [brewMode, setBrewMode] = useState(() => {
+    const last = shots[0]?.brew_mode
+    return last && brewModes.includes(last) ? last : ''
   })
 
-  const addPour = () => {
-    if (pours.length >= 8) return
-    const remaining = Math.max(0, waterTargetNum - totalPoured)
-    setPours(p => [...p, Math.round(remaining / 2) || 50])
-  }
+  const [taste,  setTaste]  = useState<Taste>({ ...DEFAULT_TASTE })
+  const [landed, setLanded] = useState<number | null>(null)
+  const [bad,    setBad]    = useState(false)
+  const [notes,  setNotes]  = useState('')
+  const [rating, setRating] = useState<number | null>(null)   // null: follows the taste average
+  const [tasteOpen, setTasteOpen] = useState(false)
 
-  const removePour = () => {
-    if (pours.length <= 1) return
-    setPours(p => p.slice(0, -1))
-  }
+  const bean      = beans.find(b => b.id === selectedBean)
+  const lastShot  = shots.find(s => s.bean_id === selectedBean)
+  const doseNum   = parseFloat(dose) || 0
+  const yieldNum  = parseFloat(yieldG) || 0
+  const timeNum   = parseMmss(shotTime) ?? 0
+  const shownRating = rating ?? tasteAverage(taste)
+  const canSave   = timeNum > 0 && doseNum > 0
 
-  const start = () => {
-    if (running) {
-      clearInterval(intervalRef.current)
-      setRunning(false)
-      return
-    }
-    setRunning(true)
-    intervalRef.current = setInterval(() => setElapsed(e => e + 1), 1000)
+  const loadShot = (s: Shot) => {
+    setDose(String(s.dose ?? dose))
+    setYieldG(String(s.yield ?? yieldG))
+    setGrind(String(s.grind ?? grind))
+    setTemp(String(s.temp ?? temp))
+    setPreinf(String(s.preinf ?? 0))
+    if (s.machine) setMachine(s.machine)
+    if (s.grinder_model) setGrinderModel(s.grinder_model)
+    if (s.grinder_rpm) setGrinderRpm(String(s.grinder_rpm))
+    if (s.water_recipe) setWaterRecipe(s.water_recipe)
+    if (s.basket) setBasket(s.basket)
+    if (s.brew_mode) setBrewMode(s.brew_mode)
   }
-
-  const reset = () => {
-    clearInterval(intervalRef.current)
-    setRunning(false); setElapsed(0)
-  }
-
-  useEffect(() => () => clearInterval(intervalRef.current), [])
 
   useEffect(() => {
     if (!preset) return
-    setDose(String(preset.dose ?? 15))
-    setWaterTarget(String(preset.water ?? 250))
-    setTemp(String(preset.temp ?? 92))
-    setGrind(String(preset.grind ?? 10))
+    loadShot(preset)
     const presetBean = presetBeanId(beans, preset)
     if (presetBean) setSelectedBean(presetBean)
-    if (preset.dripper) setDripper(preset.dripper)
-    if (preset.grinder_model) setGrinderModel(preset.grinder_model)
-    if (preset.grinder_rpm) setGrinderRpm(String(preset.grinder_rpm))
-    if (preset.water_recipe) setWaterRecipe(preset.water_recipe)
-    if (preset.pours?.length) setPours(preset.pours.map(p => typeof p === 'object' ? (p.water ?? p) : p) as (number | string)[])
-    onPresetConsumed?.()
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => {
-    const grinder = filterGrinders.find(g => g.name === grinderModel)
-    if (grinder?.meta && /\bmanual\b/i.test(grinder.meta)) setGrinderRpm('manual')
-  }, [grinderModel])
+  // A grinder marked manual in Gear has no RPM
+  const pickGrinder = (name: string) => {
+    setGrinderModel(name)
+    if (isManualGrinder(grinderGear.find(g => g.name === name))) setGrinderRpm('manual')
+  }
 
-  const [taste,   setTaste]   = useState<Taste>({ ...DEFAULT_TASTE })
-  const [notes,   setNotes]   = useState('')
-  const [verdict, setVerdict] = useState('')
+  const saveShot = () => {
+    if (!canSave) return
+    onSaveShot({
+      id:      's-' + Date.now(),
+      date:    nowStamp(),
+      bean_id: selectedBean || null,
+      bean:    bean?.name || '',
+      roaster: bean?.roaster || '',
+      dose: doseNum, yield: yieldNum,
+      time: timeNum, preinf: parseInt(preinf, 10) || 0, temp: parseFloat(temp) || 0, grind: parseFloat(grind) || 0,
+      machine, grinder_model: grinderModel, grinder_rpm: grinderRpm,
+      basket: basket || null,
+      brew_mode: brewMode || null,
+      water_recipe: waterRecipe,
+      rating: shownRating,
+      taste: { ...taste },
+      notes,
+      landed: bad ? null : landed,
+      bad,
+    })
+  }
+
+  return (
+    <>
+      <PageHead title="Dial-in." onBack={onBack}>{modeSwitch}</PageHead>
+      <div className="dialin-cols" style={{ marginTop: '16px' }}>
+        <div className="stack">
+          <BagCard beans={beans} bean={bean} onPick={setSelectedBean} U={U}
+            lastLine={lastShot && <><span className="mono">{U.m(lastShot.dose)} → {U.m(lastShot.yield)} {U.mU()} in {lastShot.time} s</span>, rated {lastShot.rating.toFixed(1)}</>}
+            onUseLast={lastShot ? () => loadShot(lastShot) : undefined}>
+            {bean && (
+              <BasketChips bean={bean} basketOpts={basketOpts} currentBasket={basket} U={U} onUpdateBean={onUpdateBean}
+                onApply={d => { setDose(String(d.dose)); setBasket(d.basket); if (d.grind) setGrind(String(d.grind)) }}
+                onSelectBasket={setBasket} />
+            )}
+          </BagCard>
+
+          {/* On a phone the shot time comes right after the bag */}
+          <div className="card phone-only">
+            <div className="card-head"><span className="card-title">Shot time</span>{lastShot && <span className="card-more">last time {lastShot.time} s</span>}</div>
+            <TimeField value={shotTime} onChange={setShotTime} max={SHOT_SLIDER_MAX} step={1} last={lastShot?.time} help="" />
+          </div>
+
+          <div className="card">
+            <div className="card-head desk-only"><span className="card-title">Recipe</span></div>
+            <div className="num-grid">
+              <NumField label="Dose" value={dose} onChange={setDose} step={0.1} unit={U.mU()} fallback="18" />
+              <NumField label="Yield" value={yieldG} onChange={setYieldG} step={0.5} unit={U.mU()} />
+              <Readout label="Ratio" value={ratioText(doseNum, yieldNum)} />
+              <NumField label="Grind" value={grind} onChange={setGrind} step={0.1} />
+              <NumField label="Temperature" value={temp} onChange={setTemp} step={0.5} unit={U.tU()} fallback="93" />
+              <NumField label="Pre-infusion" value={preinf} onChange={setPreinf} step={1} unit="s" fallback="0" />
+            </div>
+            <div className="ratio-line phone-only" style={{ marginTop: '12px' }}>Ratio {ratioText(doseNum, yieldNum)}, pre-infusion {preinf || 0} s</div>
+          </div>
+
+          <div className="card">
+            <div className="card-head"><span className="card-title">Gear</span></div>
+            <div className="grid grid-2 gear-grid">
+              <SelectField label="Machine" value={machine} onChange={setMachine} options={withCurrent(machineOpts, machine)} />
+              <SelectField label="Basket" value={basket} onChange={setBasket} options={withCurrent(basketOpts, basket)} />
+              <SelectField label="Grinder" value={grinderModel} onChange={pickGrinder} options={withCurrent(grinderOpts, grinderModel)} />
+              <SelectField label="Grinder RPM" value={grinderRpm} onChange={setGrinderRpm} options={withCurrent(RPM_OPTIONS, grinderRpm)} render={rpmLabel} />
+              <SelectField label="Water recipe" value={waterRecipe} onChange={setWaterRecipe} options={withCurrent(waterRecipes, waterRecipe)} />
+              {brewModes.length > 0 && (
+                <SelectField label="Brew mode" value={brewMode} onChange={setBrewMode} options={['', ...withCurrent(brewModes, brewMode)]} render={m => m || '–'} />
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="stack">
+          <div className="card desk-only">
+            <div className="card-head"><span className="card-title">Shot time</span><span>from your scale or machine</span></div>
+            <TimeField value={shotTime} onChange={setShotTime} max={SHOT_SLIDER_MAX} step={1} last={lastShot?.time}
+              help="Type it, drag the slider or nudge it a second at a time." />
+          </div>
+
+          <DrawerRow title="Taste and notes" open={tasteOpen} onToggle={() => setTasteOpen(o => !o)}>
+            <MiniLanded landed={landed} bad={bad} />
+            <span>{bad ? 'Bad shot' : landedLabel(landed)}, {shownRating.toFixed(1)}</span>
+          </DrawerRow>
+          <div className={`fold${tasteOpen ? ' open' : ''}`}>
+            <TasteCard taste={taste} setTaste={setTaste} landed={landed} setLanded={setLanded} bad={bad} setBad={setBad} badLabel="Bad shot"
+              notes={notes} setNotes={setNotes} bagNotes={bean?.notes ?? []} placeholder="Bright lemon, honey finish…" />
+          </div>
+        </div>
+      </div>
+
+      <SaveBar footer={footer}>
+        <div className="sum">
+          <b>{bean?.name || 'Shot'}</b>
+          {U.m(doseNum)} → {U.m(yieldNum)} {U.mU()}{timeNum > 0 && ` in ${timeNum} s`}{basket && <span>, {basket}</span>}
+        </div>
+        <RatingStepper value={shownRating} onChange={setRating} />
+        <button className="primary-btn" onClick={saveShot} disabled={!canSave} title={canSave ? '' : 'Enter the shot time first'}>
+          <Ico name="check" size={ICON_SM} /> Save shot
+        </button>
+      </SaveBar>
+    </>
+  )
+}
+
+// ── Filter ────────────────────────────────────────────────────────────
+// Pours are entered as scale totals ("to 150 g") and stored as the amount of each pour.
+const toTotals = (amounts: number[]): number[] => amounts.reduce<number[]>((acc, a) => [...acc, (acc[acc.length - 1] ?? 0) + a], [])
+const toAmounts = (totals: number[]): number[] => totals.map((t, i) => Math.max(0, t - (i ? totals[i - 1]! : 0)))
+const roundPour = (g: number) => Math.round(g / ROUND_POUR_TO) * ROUND_POUR_TO
+
+/** Bloom of about 3× the dose, then even pours up to the water target */
+function plannedTotals(count: number, dose: number, water: number): string[] {
+  const bloom = Math.min(water, roundPour(dose * BLOOM_PER_GRAM))
+  if (count <= 1) return [String(water)]
+  return Array.from({ length: count }, (_, i) => String(i === 0 ? bloom : roundPour(bloom + ((water - bloom) * i) / (count - 1))))
+}
+
+interface FilterDialinProps {
+  brews:          Brew[]
+  beans:          Bean[]
+  gear:           Gear[]
+  units:          Units
+  waterRecipes:   string[]
+  dialinDefaults: DialinDefaults
+  onSaveBrew:     (brew: BrewInput) => void
+  preset:         Brew | null
+  startBeanId?:   string
+  modeSwitch:     ReactNode
+  onBack:         () => void
+  footer:         HTMLElement | null
+}
+
+function FilterDialin({ brews, beans, gear, units, waterRecipes, dialinDefaults, onSaveBrew, preset, startBeanId, modeSwitch, onBack, footer }: FilterDialinProps) {
+  const U = useUnits(units)
+
+  const dripperGear    = activeGear(gear, DRIPPER_KIND)
+  const filterGrinders = activeGear(gear, GRINDER_KIND)
+  const dripperOpts    = dripperGear.length    ? dripperGear.map(g => g.name)    : DRIPPERS
+  const grinderOpts    = filterGrinders.length ? filterGrinders.map(g => g.name) : ESPRESSO_GRINDERS
+  const primaryOf = (list: Gear[], fallback: string) => (list.find(g => g.status === 'Primary') || list[0])?.name || fallback
+
+  const [selectedBean, setSelectedBean] = useState(() => (startBeanId && beans.some(b => b.id === startBeanId) ? startBeanId : beans[0]?.id) || '')
+  const [dose,        setDose]        = useState(() => dd(dialinDefaults, 'filter', 'dose', '15'))
+  const [water,       setWater]       = useState(() => dd(dialinDefaults, 'filter', 'water', '250'))
+  const [temp,        setTemp]        = useState(() => dd(dialinDefaults, 'filter', 'temp', '92'))
+  const [grind,       setGrind]       = useState(() => dd(dialinDefaults, 'filter', 'grind', '10'))
+  const [waterRecipe, setWaterRecipe] = useState(() => dd(dialinDefaults, 'filter', 'waterRecipe', waterRecipes[0]))
+  const [dripper,     setDripper]     = useState(() => primaryOf(dripperGear, dripperOpts[0] || 'V60'))
+  const [grinderModel, setGrinderModel] = useState(() => primaryOf(filterGrinders, grinderOpts[0] || ''))
+  const [grinderRpm,  setGrinderRpm]  = useState(() => dd(dialinDefaults, 'filter', 'grinderRpm', '800'))
+  const [totalTime,   setTotalTime]   = useState('')
+  const [pours,       setPours]       = useState<string[]>(() => plannedTotals(parseInt(dd(dialinDefaults, 'filter', 'numPours', String(DEFAULT_POURS)), 10) || DEFAULT_POURS, parseFloat(dose) || 0, parseFloat(water) || 0))
+  const [poursEdited, setPoursEdited] = useState(false)
+
+  const [taste,  setTaste]  = useState<Taste>({ ...DEFAULT_TASTE })
+  const [landed, setLanded] = useState<number | null>(null)
+  const [bad,    setBad]    = useState(false)
+  const [notes,  setNotes]  = useState('')
+  const [rating, setRating] = useState<number | null>(null)
+  const [tasteOpen, setTasteOpen] = useState(false)
+
+  const bean     = beans.find(b => b.id === selectedBean)
+  const lastBrew = brews.find(b => b.bean_id === selectedBean)
+  const doseNum  = parseFloat(dose) || 0
+  const waterNum = parseFloat(water) || 0
+  const timeNum  = parseMmss(totalTime) ?? 0
+  const totals   = pours.map(p => parseFloat(p) || 0)
+  const shownRating = rating ?? tasteAverage(taste)
+  const canSave  = timeNum > 0 && doseNum > 0
+
+  // Until a pour is typed in, the plan follows the dose and water
+  useEffect(() => {
+    if (!poursEdited) setPours(plannedTotals(pours.length, doseNum, waterNum))
+  }, [doseNum, waterNum]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const setPourCount = (n: number) => {
+    const count = Math.min(MAX_POURS, Math.max(1, n))
+    if (poursEdited) {
+      setPours(p => count > p.length ? [...p, ...Array.from({ length: count - p.length }, () => String(waterNum))] : p.slice(0, count))
+    } else {
+      setPours(plannedTotals(count, doseNum, waterNum))
+    }
+  }
+
+  const loadBrew = (b: Brew) => {
+    setDose(String(b.dose ?? dose))
+    setWater(String(b.water ?? water))
+    setTemp(String(b.temp ?? temp))
+    setGrind(String(b.grind ?? grind))
+    if (b.dripper) setDripper(b.dripper)
+    if (b.grinder_model) setGrinderModel(b.grinder_model)
+    if (b.grinder_rpm) setGrinderRpm(String(b.grinder_rpm))
+    if (b.water_recipe) setWaterRecipe(b.water_recipe)
+    if (b.pours?.length) {
+      setPours(toTotals(b.pours.map(p => typeof p === 'object' ? p.water : p)).map(String))
+      setPoursEdited(true)
+    }
+  }
+
+  useEffect(() => {
+    if (!preset) return
+    loadBrew(preset)
+    const presetBean = presetBeanId(beans, preset)
+    if (presetBean) setSelectedBean(presetBean)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const pickGrinder = (name: string) => {
+    setGrinderModel(name)
+    if (isManualGrinder(filterGrinders.find(g => g.name === name))) setGrinderRpm('manual')
+  }
 
   const saveBrew = () => {
-    const now = new Date()
-    const avgRating = parseFloat((Object.values(taste).reduce((a, b) => a + b, 0) / 6).toFixed(1))
+    if (!canSave) return
+    const amounts = toAmounts(totals)
     onSaveBrew({
       id:          'brew-' + Date.now(),
-      date:        now.toISOString().slice(0, 10) + ' ' + now.toTimeString().slice(0, 5),
-      bean_id:        selectedBean || null,
-      bean:        beans.find(b => b.id === selectedBean)?.name || '',
-      roaster:     beans.find(b => b.id === selectedBean)?.roaster || '',
+      date:        nowStamp(),
+      bean_id:     selectedBean || null,
+      bean:        bean?.name || '',
+      roaster:     bean?.roaster || '',
       dripper,
       grinder_model: grinderModel,
       grinder_rpm:   grinderRpm,
       dose:        doseNum,
       water_recipe: waterRecipe,
-      water:       waterTargetNum,
-      temp:        tempNum,
-      grind:       grindNum,
+      water:       waterNum,
+      temp:        parseFloat(temp) || 0,
+      grind:       parseFloat(grind) || 0,
       bloom_time:  0,
-      num_pours:   pours.length,
-      pours:       pours.map(p => parseFloat(String(p)) || 0),
-      time:        elapsed,
-      rating:      avgRating,
+      num_pours:   amounts.length,
+      pours:       amounts,
+      time:        timeNum,
+      rating:      shownRating,
       taste:       { ...taste },
       notes,
-      verdict:     (verdict || 'good') as Verdict,
+      landed:      bad ? null : landed,
+      bad,
     })
-    reset()
-    setTaste({ ...DEFAULT_TASTE })
-    setNotes('')
-    setVerdict('')
   }
 
-  const mins = String(Math.floor(elapsed / 60)).padStart(2, '0')
-  const secs = String(elapsed % 60).padStart(2, '0')
-  const timerColor = running ? 'var(--crema)' : elapsed > 0 ? 'var(--good)' : 'var(--text)'
+  const lastTotal = totals[totals.length - 1] ?? 0
 
   return (
-    <div className="grid grid-2" style={{ gap: 16 }}>
-      {/* LEFT COLUMN */}
-      <div className="stack">
-        {/* Timer */}
-        <div className="card">
-          <div className="card-head">
-            <span className="card-title">Timer</span>
-            {running && <span className="card-more" style={{ color: 'var(--good)' }}>● live</span>}
-          </div>
-          {manualMode ? (
-            <>
-              <div className="shot-timer" style={{ color: 'var(--crema)', display: 'flex', alignItems: 'baseline', gap: 4 }}>
-                <input autoFocus type="number" value={manualM} min="0" max="9" step="1"
-                  onChange={e => setManualM(e.target.value)}
-                  style={{ width: '2ch', background: 'none', border: 'none', borderBottom: '2px solid var(--crema)', outline: 'none', font: 'inherit', color: 'inherit', padding: '0 2px', textAlign: 'center' }}
-                />
-                <span>:</span>
-                <select value={manualS} onChange={e => setManualS(e.target.value)}
-                  style={{ background: 'none', border: 'none', borderBottom: '2px solid var(--crema)', outline: 'none', font: 'inherit', color: 'inherit', padding: '0 2px', textAlign: 'center', appearance: 'none', cursor: 'pointer' }}
-                >
-                  {Array.from({ length: 12 }, (_, i) => i * 5).map(s => (
-                    <option key={s} value={s}>{String(s).padStart(2, '0')}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="row" style={{ marginTop: 16, gap: 10 }}>
-                <button className="primary-btn" style={{ background: 'var(--good)', borderColor: 'var(--good)' }} onClick={() => {
-                  const total = (parseInt(manualM) || 0) * 60 + Math.min(59, parseInt(manualS) || 0)
-                  setElapsed(total)
-                  setManualMode(false)
-                }}>
-                  <Ico name="check" size={13} /> Confirm
-                </button>
-                <button className="ghost-btn" onClick={() => setManualMode(false)}>Cancel</button>
-              </div>
-            </>
-          ) : (
-            <>
-              <div className="shot-timer" style={{ color: timerColor }}>{mins}:{secs}</div>
-              <div className="row" style={{ marginTop: 16, gap: 10 }}>
-                <button className="primary-btn" onClick={start}>
-                  <Ico name={running ? 'pause' : 'play'} size={13} />
-                  {running ? 'Pause' : 'Start'}
-                </button>
-                <button className="ghost-btn" onClick={reset}>
-                  <Ico name="stop" size={13} /> Reset
-                </button>
-                {!running && (
-                  <button className="ghost-btn" onClick={() => {
-                    setManualM(String(Math.floor(elapsed / 60)))
-                    setManualS(String(elapsed % 60))
-                    setManualMode(true)
-                  }}>
-                    <Ico name="pencil" size={13} /> Manual
-                  </button>
-                )}
-                {elapsed > 0 && !running && (
-                  <button className="ghost-btn" style={{ color: 'var(--good)', borderColor: 'var(--good)' }} onClick={saveBrew}>
-                    <Ico name="check" size={13} /> Save brew
-                  </button>
-                )}
-              </div>
-            </>
-          )}
-        </div>
+    <>
+      <PageHead title="Dial-in." onBack={onBack}>{modeSwitch}</PageHead>
+      <div className="dialin-cols" style={{ marginTop: '16px' }}>
+        <div className="stack">
+          <BagCard beans={beans} bean={bean} onPick={setSelectedBean} U={U}
+            lastLine={lastBrew && <><span className="mono">{U.m(lastBrew.dose)} → {U.m(lastBrew.water)} {U.mU()} in {mmss(lastBrew.time)}</span>, rated {lastBrew.rating.toFixed(1)}</>}
+            onUseLast={lastBrew ? () => loadBrew(lastBrew) : undefined} />
 
-        {/* Parameters */}
-        <div className="card">
-          <div className="card-head"><span className="card-title">Parameters</span></div>
-          <div className="dial-pad">
-            <div className="dial-input">
-              <label>Dose</label>
-              <div style={{ display: 'flex', alignItems: 'baseline' }}>
-                <input type="number" value={dose} step="1" min="5" max="50"
-                  onChange={e => setDose(e.target.value)}
-                  onBlur={e => !e.target.value.trim() && setDose('20')} />
-                <span className="unit">{U.mU()}</span>
-              </div>
+          <div className="card">
+            <div className="card-head desk-only"><span className="card-title">Recipe</span></div>
+            <div className="num-grid">
+              <NumField label="Dose" value={dose} onChange={setDose} step={0.5} unit={U.mU()} fallback="15" />
+              <NumField label="Water" value={water} onChange={setWater} step={5} unit={U.mU()} fallback="250" />
+              <Readout label="Ratio" value={ratioText(doseNum, waterNum, 'filter')} />
+              <NumField label="Grind" value={grind} onChange={setGrind} step={1} />
+              <NumField label="Temperature" value={temp} onChange={setTemp} step={1} unit={U.tU()} fallback="92" />
+              <NumField label="Pours" value={String(pours.length)} onChange={v => setPourCount(parseInt(v, 10) || 1)} step={1} min={1} max={MAX_POURS} />
             </div>
-            <div className="dial-input">
-              <label>Water</label>
-              <div style={{ display: 'flex', alignItems: 'baseline' }}>
-                <input type="number" value={waterTarget} step="5" min="50" max="1500"
-                  onChange={e => setWaterTarget(e.target.value)}
-                  onBlur={e => !e.target.value.trim() && setWaterTarget('300')} />
-                <span className="unit">{U.mU()}</span>
-              </div>
-              <div className="hint">ratio 1:{ratio}</div>
-            </div>
-            <div className="dial-input">
-              <label>Temp</label>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
-                <input type="number" value={temp} step="1" min="70" max="100"
-                  onChange={e => setTemp(e.target.value)}
-                  onBlur={e => !e.target.value.trim() && setTemp('92')} />
-                <span className="unit">{U.tU()}</span>
-              </div>
-            </div>
-            <div className="dial-input">
-              <label>Grind</label>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
-                <input type="number" value={grind} step="0.1" min="0" max="50"
-                  onChange={e => setGrind(e.target.value)}
-                  onBlur={e => !e.target.value.trim() && setGrind('8.0')} />
-              </div>
-            </div>
-            <div className="dial-input">
-              <label>Water recipe</label>
-              <select value={waterRecipe} onChange={e => setWaterRecipe(e.target.value)} style={{ marginTop: 4 }}>
-                {waterRecipes.map(r => <option key={r} value={r}>{r}</option>)}
-              </select>
-            </div>
-            <div className="dial-input">
-              <label>Beans</label>
-              <select value={selectedBean} onChange={e => setSelectedBean(e.target.value)} style={{ marginTop: 4 }}>
-                {beans.map(b => <option key={b.id} value={b.id}>{beanLabel(b, beans)}</option>)}
-              </select>
+            <div className="ratio-line phone-only" style={{ marginTop: '12px' }}>Ratio {ratioText(doseNum, waterNum, 'filter')}</div>
+          </div>
+
+          <div className="card">
+            <div className="card-head"><span className="card-title">Gear</span></div>
+            <div className="grid grid-2 gear-grid">
+              <SelectField label="Dripper" value={dripper} onChange={setDripper} options={withCurrent(dripperOpts, dripper)} />
+              <SelectField label="Grinder" value={grinderModel} onChange={pickGrinder} options={withCurrent(grinderOpts, grinderModel)} />
+              <SelectField label="Grinder RPM" value={grinderRpm} onChange={setGrinderRpm} options={withCurrent(RPM_OPTIONS, grinderRpm)} render={rpmLabel} />
+              <SelectField label="Water recipe" value={waterRecipe} onChange={setWaterRecipe} options={withCurrent(waterRecipes, waterRecipe)} />
             </div>
           </div>
         </div>
 
-        <div className="card">
-          <div className="card-head"><span className="card-title">Gear</span></div>
-          <div className="dial-pad">
-            <div className="dial-input">
-              <label>Dripper</label>
-              <select value={dripper} onChange={e => setDripper(e.target.value)} style={{ marginTop: 4 }}>
-                {withCurrent(dripperOpts, dripper).map(d => <option key={d} value={d}>{d}</option>)}
-              </select>
+        <div className="stack">
+          <div className="card">
+            <div className="card-head">
+              <span className="card-title">Pours</span><span>amounts are the scale total</span>
+              <span className="card-more" style={{ color: lastTotal > waterNum ? 'var(--bad)' : undefined }}>{U.m(lastTotal)} / {U.m(waterNum)} {U.mU()}</span>
             </div>
-            <div className="dial-input">
-              <label>Grinder</label>
-              <select value={grinderModel} onChange={e => setGrinderModel(e.target.value)} style={{ marginTop: 4 }}>
-                {withCurrent(grinderOpts, grinderModel).map(g => <option key={g} value={g}>{g}</option>)}
-              </select>
+            <div className="pour-bar">
+              {toAmounts(totals).map((a, i) => <i key={i} style={{ width: `${waterNum > 0 ? Math.min(PERCENT, (a / Math.max(waterNum, lastTotal)) * PERCENT) : 0}%` }} />)}
             </div>
-            <div className="dial-input">
-              <label>Grinder RPM</label>
-              <select value={grinderRpm} onChange={e => setGrinderRpm(e.target.value)} style={{ marginTop: 4 }}>
-                <option value="manual">Manual</option>
-                {[500, 600, 700, 800, 900, 1000, 1100, 1200, 1300, 1400, 1500, 1600].map(r => (
-                  <option key={r} value={String(r)}>{r} RPM</option>
-                ))}
-              </select>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* RIGHT COLUMN */}
-      <div className="stack">
-        {/* Pours + Water target */}
-        <div className="card">
-          <div className="card-head">
-            <span className="card-title">Pours</span>
-            <span className="card-more" style={{ color: totalPoured > waterTargetNum ? 'var(--bitter)' : undefined }}>
-              {U.m(totalPoured)}{U.mU()} / {U.m(waterTargetNum)}{U.mU()}
-            </span>
-            <div className="row" style={{ marginLeft: 8, gap: 2 }}>
-              <button className="icon-btn" style={{ width: 24, height: 24 }} onClick={removePour} disabled={pours.length <= 1}>–</button>
-              <span className="mono" style={{ fontSize: 12, width: 22, textAlign: 'center' }}>{pours.length}</span>
-              <button className="icon-btn" style={{ width: 24, height: 24 }} onClick={addPour} disabled={pours.length >= 8}>+</button>
-            </div>
-          </div>
-
-          <div style={{ background: 'var(--surface)', borderRadius: 6, height: 6, overflow: 'hidden', marginBottom: 14 }}>
-            <div style={{
-              height: '100%',
-              width: `${Math.min(100, waterTargetNum > 0 ? (totalPoured / waterTargetNum) * 100 : 0)}%`,
-              background: totalPoured > waterTargetNum ? 'var(--bitter)' : 'var(--crema)',
-              borderRadius: 6,
-              transition: 'width 0.2s',
-            }} />
-          </div>
-
-          <div className="stack" style={{ gap: 6 }}>
             {pours.map((p, i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <div className="mono" style={{ fontSize: 10, color: 'var(--text-3)', textTransform: 'uppercase', width: 52, letterSpacing: '0.08em' }}>
-                  {i === 0 ? 'Bloom' : `Pour ${i + 1}`}
-                </div>
-                <input type="number" value={p} step="5" min="0" max="500"
-                  onChange={e => updatePour(i, e.target.value)}
-                  style={{ width: 70 }} />
-                <span className="unit">{U.mU()}</span>
-                <div style={{ flex: 1, height: 4, background: 'var(--surface)', borderRadius: 2, overflow: 'hidden' }}>
-                  <div style={{
-                    height: '100%', borderRadius: 2,
-                    width: `${Math.min(100, waterTargetNum > 0 ? ((parseFloat(String(p)) || 0) / waterTargetNum) * 100 : 0)}%`,
-                    background: i === 0 ? 'var(--sour)' : 'var(--crema)',
-                  }} />
-                </div>
+              <div key={i} className="pour-row">
+                <span className="n">{i + 1}</span>
+                <span className="what">{i === 0 ? 'Bloom' : `Pour ${i + 1}`}</span>
+                <label className="amt">{i > 0 && 'to'}
+                  <input type="number" inputMode="numeric" step={ROUND_POUR_TO} min={0} value={p} aria-label={`${i === 0 ? 'Bloom' : `Pour ${i + 1}`} scale total`}
+                    onChange={e => { setPoursEdited(true); setPours(ps => ps.map((x, j) => j === i ? e.target.value : x)) }} />
+                  {U.mU()}
+                </label>
+                <button type="button" className="icon-btn plain sm" aria-label="Remove pour" disabled={pours.length <= 1}
+                  onClick={() => { setPoursEdited(true); setPours(ps => ps.filter((_, j) => j !== i)) }}><Ico name="x" size={ICON_XS} /></button>
               </div>
             ))}
+            {pours.length < MAX_POURS && (
+              <button className="link-btn" style={{ marginTop: '8px' }} onClick={() => setPourCount(pours.length + 1)}>+ Add a pour</button>
+            )}
           </div>
 
-          {totalPoured !== waterTargetNum && waterTargetNum > 0 && (
-            <div style={{ marginTop: 10, fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-4)' }}>
-              {totalPoured > waterTargetNum
-                ? `Over target by ${(totalPoured - waterTargetNum).toFixed(0)}${U.mU()}`
-                : `${(waterTargetNum - totalPoured).toFixed(0)}${U.mU()} remaining to target`
-              }
-            </div>
-          )}
-        </div>
-
-        {/* Tasting */}
-        <div className="card">
-          <div className="card-head">
-            <span className="card-title">Tasting notes</span>
-            <span className="card-more">drag to adjust</span>
+          <div className="card">
+            <div className="card-head"><span className="card-title">Total time</span><span>from your scale</span></div>
+            <TimeField value={totalTime} onChange={setTotalTime} minutes max={BREW_SLIDER_MAX} step={BREW_TIME_STEP} last={lastBrew?.time}
+              help="Type it, drag it or nudge 5 s at a time." />
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 14, alignItems: 'start' }}>
-            <FlavSliders taste={taste} onChange={setTaste} />
-            <FlavorRadar taste={taste} size={180} />
-          </div>
-        </div>
 
-        {/* Notes + verdict */}
-        <div className="card">
-          <div className="card-head"><span className="card-title">Notes</span></div>
-          <textarea
-            placeholder="Clean, floral, stone fruit…"
-            value={notes}
-            onChange={e => setNotes(e.target.value)}
-            style={{ height: 80 }}
-          />
-          <div className="row" style={{ marginTop: 10, gap: 6, flexWrap: 'wrap' }}>
-            <div className="micro">Verdict</div>
-            {[['good','--good'],['under','--under'],['over','--over'],['bad','--bad']].map(([v, cv]) => (
-              <button key={v}
-                className={`ghost-btn${verdict === v ? ' active' : ''}`}
-                style={verdict === v ? { borderColor: `var(${cv})`, color: `var(${cv})` } : {}}
-                onClick={() => setVerdict(p => p === v ? '' : v)}
-              >{v}</button>
-            ))}
+          <DrawerRow title="Taste and notes" open={tasteOpen} onToggle={() => setTasteOpen(o => !o)}>
+            <MiniLanded landed={landed} bad={bad} badLabel="Bad brew" />
+            <span>{bad ? 'Bad brew' : landedLabel(landed)}, {shownRating.toFixed(1)}</span>
+          </DrawerRow>
+          <div className={`fold${tasteOpen ? ' open' : ''}`}>
+            <TasteCard taste={taste} setTaste={setTaste} landed={landed} setLanded={setLanded} bad={bad} setBad={setBad} badLabel="Bad brew"
+              notes={notes} setNotes={setNotes} bagNotes={bean?.notes ?? []} placeholder="Juicy, red apple, clean finish…" />
           </div>
         </div>
       </div>
-    </div>
+
+      <SaveBar footer={footer}>
+        <div className="sum">
+          <b>{bean?.name || 'Brew'}</b>
+          {U.m(doseNum)} → {U.m(waterNum)} {U.mU()}{timeNum > 0 && ` in ${mmss(timeNum)}`}<span>, {dripper}</span>
+        </div>
+        <RatingStepper value={shownRating} onChange={setRating} />
+        <button className="primary-btn" onClick={saveBrew} disabled={!canSave} title={canSave ? '' : 'Enter the total time first'}>
+          <Ico name="check" size={ICON_SM} /> Save brew
+        </button>
+      </SaveBar>
+    </>
   )
 }
 
-// ── Outer shell with mode tabs ────────────────────────────────────────
+// ── Page: Espresso / Filter switch ────────────────────────────────────
 interface DialinProps {
-  shots:             Shot[]
-  beans:             Bean[]
-  gear?:             Gear[]
-  units:             Units
-  waterRecipes?:     string[]
-  dialinDefaults?:   DialinDefaults
-  brewModes?:        string[]
-  onSaveShot:        (shot: ShotInput) => void
-  onSaveBrew:        (brew: BrewInput) => void
-  onUpdateBean:      (id: string, data: BeanInput) => Promise<Bean>
-  preset:            DialinPreset | null
+  shots:            Shot[]
+  brews:            Brew[]
+  beans:            Bean[]
+  gear?:            Gear[]
+  units:            Units
+  waterRecipes?:    string[]
+  dialinDefaults?:  DialinDefaults
+  brewModes?:       string[]
+  onSaveShot:       (shot: ShotInput) => void
+  onSaveBrew:       (brew: BrewInput) => void
+  onUpdateBean:     (id: string, data: BeanInput) => Promise<Bean>
+  preset:           DialinPreset | null
   onPresetConsumed?: () => void
+  start:            DialinStart | null
+  onStartConsumed?: () => void
+  onBack:           () => void
+  footer:           HTMLElement | null   // where the save bar goes, below the scrolling page
 }
 
-export default function Dialin({ shots, beans, gear = [], units, waterRecipes = DEFAULT_WATER_RECIPES, dialinDefaults = {}, brewModes = [], onSaveShot, onSaveBrew, onUpdateBean, preset, onPresetConsumed }: DialinProps) {
-  const [mode, setMode] = useState(preset?.type === 'filter' ? 'filter' : 'espresso')
+export default function Dialin({ shots, brews, beans, gear = [], units, waterRecipes = DEFAULT_WATER_RECIPES, dialinDefaults = {}, brewModes = [], onSaveShot, onSaveBrew, onUpdateBean, preset, onPresetConsumed, start, onStartConsumed, onBack, footer }: DialinProps) {
+  const [mode, setMode] = useState<'espresso' | 'filter'>(preset?.type ?? start?.mode ?? 'espresso')
+  // Read once: Re-pull / Dial in buttons set these before opening the page
+  const [startBeanId] = useState(start?.beanId)
+  useEffect(() => { onPresetConsumed?.(); onStartConsumed?.() }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  return (
-    <div className="stack">
-      <div className="page-head">
-        <h1 className="page-title">Dial-in.</h1>
-        <div className="row" style={{ gap: 4, marginLeft: 'auto' }}>
-          {['espresso', 'filter'].map(m => (
-            <button key={m}
-              className={`ghost-btn${mode === m ? ' active' : ''}`}
-              onClick={() => setMode(m)}
-              style={{ textTransform: 'capitalize', fontSize: 12 }}
-            >{m}</button>
-          ))}
-        </div>
-      </div>
-
-      {mode === 'espresso'
-        ? <EspressoDialin shots={shots} beans={beans} gear={gear} units={units} waterRecipes={waterRecipes} dialinDefaults={dialinDefaults} brewModes={brewModes} onSaveShot={onSaveShot} onUpdateBean={onUpdateBean} preset={preset?.type === 'espresso' ? preset : null} onPresetConsumed={onPresetConsumed} />
-        : <FilterDialin   beans={beans} gear={gear} units={units} waterRecipes={waterRecipes} dialinDefaults={dialinDefaults} onSaveBrew={onSaveBrew} preset={preset?.type === 'filter' ? preset : null} onPresetConsumed={onPresetConsumed} />
-      }
+  const modeSwitch = (
+    <div className="seg">
+      {(['espresso', 'filter'] as const).map(m => (
+        <button key={m} className={mode === m ? 'on' : ''} onClick={() => setMode(m)}>{m === 'espresso' ? 'Espresso' : 'Filter'}</button>
+      ))}
     </div>
   )
+  const common = { beans, gear, units, waterRecipes, dialinDefaults, startBeanId, modeSwitch, onBack, footer }
+
+  return mode === 'espresso'
+    ? <EspressoDialin {...common} key="espresso" shots={shots} brewModes={brewModes} onSaveShot={onSaveShot} onUpdateBean={onUpdateBean} preset={preset?.type === 'espresso' ? preset : null} />
+    : <FilterDialin {...common} key="filter" brews={brews} onSaveBrew={onSaveBrew} preset={preset?.type === 'filter' ? preset : null} />
 }
+

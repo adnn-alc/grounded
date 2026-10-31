@@ -8,6 +8,30 @@ All notable changes to Grounded are listed here. Versions follow [Semantic Versi
 
 ## [Unreleased]
 
+A redesign (Refined), a page that works on a phone, and a sour-to-bitter slider instead of the verdict buttons. Your database is upgraded automatically on the first start, after a backup copy is saved next to it. An older version can still read the upgraded database.
+
+- New look throughout: a calmer sidebar with **Pull a shot** at the top, bigger serif page titles, plain-language labels, and cards without the old all-caps labels
+- Works in a phone browser: a bottom tab bar (Home, History, Pull, Beans, More), full-screen Settings and shot details, and a save bar on Dial-in. Taste folds away until you open it. History rows show dose, yield and time under the bag
+- **How did it land?** A slider from sour through balanced to bitter replaces the Good / Under / Over / Bad buttons, with a **Bad shot** (or **Bad brew**) switch next to it for one that went wrong. Turning it on grays the slider out. Until you place it, a hollow knob sits in the middle to show it can be dragged. Existing shots and brews are placed on the slider for you (sour 25, good 50, bitter 75; bad ones have the switch on)
+- No timer anywhere. Shot time and total brew time are typed, dragged on a slider (up to 60 s and 3 min; typing more is fine) or nudged with − / +, and the slider marks your last time with that bag. Nothing assumes a 1:2 ratio or a 25–30 s window
+- Dial-in: the bag's basket doses are chips you tap to use, with the grind you measured them at, every number has − / + buttons, **Start from this** loads your last shot with that bag, and the rating can be set by hand (it starts at the average of the taste sliders). Tap the bag's tasting notes to add them to your notes. Gear (machine, basket, grinder, water, brew mode) is always shown, and the save bar sits below the page instead of covering it. The back arrow returns to the page you came from
+- Filter Dial-in: pours are entered as scale totals ("to 150 g"); the plan follows the dose and water until you change it
+- Home: your last shot with **Pull again**, this week's shots and brews against last week (Sundays marked in red under the chart), and open bags with how much is left in whole grams
+- Shots and Brews: grouped by day, filtered by bag (open bags first, then finished ones) and period (7, 30, 90 days or all time), with a search over the bean, roaster and notes, with the details in a wider panel on the right: numbers first, then machine, grinder, basket and water on their own labeled rows
+- Beans: basket doses and grind on each bag, how many days off roast with a freshness label (resting, in its window, aging, past its best), the price, and **Dial in**, **Edit** and **Finish** on the same line as the basket doses link, right under the doses. The header shows how much coffee is available, rounded up to a whole number
+- Espresso ratios show two decimals (1:2.05); filter ratios keep one (1:16.7)
+- Stats: Espresso and Filter side by side, each with where your shots or brews landed between sour and bitter (bad ones apart), for 30 days, 90 days or all time. Below them, Origins (countries, process, roasters) next to Spending: spent on beans, bags, average per bag and per kg, the most expensive bag, beans per month for the last 6 months, spent on gear, how much coffee you used, and how much is left in your open bags. The rating-per-day chart, the espresso-by-basket table and the price per coffee are gone
+- Settings: a centered dialog with sections, two new themes (**Oat**, gray and light, and **Ember**, oxblood), and fonts picked from chips. Water recipes and brew modes each have their own section. Geist and Geist Mono are the new default text and number fonts. on a phone it scrolls on its own without moving the page behind it
+- Renamed: Inventory is now **Stock**, the bean archive is **Finished bags**, shown as bordered cards (10/page, 20/page or 50/page). Beans and Finished bags share an **Open / Finished** switch at the top to move between them
+- Stock lists the emptiest bag first with how many shots are left at your usual dose. The **Reorder** buttons, which didn't do anything, are gone
+- Gear, Recipes, Tips and the coffee map match the new look, and the basket doses popup lines up its columns. Gear categories and recipes fill both columns without gaps and show each item's price next to its status (€0 when there's none: free or included with something else), each Tips category sits in its own block, and Recipes no longer has a timer
+- Gear pickers in Dial-in and the shot editor list each name once, and only take grinders and machines from categories that end in that word, so parts filed as "Grinder burrs" or "Machine parts" stay out
+- Dropdowns inside a labeled box line up with their label instead of starting a little to the right
+- Every popup (editing a bean, shot, brew, recipe, gear or tip, basket doses, Settings) closes with **Escape** as well as by clicking outside it
+- The page you open starts at the top, and the sidebar clearly marks the page you're on in every theme
+- US English spelling throughout (favorites, color)
+- API: shots and brews have `landed` (0–100, or null) and `bad`. `verdict` is still accepted and returned, now worked out from those two. CSV exports have both new columns
+
 ## [1.3.0] — 2026-10-30
 
 Backup & restore from the app, plus CSV export for spreadsheets. No database changes.

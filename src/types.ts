@@ -6,6 +6,7 @@
 
 // ── Shots & brews ───────────────────────────────────────────────────
 
+/** Older Sour/Good/Bitter/Bad buttons. Still stored (worked out from landed/bad) for older versions. */
 export type Verdict = 'good' | 'under' | 'over' | 'bad'
 
 export type TasteAxis = 'acidity' | 'sweetness' | 'body' | 'bitterness' | 'balance' | 'aftertaste'
@@ -29,6 +30,8 @@ export interface Shot {
   taste:         Taste
   notes:         string
   verdict:       Verdict | ''
+  landed:        number | null   // 0 sour … 50 balanced … 100 bitter; null = not placed (or bad)
+  bad:           boolean         // went wrong (channelled, gushed); not placed on the slider
   machine:       string | null
   grinder_model: string | null
   grinder_rpm:   string | null   // '800', … or 'manual'
@@ -42,7 +45,7 @@ export interface Shot {
  * Body of POST /api/shots and PUT /api/shots/:id (the server makes up an id if none is sent).
  * The server fills bean/roaster from bean_id, and adjusts that bean's remaining stock.
  */
-export type ShotInput = Omit<Shot, 'id' | 'favorited' | 'bean_id'> & { id?: string; favorited?: boolean; bean_id?: string | null }
+export type ShotInput = Omit<Shot, 'id' | 'favorited' | 'bean_id' | 'verdict'> & { id?: string; favorited?: boolean; bean_id?: string | null; verdict?: Verdict | '' }
 
 /** Older brews stored pours as objects; new ones are plain gram amounts */
 export type Pour = number | { water: number }
@@ -67,12 +70,14 @@ export interface Brew {
   taste:         Taste
   notes:         string
   verdict:       Verdict | ''
+  landed:        number | null
+  bad:           boolean
   grinder_rpm:   string | null
   water_recipe:  string | null
   favorited:     boolean
 }
 
-export type BrewInput = Omit<Brew, 'id' | 'favorited' | 'bean_id'> & { id?: string; favorited?: boolean; bean_id?: string | null }
+export type BrewInput = Omit<Brew, 'id' | 'favorited' | 'bean_id' | 'verdict'> & { id?: string; favorited?: boolean; bean_id?: string | null; verdict?: Verdict | '' }
 
 // ── Beans ───────────────────────────────────────────────────────────
 
@@ -95,7 +100,7 @@ export interface Bean {
   roast_date:  string   // 'YYYY-MM-DD'
   roast:       string
   altitude:    string
-  notes:       string[] // flavour notes
+  notes:       string[] // flavor notes
   price:       number
   weight:      number   // grams in a full bag
   remaining:   number   // grams left
@@ -201,7 +206,7 @@ export interface DialinDefaults {
 
 /** GET /api/settings: only the keys that have been saved. PUT takes any subset. */
 export interface Settings {
-  theme?:          string   // 'moody', 'midnight', 'terminal' or 'parchment'
+  theme?:          string   // 'moody', 'midnight', 'terminal', 'parchment', 'oat' or 'ember'
   fonts?:          Partial<Fonts>
   units?:          Partial<Units>
   waterRecipes?:   string[]
@@ -266,14 +271,16 @@ export interface ImportResult {
 
 type TasteColumns = { [K in TasteAxis as `taste_${K}`]: number }
 
-export type ShotRow = Omit<Shot, 'taste' | 'favorited'> & TasteColumns & {
+export type ShotRow = Omit<Shot, 'taste' | 'favorited' | 'bad'> & TasteColumns & {
   favorited:  number   // 0/1
+  bad:        number   // 0/1
   created_at: string
 }
 
-export type BrewRow = Omit<Brew, 'taste' | 'favorited' | 'pours'> & TasteColumns & {
+export type BrewRow = Omit<Brew, 'taste' | 'favorited' | 'pours' | 'bad'> & TasteColumns & {
   pours:      string   // JSON array
   favorited:  number
+  bad:        number
   created_at: string
 }
 
@@ -308,6 +315,12 @@ export interface OkResponse {
 export type Route =
   | 'home' | 'dialin' | 'shot-history' | 'brew-history' | 'beans' | 'archived-beans'
   | 'recipes' | 'gear' | 'stats' | 'stock' | 'tips'
+
+/** How Dial-in opens from a button elsewhere ("Pull a shot", "Brew filter", a bag's "Dial in") */
+export interface DialinStart {
+  mode:    'espresso' | 'filter'
+  beanId?: string
+}
 
 /** A past shot or brew loaded into Dial-in as the starting point ("Re-pull" / "Re-brew") */
 export type DialinPreset = (Shot & { type: 'espresso' }) | (Brew & { type: 'filter' })

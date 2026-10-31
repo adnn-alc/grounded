@@ -7,7 +7,7 @@ import { createTempDatabase } from './test-helpers.ts'
 
 const tmp = createTempDatabase()
 
-// A 1.0-era database: no bean_id, no archive or favourite columns, tips with the old column names
+// A 1.0-era database: no bean_id, no archive or favorite columns, tips with the old column names
 const old = new Database(tmp.dbPath)
 old.exec(`
   CREATE TABLE beans (id TEXT PRIMARY KEY, name TEXT NOT NULL, roaster TEXT NOT NULL, origin TEXT, process TEXT,
@@ -34,7 +34,9 @@ old.exec(`
   INSERT INTO shots (id, date, bean, roaster, dose, brew_mode, verdict) VALUES
     ('s-feb', '2026-02-10 08:00', 'Idido', 'Tim Wendelboe', 18, 'Paddle', 'great'),
     ('s-jul', '2026-07-10 08:00', 'Idido', 'Tim Wendelboe', 18, 'Button 1', 'sour'),
-    ('s-gone', '2026-07-11 08:00', 'Long gone bean', 'X', 18, NULL, 'good');
+    ('s-gone', '2026-07-11 08:00', 'Long gone bean', 'X', 18, NULL, 'good'),
+    ('s-bad', '2026-07-12 08:00', 'Long gone bean', 'X', 18, NULL, 'bad'),
+    ('s-none', '2026-07-13 08:00', 'Long gone bean', 'X', 18, NULL, NULL);
   INSERT INTO tips (id, category, title, body) VALUES ('t1', 'espresso', 'Puck prep', 'WDT');
 `)
 old.close()
@@ -46,15 +48,15 @@ after(() => {
   tmp.cleanup()
 })
 
-const LATEST_SCHEMA = 3
+const LATEST_SCHEMA = 4
 const columns = (table: string): string[] =>
   db.prepare<[string], { name: string }>('SELECT name FROM pragma_table_info(?)').all(table).map(c => c.name)
 
 test('runs every migration and records the version', () => {
   assert.equal(db.pragma('user_version', { simple: true }), LATEST_SCHEMA)
   assert.ok(['archived', 'archived_at', 'doses'].every(c => columns('beans').includes(c)))
-  assert.ok(['bean_id', 'favorited', 'machine', 'basket'].every(c => columns('shots').includes(c)))
-  assert.ok(['bean_id', 'favorited'].every(c => columns('brews').includes(c)))
+  assert.ok(['bean_id', 'favorited', 'machine', 'basket', 'landed', 'bad'].every(c => columns('shots').includes(c)))
+  assert.ok(['bean_id', 'favorited', 'landed', 'bad'].every(c => columns('brews').includes(c)))
   assert.ok(columns('gear').includes('price'))
 })
 
@@ -79,5 +81,10 @@ test('keeps used brew modes as a setting, renames tips columns, retires old verd
   assert.deepEqual(JSON.parse(modes?.value ?? 'null'), ['Paddle', 'Button 1'])
   assert.deepEqual(db.prepare('SELECT section, category FROM tips WHERE id = ?').get('t1'), { section: 'espresso', category: 'Puck prep' })
   const verdicts = db.prepare<[], { verdict: string }>(`SELECT verdict FROM shots ORDER BY date`).all().map(r => r.verdict)
-  assert.deepEqual(verdicts, ['good', 'under', 'good'])
+  assert.deepEqual(verdicts, ['good', 'under', 'good', 'bad', null])
+})
+
+test('places old verdicts on the sour-to-bitter slider', () => {
+  const rows = db.prepare<[], { landed: number | null, bad: number }>('SELECT landed, bad FROM shots ORDER BY date').all()
+  assert.deepEqual(rows.map(r => [r.landed, r.bad]), [[50, 0], [25, 0], [50, 0], [null, 1], [null, 0]])
 })

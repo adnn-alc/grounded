@@ -1,22 +1,38 @@
 import { useState, useEffect } from 'react'
-import Ico from './Ico.tsx'
+import { Backdrop } from './ui.tsx'
+import Ico, { type IconName } from './Ico.tsx'
 import DataSettings from './DataSettings.tsx'
 import type { DataSettingsProps } from './DataSettings.tsx'
 import { FONT_ROLES, FONT_OPTIONS, fontStack } from '../data/fonts.ts'
 import { RPM_OPTIONS } from '../data/grinderRpm.ts'
-import type { DialinDefaults, EspressoDefaults, FilterDefaults, FontRole, Fonts, Units } from '../types.ts'
+import type { DialinDefaults, EspressoDefaults, FilterDefaults, Fonts, Units } from '../types.ts'
 
-const FONT_SAMPLES: Record<FontRole, string> = { sans: 'Bright, sweet, clean finish', mono: '18.0g → 36.4g · 28s', serif: 'Dial-in' }
+interface ThemeSwatch { id: string; name: string; tag: string; bg: string; sb: string; card: string; accent: string; txt: string }
 
-const THEMES = [
-  { id: 'moody',     name: 'Moody',     tag: 'espresso bar', bg: '#2a2420', sb: '#1f1a17', accent: '#d1a16a', txt: '#efe6d9', card: '#332a24' },
-  { id: 'midnight',  name: 'Midnight',  tag: 'cool inky',    bg: '#1a2035', sb: '#141a2b', accent: '#e3b366', txt: '#e8eaf5', card: '#252b45' },
-  { id: 'terminal',  name: 'Terminal',  tag: 'self-hosted',  bg: '#0c1612', sb: '#0a120f', accent: '#6ee88a', txt: '#b8e0c2', card: '#13201a' },
-  { id: 'parchment', name: 'Parchment', tag: 'editorial',    bg: '#efe7d4', sb: '#e5dcc6', accent: '#9a5a2c', txt: '#2e2518', card: '#f7f1e0' },
+export const THEMES: ThemeSwatch[] = [
+  { id: 'moody',     name: 'Moody',     tag: 'dark brown',     bg: '#15110e', sb: '#1c1612', card: '#231d19', accent: '#e8b46a', txt: '#f4ede3' },
+  { id: 'midnight',  name: 'Midnight',  tag: 'dark blue',      bg: '#10141f', sb: '#141a28', card: '#1b2233', accent: '#e8b866', txt: '#eef0f8' },
+  { id: 'terminal',  name: 'Terminal',  tag: 'green on black', bg: '#08110d', sb: '#0c1712', card: '#12201a', accent: '#7be38f', txt: '#b8f0c8' },
+  { id: 'parchment', name: 'Parchment', tag: 'warm light',     bg: '#f3ead8', sb: '#e9dfca', card: '#fbf6ea', accent: '#9a5a2c', txt: '#2e2518' },
+  { id: 'oat',       name: 'Oat',       tag: 'gray light',     bg: '#e9e6e0', sb: '#dedad2', card: '#f6f4f0', accent: '#8a5a2b', txt: '#2a2622' },
+  { id: 'ember',     name: 'Ember',     tag: 'oxblood',        bg: '#1d0f0e', sb: '#251412', card: '#2e1a17', accent: '#e0a35a', txt: '#f6e7df' },
 ]
 
 const ESP_FALLBACK: EspressoDefaults = { dose: '18', yield: '36', temp: '92', grind: '3', preinf: '0', waterRecipe: 'Light and Bright', grinderRpm: '800' }
 const FIL_FALLBACK: FilterDefaults = { dose: '15', water: '250', temp: '92', grind: '10', numPours: '3', waterRecipe: 'Light and Bright', grinderRpm: '800' }
+const SAVE_DELAY_MS = 500
+const ICON = 16
+
+type Section = 'appearance' | 'units' | 'defaults' | 'water' | 'modes' | 'data' | 'about'
+const SECTIONS: { id: Section; label: string; icon: IconName }[] = [
+  { id: 'appearance', label: 'Appearance',            icon: 'sliders' },
+  { id: 'units',      label: 'Units',                 icon: 'scale' },
+  { id: 'defaults',   label: 'Dial-in defaults',      icon: 'timer' },
+  { id: 'water',      label: 'Water recipes',         icon: 'droplet' },
+  { id: 'modes',      label: 'Brew modes',            icon: 'machine' },
+  { id: 'data',       label: 'Backup and data',       icon: 'download' },
+  { id: 'about',      label: 'About',                 icon: 'book' },
+]
 
 interface SettingsProps {
   open:              boolean
@@ -37,8 +53,49 @@ interface SettingsProps {
   onRestoreBackup:   DataSettingsProps['onRestore']
 }
 
+function ThemeCard({ t, on, onPick }: { t: ThemeSwatch; on: boolean; onPick: () => void }) {
+  return (
+    <button className={`theme-card${on ? ' on' : ''}`} onClick={onPick} aria-pressed={on}>
+      <div className="theme-preview" style={{ background: t.bg, color: t.txt }}>
+        <div className="sb" style={{ background: t.sb }}>
+          <i style={{ background: t.accent, width: '70%' }} />
+          <i style={{ background: t.txt, width: '50%' }} />
+          <i style={{ background: t.txt, width: '80%' }} />
+        </div>
+        <div className="mn">
+          <span className="tt">Dial-in.</span>
+          <div className="cd" style={{ background: t.card }}><span>18 → 50</span><span style={{ color: t.accent }}>8.5</span></div>
+        </div>
+      </div>
+      <div className="meta"><span className="name">{t.name}</span><span className="tag">{t.tag}</span></div>
+    </button>
+  )
+}
+
+function DefaultsField({ label, value, step, onChange }: { label: string; value: string; step: string; onChange: (v: string) => void }) {
+  return (
+    <div className="dial-input">
+      <label>{label}</label>
+      <input type="number" step={step} value={value} onChange={e => onChange(e.target.value)} />
+    </div>
+  )
+}
+
+function DefaultsSelect({ label, value, options, render = (o: string) => o, onChange }: { label: string; value: string; options: string[]; render?: (o: string) => string; onChange: (v: string) => void }) {
+  return (
+    <div className="dial-input">
+      <label>{label}</label>
+      <select value={value} onChange={e => onChange(e.target.value)}>
+        {options.map(o => <option key={o} value={o}>{render(o)}</option>)}
+      </select>
+    </div>
+  )
+}
+
+const rpmLabel = (r: string) => r === 'manual' ? 'Manual' : `${r} RPM`
+
 export default function Settings({ open, onClose, theme, setTheme, fonts, setFonts, units, setUnits, waterRecipes, setWaterRecipes, dialinDefaults, setDialinDefaults, brewModes, setBrewModes, onPreviewBackup, onRestoreBackup }: SettingsProps) {
-  const [tab, setTab]   = useState('preferences')
+  const [section, setSection] = useState<Section>('appearance')
   const [defs, setDefs] = useState(dialinDefaults)
   const [newRecipe, setNewRecipe] = useState('')
   const [newMode, setNewMode] = useState('')
@@ -46,7 +103,7 @@ export default function Settings({ open, onClose, theme, setTheme, fonts, setFon
   // Typing in the number fields saves after a short pause, not on every keystroke
   useEffect(() => {
     if (defs === dialinDefaults) return
-    const t = setTimeout(() => setDialinDefaults(defs), 500)
+    const t = setTimeout(() => setDialinDefaults(defs), SAVE_DELAY_MS)
     return () => clearTimeout(t)
   }, [defs]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -57,11 +114,6 @@ export default function Settings({ open, onClose, theme, setTheme, fonts, setFon
     if (!name || waterRecipes.includes(name)) return
     setWaterRecipes([...waterRecipes, name])
     setNewRecipe('')
-  }
-
-  const removeWaterRecipe = (name: string) => {
-    if (waterRecipes.length <= 1) return
-    setWaterRecipes(waterRecipes.filter(r => r !== name))
   }
 
   // Brew modes are optional: with none, Dial-in doesn't show the field at all
@@ -78,251 +130,159 @@ export default function Settings({ open, onClose, theme, setTheme, fonts, setFon
   const fil = { ...FIL_FALLBACK, ...defs.filter }
   const mU  = units.mass === 'oz' ? 'oz' : 'g'
   const tU  = units.temp === 'F'  ? '°F' : '°C'
+  const current = SECTIONS.find(s => s.id === section)!
 
   return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal" onClick={e => e.stopPropagation()}>
-        <div className="modal-head">
-          <Ico name="sliders" size={18} />
+    <Backdrop onClose={onClose}>
+      <div className="modal settings" role="dialog" aria-label="Settings" onClick={e => e.stopPropagation()}>
+        <div className="settings-phone-head phone-only">
+          <button className="icon-btn plain" aria-label="Back" onClick={onClose}><Ico name="back" size={20} /></button>
           <h2>Settings</h2>
-          <button className="icon-btn" style={{ marginLeft: 'auto' }} onClick={onClose}>
-            <Ico name="x" size={14} />
-          </button>
         </div>
-
-        <div className="row" style={{ gap: 4, padding: '0 20px', borderBottom: '1px solid var(--border)' }}>
-          {[['preferences', 'Preferences'], ['defaults', 'Dial-in defaults'], ['data', 'Backup & data']].map(([t, label]) => (
-            <button key={t}
-              className={`ghost-btn${tab === t ? ' active' : ''}`}
-              style={{ fontSize: 12, borderRadius: 0, borderBottom: tab === t ? '2px solid var(--crema)' : '2px solid transparent', marginBottom: -1 }}
-              onClick={() => setTab(t)}>{label}</button>
+        <nav className="settings-nav">
+          <h2>Settings</h2>
+          {SECTIONS.map(s => (
+            <button key={s.id} className={`nav-item${section === s.id ? ' active' : ''}`} onClick={() => setSection(s.id)}>
+              <Ico name={s.icon} size={ICON} className="ico" /> {s.label}
+            </button>
           ))}
-        </div>
+          <div className="saved">Changes save as you go</div>
+        </nav>
 
-        <div className="modal-body scroll">
-          {tab === 'data' && <DataSettings onPreview={onPreviewBackup} onRestore={onRestoreBackup} />}
-          {tab === 'preferences' && (
-            <>
-              <div className="settings-section">
-                <h3>Appearance · Theme</h3>
-                <div className="theme-grid">
-                  {THEMES.map(t => (
-                    <button key={t.id}
-                      className={`theme-card${theme === t.id ? ' on' : ''}`}
-                      onClick={() => setTheme(t.id)}>
-                      <div className="on-mark"><Ico name="check" size={10} /></div>
-                      <div className="theme-preview">
-                        <div className="sb" style={{ background: t.sb }}>
-                          <div className="ln" style={{ background: t.accent, width: '70%' }} />
-                          <div className="ln" style={{ background: t.txt, width: '50%', opacity: 0.4 }} />
-                          <div className="ln" style={{ background: t.txt, width: '80%', opacity: 0.3 }} />
-                          <div className="ln" style={{ background: t.txt, width: '60%', opacity: 0.3 }} />
-                        </div>
-                        <div className="mn" style={{ background: t.bg }}>
-                          <div className="ttl" style={{ background: t.txt, opacity: 0.8 }} />
-                          <div className="crd" style={{ background: t.card, border: `1px solid ${t.accent}33` }} />
-                        </div>
-                      </div>
-                      <div className="meta">
-                        <span className="name">{t.name}</span>
-                        <span className="tag">{t.tag}</span>
-                      </div>
-                    </button>
-                  ))}
+        <div className="settings-main">
+          <div className="settings-head">
+            <h3>{current.label}</h3>
+            <button className="icon-btn" aria-label="Close settings" onClick={onClose}><Ico name="x" size={ICON} /></button>
+          </div>
+
+          <div className="settings-body scroll">
+            {section === 'appearance' && (
+              <>
+                <div className="settings-section">
+                  <h4>Themes</h4>
+                  <div className="theme-grid">
+                    {THEMES.map(t => <ThemeCard key={t.id} t={t} on={theme === t.id} onPick={() => setTheme(t.id)} />)}
+                  </div>
                 </div>
-              </div>
-
-              <div className="settings-section">
-                <h3>Appearance · Fonts</h3>
-                {FONT_ROLES.map(({ role, label, desc }) => (
-                  <div key={role} className="settings-row">
-                    <div>
-                      <div className="label">{label}</div>
-                      <div className="desc">{desc}</div>
-                      <div className={`font-sample${role === 'serif' ? ' serif' : ''}`} style={{ fontFamily: fontStack(role, fonts[role]) }}>
-                        {FONT_SAMPLES[role]}
+                <div className="settings-section">
+                  <h4>Fonts</h4>
+                  {FONT_ROLES.map(({ role, label, desc }) => (
+                    <div key={role} className="font-row">
+                      <div><div className="label">{label}</div><div className="desc">{desc}</div></div>
+                      <div className="font-chips">
+                        {FONT_OPTIONS[role].map(f => (
+                          <button key={f.id} className={`font-chip${role === 'serif' ? ' serif' : ''}${fonts[role] === f.id ? ' on' : ''}`}
+                            style={{ fontFamily: fontStack(role, f.id) }} onClick={() => setFonts({ ...fonts, [role]: f.id })}>
+                            {f.name}
+                          </button>
+                        ))}
                       </div>
                     </div>
-                    <select className="font-select" value={fonts[role]} onChange={e => setFonts({ ...fonts, [role]: e.target.value })}>
-                      {FONT_OPTIONS[role].map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
-                    </select>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              </>
+            )}
 
+            {section === 'units' && (
               <div className="settings-section">
-                <h3>Units</h3>
                 <div className="settings-row">
-                  <div>
-                    <div className="label">Mass</div>
-                    <div className="desc">Used for dose, yield, stock, and all weights.</div>
-                  </div>
+                  <div><div className="label">Weight</div><div className="desc">Dose, yield, water and what's left in a bag.</div></div>
                   <div className="unit-toggle">
-                    <button className={units.mass === 'g'  ? 'on' : ''} onClick={() => setUnits({ ...units, mass: 'g' })}>grams</button>
-                    <button className={units.mass === 'oz' ? 'on' : ''} onClick={() => setUnits({ ...units, mass: 'oz' })}>ounces</button>
+                    <button className={units.mass === 'g'  ? 'on' : ''} onClick={() => setUnits({ ...units, mass: 'g' })}>Grams</button>
+                    <button className={units.mass === 'oz' ? 'on' : ''} onClick={() => setUnits({ ...units, mass: 'oz' })}>Ounces</button>
                   </div>
                 </div>
                 <div className="settings-row">
-                  <div>
-                    <div className="label">Temperature</div>
-                    <div className="desc">Group-head, kettle, and brew temp displays.</div>
-                  </div>
+                  <div><div className="label">Temperature</div><div className="desc">Brew and kettle temperature.</div></div>
                   <div className="unit-toggle">
                     <button className={units.temp === 'C' ? 'on' : ''} onClick={() => setUnits({ ...units, temp: 'C' })}>Celsius</button>
                     <button className={units.temp === 'F' ? 'on' : ''} onClick={() => setUnits({ ...units, temp: 'F' })}>Fahrenheit</button>
                   </div>
                 </div>
               </div>
+            )}
 
-              <div className="settings-section">
-                <h3>About</h3>
-                <div className="settings-row">
-                  <div>
-                    <div className="label">Grounded</div>
-                    <div className="desc">Self-hosted coffee tracker · v{__APP_VERSION__}</div>
+            {section === 'defaults' && (
+              <>
+                <div className="settings-section">
+                  <h4>Espresso: what Dial-in starts with</h4>
+                  <div className="form-grid">
+                    <DefaultsField label={`Dose (${mU})`} value={esp.dose} step="0.1" onChange={v => updateDef('espresso', 'dose', v)} />
+                    <DefaultsField label={`Yield (${mU})`} value={esp.yield} step="0.1" onChange={v => updateDef('espresso', 'yield', v)} />
+                    <DefaultsField label={`Temperature (${tU})`} value={esp.temp} step="1" onChange={v => updateDef('espresso', 'temp', v)} />
+                    <DefaultsField label="Grind" value={esp.grind} step="0.1" onChange={v => updateDef('espresso', 'grind', v)} />
+                    <DefaultsField label="Pre-infusion (s)" value={esp.preinf} step="1" onChange={v => updateDef('espresso', 'preinf', v)} />
+                    <DefaultsSelect label="Grinder RPM" value={esp.grinderRpm} options={RPM_OPTIONS} render={rpmLabel} onChange={v => updateDef('espresso', 'grinderRpm', v)} />
+                    <DefaultsSelect label="Water recipe" value={esp.waterRecipe} options={waterRecipes} onChange={v => updateDef('espresso', 'waterRecipe', v)} />
                   </div>
-                  <div className="mono text-dim" style={{ fontSize: 11 }}>localhost</div>
                 </div>
-              </div>
-            </>
-          )}
-          {tab === 'defaults' && (
-            <>
+                <div className="settings-section">
+                  <h4>Filter</h4>
+                  <div className="form-grid">
+                    <DefaultsField label={`Dose (${mU})`} value={fil.dose} step="0.1" onChange={v => updateDef('filter', 'dose', v)} />
+                    <DefaultsField label={`Water (${mU})`} value={fil.water} step="5" onChange={v => updateDef('filter', 'water', v)} />
+                    <DefaultsField label={`Temperature (${tU})`} value={fil.temp} step="1" onChange={v => updateDef('filter', 'temp', v)} />
+                    <DefaultsField label="Grind" value={fil.grind} step="0.1" onChange={v => updateDef('filter', 'grind', v)} />
+                    <DefaultsField label="Number of pours" value={fil.numPours} step="1" onChange={v => updateDef('filter', 'numPours', v)} />
+                    <DefaultsSelect label="Grinder RPM" value={fil.grinderRpm} options={RPM_OPTIONS} render={rpmLabel} onChange={v => updateDef('filter', 'grinderRpm', v)} />
+                    <DefaultsSelect label="Water recipe" value={fil.waterRecipe} options={waterRecipes} onChange={v => updateDef('filter', 'waterRecipe', v)} />
+                  </div>
+                </div>
+              </>
+            )}
+
+            {section === 'water' && (
               <div className="settings-section">
-                <h3>Water recipes</h3>
-                <div className="desc" style={{ marginBottom: 10 }}>Manage the water recipe options offered when dialing in.</div>
-                <div className="stack" style={{ gap: 6, marginBottom: 10 }}>
-                  {waterRecipes.map(r => (
-                    <div key={r} className="settings-row" style={{ padding: '6px 0' }}>
-                      <div className="label">{r}</div>
-                      <button className="icon-btn" onClick={() => removeWaterRecipe(r)} disabled={waterRecipes.length <= 1}>
-                        <Ico name="x" size={12} />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-                <div className="row" style={{ gap: 8 }}>
-                  <input type="text" placeholder="Add water recipe…" value={newRecipe}
+                <div className="desc">The choices Dial-in offers for water.</div>
+                {waterRecipes.map(r => (
+                  <div key={r} className="list-row">
+                    <span>{r}</span>
+                    <button className="icon-btn plain" aria-label={`Remove ${r}`} onClick={() => setWaterRecipes(waterRecipes.filter(x => x !== r))} disabled={waterRecipes.length <= 1}>
+                      <Ico name="x" size={ICON} />
+                    </button>
+                  </div>
+                ))}
+                <div className="row" style={{ marginTop: '10px' }}>
+                  <input className="text-input" type="text" placeholder="Add a water recipe" value={newRecipe}
                     onChange={e => setNewRecipe(e.target.value)}
                     onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addWaterRecipe() } }} />
-                  <button className="ghost-btn" onClick={addWaterRecipe}>Add</button>
+                  <button className="ghost-btn lg" onClick={addWaterRecipe}>Add</button>
                 </div>
               </div>
+            )}
 
+            {section === 'modes' && (
               <div className="settings-section">
-                <h3>Brew modes · optional</h3>
-                <div className="desc" style={{ marginBottom: 10 }}>
-                  Buttons or programs on your espresso machine (e.g. "Button 1", "Paddle") to pick from when dialing in. Leave empty to hide the field.
-                </div>
-                {brewModes.length > 0 && (
-                  <div className="stack" style={{ gap: 6, marginBottom: 10 }}>
-                    {brewModes.map(m => (
-                      <div key={m} className="settings-row" style={{ padding: '6px 0' }}>
-                        <div className="label">{m}</div>
-                        <button className="icon-btn" aria-label={`Remove ${m}`} onClick={() => setBrewModes(brewModes.filter(x => x !== m))}>
-                          <Ico name="x" size={12} />
-                        </button>
-                      </div>
-                    ))}
+                <div className="desc">Optional. Buttons or programs on your espresso machine, like “Button 1” or “Paddle”. Leave this empty and Dial-in won't ask.</div>
+                {brewModes.map(m => (
+                  <div key={m} className="list-row">
+                    <span>{m}</span>
+                    <button className="icon-btn plain" aria-label={`Remove ${m}`} onClick={() => setBrewModes(brewModes.filter(x => x !== m))}>
+                      <Ico name="x" size={ICON} />
+                    </button>
                   </div>
-                )}
-                <div className="row" style={{ gap: 8 }}>
-                  <input type="text" placeholder="Add brew mode…" value={newMode}
+                ))}
+                <div className="row" style={{ marginTop: '10px' }}>
+                  <input className="text-input" type="text" placeholder="Add a brew mode" value={newMode}
                     onChange={e => setNewMode(e.target.value)}
                     onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addBrewMode() } }} />
-                  <button className="ghost-btn" onClick={addBrewMode}>Add</button>
+                  <button className="ghost-btn lg" onClick={addBrewMode}>Add</button>
                 </div>
               </div>
+            )}
 
-              <div className="settings-section">
-                <h3>Espresso</h3>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                  <div className="dial-input">
-                    <label>Dose ({mU})</label>
-                    <input type="number" step="0.1" min="10" max="25" value={esp.dose}
-                      onChange={e => updateDef('espresso', 'dose', e.target.value)} />
-                  </div>
-                  <div className="dial-input">
-                    <label>Yield ({mU})</label>
-                    <input type="number" step="0.1" min="0" max="100" value={esp.yield}
-                      onChange={e => updateDef('espresso', 'yield', e.target.value)} />
-                  </div>
-                  <div className="dial-input">
-                    <label>Temp ({tU})</label>
-                    <input type="number" step="1" min="80" max="105" value={esp.temp}
-                      onChange={e => updateDef('espresso', 'temp', e.target.value)} />
-                  </div>
-                  <div className="dial-input">
-                    <label>Grind</label>
-                    <input type="number" step="0.1" min="0" max="10" value={esp.grind}
-                      onChange={e => updateDef('espresso', 'grind', e.target.value)} />
-                  </div>
-                  <div className="dial-input">
-                    <label>Pre-infusion (s)</label>
-                    <input type="number" step="1" min="0" max="20" value={esp.preinf}
-                      onChange={e => updateDef('espresso', 'preinf', e.target.value)} />
-                  </div>
-                  <div className="dial-input">
-                    <label>Grinder RPM</label>
-                    <select value={esp.grinderRpm} onChange={e => updateDef('espresso', 'grinderRpm', e.target.value)}>
-                      {RPM_OPTIONS.map(r => <option key={r} value={r}>{r === 'manual' ? 'Manual' : `${r} RPM`}</option>)}
-                    </select>
-                  </div>
-                  <div className="dial-input" style={{ gridColumn: '1 / -1' }}>
-                    <label>Water recipe</label>
-                    <select value={esp.waterRecipe} onChange={e => updateDef('espresso', 'waterRecipe', e.target.value)}>
-                      {waterRecipes.map(r => <option key={r} value={r}>{r}</option>)}
-                    </select>
-                  </div>
-                </div>
-              </div>
+            {section === 'data' && <DataSettings onPreview={onPreviewBackup} onRestore={onRestoreBackup} />}
 
+            {section === 'about' && (
               <div className="settings-section">
-                <h3>Filter</h3>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                  <div className="dial-input">
-                    <label>Dose ({mU})</label>
-                    <input type="number" step="0.1" min="5" max="50" value={fil.dose}
-                      onChange={e => updateDef('filter', 'dose', e.target.value)} />
-                  </div>
-                  <div className="dial-input">
-                    <label>Water ({mU})</label>
-                    <input type="number" step="5" min="50" max="1500" value={fil.water}
-                      onChange={e => updateDef('filter', 'water', e.target.value)} />
-                  </div>
-                  <div className="dial-input">
-                    <label>Temp ({tU})</label>
-                    <input type="number" step="1" min="70" max="105" value={fil.temp}
-                      onChange={e => updateDef('filter', 'temp', e.target.value)} />
-                  </div>
-                  <div className="dial-input">
-                    <label>Grind</label>
-                    <input type="number" step="0.1" min="0" max="50" value={fil.grind}
-                      onChange={e => updateDef('filter', 'grind', e.target.value)} />
-                  </div>
-                  <div className="dial-input">
-                    <label>Number of pours</label>
-                    <input type="number" step="1" min="1" max="8" value={fil.numPours}
-                      onChange={e => updateDef('filter', 'numPours', e.target.value)} />
-                  </div>
-                  <div className="dial-input">
-                    <label>Grinder RPM</label>
-                    <select value={fil.grinderRpm} onChange={e => updateDef('filter', 'grinderRpm', e.target.value)}>
-                      {RPM_OPTIONS.map(r => <option key={r} value={r}>{r === 'manual' ? 'Manual' : `${r} RPM`}</option>)}
-                    </select>
-                  </div>
-                  <div className="dial-input" style={{ gridColumn: '1 / -1' }}>
-                    <label>Water recipe</label>
-                    <select value={fil.waterRecipe} onChange={e => updateDef('filter', 'waterRecipe', e.target.value)}>
-                      {waterRecipes.map(r => <option key={r} value={r}>{r}</option>)}
-                    </select>
-                  </div>
+                <div className="settings-row">
+                  <div><div className="label">Grounded {__APP_VERSION__}</div><div className="desc">A self-hosted coffee tracker. Everything stays on this server.</div></div>
                 </div>
               </div>
-            </>
-          )}
+            )}
+          </div>
         </div>
       </div>
-    </div>
+    </Backdrop>
   )
 }

@@ -1,5 +1,4 @@
 import { useRef, type PointerEvent as ReactPointerEvent } from 'react'
-import { flavColor } from '../hooks/useUnits.ts'
 import type { Taste, TasteAxis } from '../types.ts'
 
 interface FlavorRadarProps {
@@ -11,14 +10,14 @@ interface FlavorRadarProps {
 
 export function FlavorRadar({ taste, size = 200, color = 'var(--crema)', compareTaste = null }: FlavorRadarProps) {
   const axes: TasteAxis[] = ['acidity', 'sweetness', 'body', 'bitterness', 'balance', 'aftertaste']
-  const labels = ['Acid', 'Sweet', 'Body', 'Bitter', 'Balance', 'Finish']
+  const labels = ['Acidity', 'Sweet', 'Body', 'Bitter', 'Balance', 'Finish']
   const cx = size / 2, cy = size / 2, r = size / 2 - 30
   const angle  = (i: number) => (-Math.PI / 2) + (i * 2 * Math.PI / axes.length)
   const pt     = (val: number, i: number) => { const rr = (val / 10) * r; return [cx + rr * Math.cos(angle(i)), cy + rr * Math.sin(angle(i))] }
   const poly   = (t: Taste) => axes.map((k, i) => pt(t[k] || 0, i).join(',')).join(' ')
 
   return (
-    <svg width={size} height={size} style={{ display: 'block' }}>
+    <svg width={size} height={size} style={{ display: 'block', overflow: 'visible' }}>
       {[2, 4, 6, 8, 10].map(v => (
         <polygon key={v}
           points={axes.map((_, i) => pt(v, i).join(',')).join(' ')}
@@ -41,8 +40,7 @@ export function FlavorRadar({ taste, size = 200, color = 'var(--crema)', compare
         const [x, y] = pt(12.5, i)
         return (
           <text key={l} x={x} y={y} textAnchor="middle" dominantBaseline="middle"
-            fill="var(--text-4)" fontFamily="var(--font-mono)" fontSize="9"
-            style={{ textTransform: 'uppercase', letterSpacing: '0.1em' }}>{l}</text>
+            fill="var(--text-3)" fontFamily="var(--font-sans)" fontSize="10">{l}</text>
         )
       })}
     </svg>
@@ -267,8 +265,8 @@ export function FlavSliders({ taste, onChange }: { taste: Taste; onChange: (tast
         <div key={k} className="flav-row">
           <div className="name">{k}</div>
           <div className="flav-bar" onPointerDown={(e) => handlePointerDown(k, e)}>
-            <div className="flav-bar-fill" style={{ transform: `scaleX(${(taste[k] || 0) / 10})`, background: flavColor(k) }} />
-            <div className="flav-thumb" style={{ left: `calc(${(taste[k] || 0) * 10}% - 6px)`, background: flavColor(k) }} />
+            <div className="flav-bar-fill" style={{ transform: `scaleX(${(taste[k] || 0) / 10})` }} />
+            <div className="flav-thumb" style={{ left: `calc(${(taste[k] || 0) * 10}% - 7px)` }} />
           </div>
           <div className="v">{taste[k]}</div>
         </div>

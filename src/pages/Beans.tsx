@@ -1,9 +1,16 @@
 import { useState, type FormEvent } from 'react'
-import { Meta } from '../components/ui.tsx'
+import { Backdrop } from '../components/ui.tsx'
 import { useUnits } from '../hooks/useUnits.ts'
 import Ico from '../components/Ico.tsx'
+import { PageHead } from '../components/Shell.tsx'
 import { BeanDosesModal } from '../components/BeanDoses.tsx'
-import type { Bean, BeanInput, Gear, Units } from '../types.ts'
+import { daysOffRoast, freshness, FRESHNESS_TEXT } from '../data/beans.ts'
+import { activeGear, BASKET_KIND } from '../data/gear.ts'
+import type { Bean, BeanInput, Gear, Route, Units } from '../types.ts'
+
+const PERCENT = 100
+const ICON = 14
+const CENTS = 2
 
 // ── BEANS ─────────────────────────────────────────────────────────────
 /** Form fields are the inputs' strings until saved */
@@ -21,16 +28,18 @@ const EMPTY_BEAN: BeanForm = {
 interface BeansProps {
   beans:         Bean[]
   gear?:         Gear[]
+  archivedCount?: number
+  goTo?:         (route: Route) => void
+  onDialIn?:     (bean: Bean) => void
   units:         Units
   onSaveBean:    (bean: BeanInput) => Promise<Bean>
   onUpdateBean:  (id: string, data: BeanInput) => Promise<Bean>
   onArchiveBean: (id: string) => Promise<Bean>
 }
 
-export function Beans({ beans, gear = [], units, onSaveBean, onUpdateBean, onArchiveBean }: BeansProps) {
+export function Beans({ beans, gear = [], archivedCount = 0, goTo, onDialIn, units, onSaveBean, onUpdateBean, onArchiveBean }: BeansProps) {
   const U = useUnits(units)
-  const stockColor: Record<string, string> = { good: 'var(--good)', low: 'var(--sweet)', critical: 'var(--bitter)' }
-  const basketOpts = gear.filter(g => /basket/i.test(g.kind) && g.status !== 'Retired').map(g => g.name)
+  const basketOpts = activeGear(gear, BASKET_KIND).map(g => g.name)
   const [adding, setAdding]   = useState(false)
   const [editing, setEditing] = useState<Bean | null>(null)  // bean being edited
   const [dosesFor, setDosesFor] = useState<Bean | null>(null) // bean whose basket doses are open
@@ -127,74 +136,78 @@ export function Beans({ beans, gear = [], units, onSaveBean, onUpdateBean, onArc
   }
 
   const handleArchive = async (id: string) => {
-    if (!confirm('Archive this bean? It will move to the bean archive.')) return
+    if (!confirm('Move this bag to Finished bags?')) return
     await onArchiveBean(id)
   }
 
   const isEditing = !!editing
   const showModal = adding || isEditing
+  const totalLeft = beans.reduce((a, b) => a + (b.remaining || 0), 0)
+  const ages = beans.map(b => daysOffRoast(b)).filter((d): d is number => d != null)
+  // Whole numbers in the chosen unit; the total rounds up, so a few grams never read as nothing
+  const whole = (g: number) => Math.round(parseFloat(U.m(g)))
+  const sub = `${Math.ceil(parseFloat(U.m(totalLeft)))} ${U.mU()} available${ages.length ? `, roasted ${Math.min(...ages)} to ${Math.max(...ages)} days ago` : ''}`
 
   return (
     <div className="stack">
-      <div className="page-head">
-        <h1 className="page-title">Beans.</h1>
-        <span className="page-sub">{beans.length} active</span>
-        <button className="primary-btn" style={{ marginLeft: 'auto' }} onClick={openAdd}>
-          <Ico name="plus" size={13} /> Add bean
-        </button>
-      </div>
+      <PageHead title="Beans." sub={sub}>
+        <div className="seg">
+          <button className="on">Open {beans.length}</button>
+          <button onClick={() => goTo?.('archived-beans')}>Finished {archivedCount}</button>
+        </div>
+        <button className="primary-btn" onClick={openAdd}><Ico name="plus" size={ICON} /> Add bean</button>
+      </PageHead>
 
-      <div className="grid grid-2">
+      {beans.length === 0 && <div className="card empty">No open bags. Add the one you're drinking now.</div>}
+
+      <div className="bean-grid">
         {beans.map(b => {
-          const pct = (b.remaining / b.weight) * 100
+          const pct = b.weight > 0 ? Math.min(PERCENT, (b.remaining / b.weight) * PERCENT) : 0
+          const days = daysOffRoast(b)
+          const tags = [b.process, b.roast, b.variety].filter(Boolean)
           return (
-            <div key={b.id} className="bean-card">
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
-                <div>
-                  <div style={{ fontFamily: 'var(--font-serif)', fontStyle: 'italic', fontSize: 28, lineHeight: 1 }}>{b.name}</div>
-                  <div className="text-muted mono" style={{ fontSize: 10, marginTop: 4, letterSpacing: '0.08em' }}>
-                    {b.roaster.toUpperCase()} · {b.origin.toUpperCase()}
-                  </div>
-                </div>
-                <div className="row" style={{ gap: 6, alignItems: 'center' }}>
-                  <button className="icon-btn" style={{ width: 24, height: 24, borderColor: 'transparent', color: b.doses?.length ? 'var(--crema)' : undefined }}
-                    onClick={() => setDosesFor(b)} title="Basket doses">
-                    <Ico name="scale" size={11} />
-                  </button>
-                  <button className="icon-btn" style={{ width: 24, height: 24, borderColor: 'transparent' }}
-                    onClick={() => openEdit(b)} title="Edit bean">
-                    <Ico name="pencil" size={11} />
-                  </button>
-                  <button className="icon-btn" style={{ width: 24, height: 24, borderColor: 'transparent', color: 'oklch(0.70 0.16 55)' }}
-                    onClick={() => handleArchive(b.id)} title="Archive bean">
-                    <Ico name="download" size={11} />
-                  </button>
+            <div key={b.id} className="card bean-card">
+              <div style={{ minWidth: 0 }}>
+                <div className="nm">{b.name}</div>
+                <div className="rs">{[b.roaster, b.origin?.replace(' · ', ', ')].filter(Boolean).join(', ')}</div>
+                {tags.length > 0 && <div className="tags">{tags.map(t => <span key={t} className="badge">{t}</span>)}</div>}
+                {b.notes?.length > 0 && <div className="notes">{b.notes.join(', ')}</div>}
+                <div className="dose-list">
+                  {(b.doses || []).map(d => (
+                    <div key={d.basket} className="dose-row">
+                      <span>{d.basket}</span>
+                      <span><b>{U.m(d.dose)} {U.mU()}</b></span>
+                      <span className="g">{d.grind ? <>grind <b>{d.grind}</b></> : ''}</span>
+                    </div>
+                  ))}
                 </div>
               </div>
-
-              <div className="grid grid-3" style={{ gap: 4 }}>
-                <Meta k="Process"  v={b.process} />
-                <Meta k="Roast"    v={b.roast} />
-                <Meta k="Variety"  v={b.variety} />
-                <Meta k="Altitude" v={b.altitude} />
-                <Meta k="Roasted"  v={b.roast_date} />
-                <Meta k="Price"    v={b.price ? `€${b.price % 1 === 0 ? b.price : b.price.toFixed(2)}` : null} />
-              </div>
-
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                  <div className="micro">Remaining</div>
-                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11 }}>
-                    {U.m(b.remaining)}{U.mU()} / {U.m(b.weight)}{U.mU()}
-                  </div>
-                </div>
-                <div className="bean-stock-bar">
-                  <div className="bean-stock-fill" style={{ width: `${pct.toFixed(1)}%`, background: stockColor[b.stock] || 'var(--crema)' }} />
+              <div className="bean-side">
+                <div className="big">{whole(b.remaining)}<small>{U.mU()} of {whole(b.weight)}</small></div>
+                <div className="stock-bar"><i className={b.stock} style={{ width: `${pct}%` }} /></div>
+                <div className="bean-facts">
+                  {days != null && (
+                    <div className="kv">
+                      <span className="k">Off roast</span>
+                      <span className="v">{days}<small>{days === 1 ? 'day' : 'days'}</small></span>
+                      <span className={`fresh ${freshness(days)}`}>{FRESHNESS_TEXT[freshness(days)]}</span>
+                    </div>
+                  )}
+                  {b.price > 0 && (
+                    <div className="kv">
+                      <span className="k">Price</span>
+                      <span className="v">€{b.price % 1 === 0 ? b.price : b.price.toFixed(CENTS)}</span>
+                    </div>
+                  )}
                 </div>
               </div>
-
-              <div className="row" style={{ gap: 5, flexWrap: 'wrap' }}>
-                {b.notes.map(n => <span key={n} className="badge">{n}</span>)}
+              <div className="bean-foot">
+                <button className="link-btn" onClick={() => setDosesFor(b)}>{b.doses?.length ? 'Edit basket doses' : '+ Add basket dose'}</button>
+                <div className="acts">
+                  {onDialIn && <button className="primary-btn" onClick={() => onDialIn(b)}>Dial in</button>}
+                  <button className="ghost-btn lg" onClick={() => openEdit(b)}>Edit</button>
+                  <button className="icon-btn lg" title="Move to Finished bags" aria-label="Move to Finished bags" onClick={() => handleArchive(b.id)}><Ico name="archive" size={ICON} /></button>
+                </div>
               </div>
             </div>
           )
@@ -202,7 +215,7 @@ export function Beans({ beans, gear = [], units, onSaveBean, onUpdateBean, onArc
       </div>
 
       {showModal && (
-        <div className="modal-backdrop" onClick={closeModal}>
+        <Backdrop onClose={closeModal}>
           <div className="modal" style={{ width: 680 }} onClick={e => e.stopPropagation()}>
             <div className="modal-head">
               <h2>{isEditing ? 'Edit bean' : 'Add bean'}</h2>
@@ -285,7 +298,7 @@ export function Beans({ beans, gear = [], units, onSaveBean, onUpdateBean, onArc
               </div>
             </form>
           </div>
-        </div>
+        </Backdrop>
       )}
 
       {dosesFor && (

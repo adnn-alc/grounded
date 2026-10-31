@@ -1,15 +1,27 @@
-import { useState, useEffect, type FormEvent } from 'react'
-import { Meta, BrewCard } from '../components/ui.tsx'
+import { useState, type FormEvent } from 'react'
+import { Backdrop } from '../components/ui.tsx'
 import { FlavorRadar } from '../components/charts.tsx'
+import { LandedSlider } from '../components/Landed.tsx'
+import { HistoryList, InspectorEmpty } from '../components/History.tsx'
+import { Input, Kv, Select, Setup, rpmText } from './ShotHistory.tsx'
 import { useUnits } from '../hooks/useUnits.ts'
 import Ico from '../components/Ico.tsx'
 import { DEFAULT_WATER_RECIPES } from '../data/waterRecipes.ts'
 import { RPM_OPTIONS } from '../data/grinderRpm.ts'
-import type { Bean, Brew, BrewInput, Pour, Units, Verdict } from '../types.ts'
+import { withCurrent } from '../data/gear.ts'
+import { whenText } from '../data/dates.ts'
+import { clampRating, mmss, parseMmss, ratioText } from '../data/taste.ts'
+import type { Bean, Brew, BrewInput, Pour, Route, Units } from '../types.ts'
+
+const RADAR_SIZE = 160
+const RATING_DECIMALS = 1
+const ICON = 14
 
 // ── BREW HISTORY ──────────────────────────────────────────────────────
 interface BrewHistoryProps {
   brews?:             Brew[]
+  shotCount?:         number
+  goTo?:              (route: Route) => void
   beans?:             Bean[]
   units:              Units
   waterRecipes?:      string[]
@@ -20,308 +32,178 @@ interface BrewHistoryProps {
   onFavorite?:        (id: string, val: boolean) => Promise<Brew>
 }
 
-/** The edit form keeps numbers as the inputs' strings until saved */
+/** The edit form keeps numbers as the inputs' strings until saved. Pours are scale totals, as on Dial-in. */
 interface BrewEditForm {
-  dose: string; water: string; temp: string; grind: string; bloom_time: string
+  dose: string; water: string; temp: string; grind: string; time: string
   water_recipe: string; grinder_rpm: string
   notes: string
-  verdict: string
+  landed: number | null
+  bad: boolean
+  rating: string
   pours: string[]
 }
 
-export function BrewHistory({ brews = [], beans = [], units, waterRecipes = DEFAULT_WATER_RECIPES, onDeleteBrew, onUpdateBrew, initialSelectedId, onReplicate, onFavorite }: BrewHistoryProps) {
+const pourGrams = (p: Pour): number => typeof p === 'object' ? p.water : p
+const totalsOf = (pours: Pour[]): number[] => pours.reduce<number[]>((acc, p) => [...acc, (acc[acc.length - 1] ?? 0) + (pourGrams(p) || 0)], [])
+const rpmLabel = (r: string) => r === 'manual' ? 'Manual' : `${r} RPM`
+
+export function BrewHistory({ brews = [], shotCount = 0, goTo, beans = [], units, waterRecipes = DEFAULT_WATER_RECIPES, onDeleteBrew, onUpdateBrew, initialSelectedId, onReplicate, onFavorite }: BrewHistoryProps) {
   const U = useUnits(units)
-  const [selectedBrew, setSelectedBrew] = useState<Brew | null>(null)
+  const [selectedId, setSelectedId] = useState<string | null>(initialSelectedId ?? null)
   const [editing, setEditing] = useState<Brew | null>(null)
-  const [editForm, setEditForm] = useState<BrewEditForm | null>(null)
-  const [perPage, setPerPage] = useState(10)
-  const [page, setPage] = useState(0)
-  const [beanFilter, setBeanFilter] = useState('')
+  const [form, setForm] = useState<BrewEditForm | null>(null)
+  const selected = brews.find(b => b.id === selectedId) ?? null
 
-  const filtered = beanFilter ? brews.filter(b => b.bean === beanFilter) : brews
-  const totalPages = Math.ceil(filtered.length / perPage)
-  const paginated  = filtered.slice(page * perPage, (page + 1) * perPage)
-
-  const changePerPage = (n: number) => { setPerPage(n); setPage(0); setSelectedBrew(null) }
-  const changeBeanFilter = (b: string) => { setBeanFilter(b); setPage(0); setSelectedBrew(null) }
-
-  useEffect(() => {
-    if (initialSelectedId) {
-      const idx = brews.findIndex(b => b.id === initialSelectedId)
-      if (idx !== -1) {
-        setSelectedBrew(brews[idx])
-        setPage(Math.floor(idx / perPage))
-      }
-    }
-  }, [initialSelectedId])
+  const set = <K extends keyof BrewEditForm>(k: K, v: BrewEditForm[K]) => setForm(f => f && ({ ...f, [k]: v }))
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Delete this brew?')) return
+    if (!confirm('Delete this brew? This can’t be undone.')) return
     await onDeleteBrew?.(id)
-    setSelectedBrew(null)
+    setSelectedId(null)
   }
 
   const openEdit = (brew: Brew) => {
     setEditing(brew)
-    setEditForm({
+    setForm({
       dose: String(brew.dose), water: String(brew.water),
       temp: String(brew.temp), grind: String(brew.grind),
-      bloom_time: String(brew.bloom_time || 0),
+      time: brew.time ? mmss(brew.time) : '',
       water_recipe: brew.water_recipe || waterRecipes[0],
       grinder_rpm: brew.grinder_rpm || 'manual',
       notes: brew.notes || '',
-      verdict: brew.verdict || '',
-      pours: (brew.pours || []).map(p => String(typeof p === 'object' ? p.water : p)),
+      landed: brew.landed,
+      bad: brew.bad,
+      rating: String(brew.rating),
+      pours: totalsOf(brew.pours || []).map(String),
     })
   }
 
-  const handleBrewEdit = async (e: FormEvent) => {
+  const handleEdit = async (e: FormEvent) => {
     e.preventDefault()
-    if (!editing || !editForm || !onUpdateBrew) return
-    const pourObjects = editForm.pours.map((w, i): Pour => {
-      const orig = (editing.pours || [])[i]
-      return typeof orig === 'object' ? { ...orig, water: parseFloat(w) || 0 } : parseFloat(w) || 0
-    })
-    const updated = await onUpdateBrew(editing.id, {
+    if (!editing || !form || !onUpdateBrew) return
+    const totals = form.pours.map(p => parseFloat(p) || 0)
+    const amounts = totals.map((t, i) => Math.max(0, t - (i ? totals[i - 1]! : 0)))
+    await onUpdateBrew(editing.id, {
       ...editing,
-      dose: parseFloat(editForm.dose), water: parseFloat(editForm.water),
-      temp: parseFloat(editForm.temp), grind: parseFloat(editForm.grind),
-      bloom_time: parseInt(editForm.bloom_time),
-      water_recipe: editForm.water_recipe,
-      grinder_rpm: editForm.grinder_rpm,
-      notes: editForm.notes,
-      verdict: editForm.verdict as Verdict | '',
-      pours: pourObjects,
-      num_pours: pourObjects.length,
+      dose: parseFloat(form.dose), water: parseFloat(form.water),
+      temp: parseFloat(form.temp), grind: parseFloat(form.grind),
+      time: parseMmss(form.time) ?? editing.time,
+      water_recipe: form.water_recipe,
+      grinder_rpm: form.grinder_rpm,
+      notes: form.notes,
+      landed: form.bad ? null : form.landed,
+      bad: form.bad,
+      rating: clampRating(parseFloat(form.rating) || 0),
+      pours: amounts,
+      num_pours: amounts.length,
     })
-    setSelectedBrew(updated)
     setEditing(null)
   }
 
-  const setEditVerdict = (v: string) => setEditForm(f => ({ ...f!, verdict: f!.verdict === v ? '' : v }))
-
-  return (
-    <div className="stack">
-      <div className="page-head">
-        <h1 className="page-title">Brew history.</h1>
-        <span className="mono" style={{ fontSize: 12, color: 'var(--text-4)', marginLeft: 'auto' }}>
-          {beanFilter ? `${filtered.length} / ${brews.length}` : brews.length}
-        </span>
-        {beans.length > 0 && (
-          <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', marginLeft: 12 }}>
-            <select value={beanFilter} onChange={e => changeBeanFilter(e.target.value)}
-              style={{ fontSize: 11, fontFamily: 'var(--font-mono)', width: 148, paddingRight: 18, appearance: 'none', WebkitAppearance: 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              <option value=''>All beans</option>
-              {beans.map(b => <option key={b.id} value={b.name}>{b.name}</option>)}
-            </select>
-            <span style={{ position: 'absolute', right: 6, pointerEvents: 'none', fontSize: 9, color: 'var(--text-3)', lineHeight: 1 }}>▾</span>
-          </div>
-        )}
-        <select value={perPage} onChange={e => changePerPage(Number(e.target.value))}
-          style={{ marginLeft: 12, fontSize: 11, fontFamily: 'var(--font-mono)' }}>
-          {[10, 25, 50].map(n => <option key={n} value={n}>{n} / page</option>)}
-        </select>
-      </div>
-
-      <div className="grid grid-2" style={{ alignItems: 'start' }}>
-        <div className="stack" style={{ gap: 8 }}>
-          {filtered.length === 0 ? (
-            <div className="card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 160 }}>
-              <div style={{ textAlign: 'center', color: 'var(--text-4)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>
-                {beanFilter ? `No brews found for ${beanFilter}.` : <><span>No brews logged yet.</span><br /><span>Switch to Filter in Dial-in to record one.</span></>}
-              </div>
-            </div>
-          ) : paginated.map((b, i) => (
-            <BrewCard key={b.id} brew={b} index={page * perPage + i} total={filtered.length}
-              active={selectedBrew === b} onClick={() => setSelectedBrew(b === selectedBrew ? null : b)} units={units} />
-          ))}
-          {totalPages > 1 && (
-            <div className="row" style={{ justifyContent: 'center', gap: 8, paddingTop: 4 }}>
-              <button className="ghost-btn" style={{ fontSize: 11 }} onClick={() => setPage(p => p - 1)} disabled={page === 0}>← Prev</button>
-              <span className="mono" style={{ fontSize: 11, color: 'var(--text-3)', alignSelf: 'center' }}>{page + 1} / {totalPages}</span>
-              <button className="ghost-btn" style={{ fontSize: 11 }} onClick={() => setPage(p => p + 1)} disabled={page >= totalPages - 1}>Next →</button>
-            </div>
+  const inspector = selected ? (() => {
+    const number = brews.length - brews.indexOf(selected)
+    const totals = totalsOf(selected.pours || [])
+    return (
+      <div className="card inspector">
+        <div className="ins-head">
+          <button className="icon-btn plain ins-close" aria-label="Back to the list" onClick={() => setSelectedId(null)}><Ico name="back" size={18} /></button>
+          <b>Brew {number}</b> {whenText(selected.date)}
+          {onFavorite && (
+            <button className={`icon-btn plain${selected.favorited ? ' on' : ''}`} style={{ marginLeft: 'auto' }}
+              title={selected.favorited ? 'Remove from favorites' : 'Add to favorites'}
+              onClick={() => onFavorite(selected.id, !selected.favorited)}>
+              <Ico name="star" size={16} style={selected.favorited ? { fill: 'currentColor' } : {}} />
+            </button>
           )}
         </div>
-
-        {selectedBrew ? (
-          <div className="card" style={{ position: 'sticky', top: 0 }}>
-            <div className="card-head">
-              <span className="card-title">Brew #{brews.length - brews.indexOf(selectedBrew)}</span>
-              <span className="card-more">{selectedBrew.date}</span>
-            </div>
-            <div style={{ fontFamily: 'var(--font-serif)', fontStyle: 'italic', fontSize: 30, lineHeight: 1 }}>{selectedBrew.bean}</div>
-            <div className="text-muted mono" style={{ fontSize: 10, marginTop: 4 }}>{selectedBrew.roaster?.toUpperCase()}</div>
-            <div className="divider" />
-            <div className="grid grid-2" style={{ gap: 4 }}>
-              <Meta k="Dose"         v={`${U.m(selectedBrew.dose)}${U.mU()}`} />
-              <Meta k="Brew"         v={`${U.m(selectedBrew.water)}${U.mU()}`} />
-              <Meta k="Time"         v={selectedBrew.time ? `${Math.floor(selectedBrew.time / 60)}:${String(selectedBrew.time % 60).padStart(2, '0')}` : '–'} />
-              <Meta k="Bloom"        v={`${selectedBrew.bloom_time}s`} />
-              <Meta k="Ratio"        v={`1:${selectedBrew.water && selectedBrew.dose ? (selectedBrew.water / selectedBrew.dose).toFixed(1) : '–'}`} />
-              <Meta k="Grind"        v={Number.isInteger(selectedBrew.grind) ? `${selectedBrew.grind}.0` : selectedBrew.grind} />
-              <Meta k="Temp"         v={`${U.t(selectedBrew.temp)}${U.tU()}`} />
-              <Meta k="Water recipe" v={selectedBrew.water_recipe || '–'} />
-              <Meta k="Dripper"      v={selectedBrew.dripper || '–'} />
-              <Meta k="Grinder"      v={selectedBrew.grinder_model || '–'} />
-              <Meta k="RPM"          v={selectedBrew.grinder_rpm || '–'} />
-            </div>
-            {selectedBrew.pours?.length > 0 && (
-              <>
-                <div className="divider" />
-                <div className="micro" style={{ marginBottom: 8 }}>Pour breakdown</div>
-                <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
-                  {selectedBrew.pours.map((p, i) => (
-                    <div key={i} style={{ padding: '4px 8px', borderRadius: 6, background: 'var(--surface)', border: '1px solid var(--border)' }}>
-                      <div className="mono" style={{ fontSize: 9, color: 'var(--text-4)', textTransform: 'uppercase', marginBottom: 1 }}>
-                        {i === 0 ? 'Bloom' : `Pour ${i + 1}`}
-                      </div>
-                      <div className="mono" style={{ fontSize: 13, color: i === 0 ? 'var(--sour)' : 'var(--crema)' }}>
-                        {U.m(p as number)}{U.mU()}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </>
-            )}
-            <div className="divider" />
-            <div style={{ display: 'flex', justifyContent: 'center', margin: '8px 0' }}>
-              <FlavorRadar taste={selectedBrew.taste} size={200} />
-            </div>
-            {selectedBrew.notes && (
-              <div style={{ fontSize: 12, color: 'var(--text-3)', fontFamily: 'var(--font-mono)', fontStyle: 'italic' }}>
-                "{selectedBrew.notes}"
-              </div>
-            )}
-            <div className="row" style={{ marginTop: 10, justifyContent: 'space-between' }}>
-              <div className="row" style={{ gap: 4, flexWrap: 'wrap' }}>
-                {['good','under','over','bad'].includes(selectedBrew.verdict) && (
-                  <span className={`badge ${selectedBrew.verdict}`}>{selectedBrew.verdict}</span>
-                )}
-              </div>
-              <div className="row" style={{ gap: 6 }}>
-                {onUpdateBrew && (
-                  <button className="ghost-btn" style={{ fontSize: 11 }} onClick={() => openEdit(selectedBrew)}>
-                    <Ico name="pencil" size={12} /> Edit
-                  </button>
-                )}
-                {onReplicate && (
-                  <button className="ghost-btn" style={{ fontSize: 11 }} onClick={() => onReplicate(selectedBrew)}>
-                    <Ico name="history" size={12} /> Re-brew
-                  </button>
-                )}
-                {onFavorite && (
-                  <button className="ghost-btn"
-                    style={{ fontSize: 11, ...(selectedBrew.favorited ? { color: 'var(--crema)', borderColor: 'var(--crema)' } : {}) }}
-                    title={selectedBrew.favorited ? 'Remove from favorites' : 'Add to favorites'}
-                    onClick={async () => { const u = await onFavorite(selectedBrew.id, !selectedBrew.favorited); setSelectedBrew(u) }}>
-                    <Ico name="star" size={12} style={selectedBrew.favorited ? { fill: 'currentColor' } : {}} />
-                  </button>
-                )}
-                {onDeleteBrew && (
-                  <button className="ghost-btn" style={{ color: 'var(--bitter)', borderColor: 'var(--bitter)', fontSize: 11 }}
-                    onClick={() => handleDelete(selectedBrew.id)}>
-                    <Ico name="trash" size={12} /> Delete
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className="card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 200 }}>
-            <div style={{ textAlign: 'center', color: 'var(--text-4)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>
-              Select a brew to inspect
-            </div>
-          </div>
+        <div>
+          <div className="ins-name">{selected.bean || 'Filter'}</div>
+          {selected.roaster && <div className="ins-sub">{selected.roaster}</div>}
+        </div>
+        <div className="ins-grid">
+          <Kv k="Dose" v={U.m(selected.dose)} u={U.mU()} />
+          <Kv k="Water" v={U.m(selected.water)} u={U.mU()} />
+          <Kv k="Ratio" v={ratioText(selected.dose, selected.water, 'filter')} />
+          <Kv k="Time" v={selected.time ? mmss(selected.time) : '–'} />
+          <Kv k="Grind" v={String(selected.grind)} />
+          <Kv k="Temp" v={U.t(selected.temp)} u={U.tU()} />
+          <Kv k="Pours" v={String(totals.length || '–')} />
+        </div>
+        {totals.length > 0 && (
+          <div className="ins-gear mono">{totals.map(t => U.m(t)).join(' → ')} {U.mU()}</div>
         )}
+        <LandedSlider landed={selected.landed} bad={selected.bad} title="Landed" badLabel="Bad brew" />
+        <div className="ins-taste">
+          <FlavorRadar taste={selected.taste} size={RADAR_SIZE} />
+          <div>
+            <div className="ins-rating">{selected.rating.toFixed(RATING_DECIMALS)}</div>
+            <div className="micro">rating</div>
+            {selected.notes && <div className="ins-quote">“{selected.notes}”</div>}
+          </div>
+        </div>
+        <Setup rows={[
+          { k: 'Dripper', v: selected.dripper },
+          { k: 'Grinder', v: selected.grinder_model, extra: rpmText(selected.grinder_rpm) },
+          { k: 'Water', v: selected.water_recipe },
+        ]} />
+        <div className="ins-actions">
+          {onReplicate && <button className="primary-btn" onClick={() => onReplicate(selected)}><Ico name="history" size={ICON} /> Brew again</button>}
+          {onUpdateBrew && <button className="ghost-btn lg" onClick={() => openEdit(selected)}><Ico name="pencil" size={ICON} /> Edit</button>}
+          {onDeleteBrew && <button className="ghost-btn lg danger" aria-label="Delete brew" title="Delete brew" onClick={() => handleDelete(selected.id)}><Ico name="trash" size={ICON} /></button>}
+        </div>
       </div>
+    )
+  })() : <InspectorEmpty kind="brew" />
 
-      {editing && editForm && (
-        <div className="modal-backdrop" onClick={() => setEditing(null)}>
+  return (
+    <>
+      <HistoryList kind="brew" items={brews} beans={beans} otherCount={shotCount} goTo={goTo}
+        selectedId={selectedId} onSelect={b => setSelectedId(b?.id ?? null)}
+        rowText={b => `${U.m(b.dose)} → ${U.m(b.water)} ${U.mU()}, ${b.time ? mmss(b.time) : '–'}`}
+        inspector={inspector} />
+
+      {editing && form && (
+        <Backdrop onClose={() => setEditing(null)}>
           <div className="modal" onClick={e => e.stopPropagation()}>
             <div className="modal-head">
               <h2>Edit brew</h2>
-              <button className="icon-btn" style={{ marginLeft: 'auto' }} onClick={() => setEditing(null)}>
-                <Ico name="x" size={14} />
-              </button>
+              <button className="icon-btn" style={{ marginLeft: 'auto' }} aria-label="Close" onClick={() => setEditing(null)}><Ico name="x" size={ICON} /></button>
             </div>
-            <form className="modal-body stack" onSubmit={handleBrewEdit}>
-              <div className="grid grid-2" style={{ gap: 12 }}>
+            <form className="modal-body stack" onSubmit={handleEdit}>
+              <div className="form-grid">
+                <Input label={`Dose (${U.mU()})`} value={form.dose} step="0.1" onChange={v => set('dose', v)} />
+                <Input label={`Water (${U.mU()})`} value={form.water} step="1" onChange={v => set('water', v)} />
+                <Input label={`Temp (${U.tU()})`} value={form.temp} step="1" onChange={v => set('temp', v)} />
+                <Input label="Grind" value={form.grind} step="0.1" onChange={v => set('grind', v)} />
                 <div className="dial-input">
-                  <label>Dose ({U.mU()})</label>
-                  <input type="number" step="0.1" value={editForm.dose} onChange={e => setEditForm(f => ({ ...f!, dose: e.target.value }))} />
+                  <label>Total time (m:ss)</label>
+                  <input value={form.time} placeholder="3:05" onChange={e => set('time', e.target.value)} />
                 </div>
-                <div className="dial-input">
-                  <label>Brew ({U.mU()})</label>
-                  <input type="number" step="1" value={editForm.water} onChange={e => setEditForm(f => ({ ...f!, water: e.target.value }))} />
-                </div>
-                <div className="dial-input">
-                  <label>Temp ({U.tU()})</label>
-                  <input type="number" step="1" value={editForm.temp} onChange={e => setEditForm(f => ({ ...f!, temp: e.target.value }))} />
-                </div>
-                <div className="dial-input">
-                  <label>Grind</label>
-                  <input type="number" step="0.1" value={editForm.grind} onChange={e => setEditForm(f => ({ ...f!, grind: e.target.value }))} />
-                </div>
-                <div className="dial-input">
-                  <label>Bloom (s)</label>
-                  <input type="number" step="1" value={editForm.bloom_time} onChange={e => setEditForm(f => ({ ...f!, bloom_time: e.target.value }))} />
-                </div>
+                <Input label="Rating (0–10)" value={form.rating} step="0.5" onChange={v => set('rating', v)} />
+                <Select label="Water recipe" value={form.water_recipe} options={withCurrent(waterRecipes, form.water_recipe)} onChange={v => set('water_recipe', v)} />
+                <Select label="Grinder RPM" value={form.grinder_rpm} options={withCurrent(RPM_OPTIONS, form.grinder_rpm)} render={rpmLabel} onChange={v => set('grinder_rpm', v)} />
               </div>
-              <div className="grid grid-2" style={{ gap: 12 }}>
-                <div className="dial-input">
-                  <label>Water recipe</label>
-                  <select value={editForm.water_recipe} onChange={e => setEditForm(f => ({ ...f!, water_recipe: e.target.value }))}>
-                    {waterRecipes.map(r => <option key={r} value={r}>{r}</option>)}
-                  </select>
-                </div>
-                <div className="dial-input">
-                  <label>Grinder RPM</label>
-                  <select value={editForm.grinder_rpm} onChange={e => setEditForm(f => ({ ...f!, grinder_rpm: e.target.value }))}>
-                    {RPM_OPTIONS.map(r => <option key={r} value={r}>{r === 'manual' ? 'Manual' : `${r} RPM`}</option>)}
-                  </select>
-                </div>
-              </div>
-              {editForm.pours.length > 0 && (
+              {form.pours.length > 0 && (
                 <div>
-                  <div className="micro" style={{ marginBottom: 6 }}>Pours ({U.mU()})</div>
-                  <div style={{ display: 'grid', gridTemplateColumns: `repeat(${editForm.pours.length}, 1fr)`, gap: 8 }}>
-                    {editForm.pours.map((w, i) => (
-                      <div key={i} className="dial-input" style={{ minWidth: 0 }}>
-                        <label style={{ fontSize: 10 }}>{i === 0 ? 'Bloom' : `Pour ${i + 1}`}</label>
-                        <input type="number" step="5" value={w}
-                          onChange={e => setEditForm(f => {
-                            const pours = [...f!.pours]
-                            pours[i] = e.target.value
-                            return { ...f!, pours }
-                          })} />
-                      </div>
+                  <div className="field-label">Pours, as scale totals ({U.mU()})</div>
+                  <div className="form-grid pours">
+                    {form.pours.map((w, i) => (
+                      <Input key={i} label={i === 0 ? 'Bloom' : `Pour ${i + 1}`} value={w} step="5"
+                        onChange={v => set('pours', form.pours.map((x, j) => j === i ? v : x))} />
                     ))}
                   </div>
                 </div>
               )}
-              <div className="dial-input">
-                <label>Notes</label>
-                <textarea value={editForm.notes} onChange={e => setEditForm(f => ({ ...f!, notes: e.target.value }))} style={{ height: 60 }} />
-              </div>
-              <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
-                <div className="micro">Verdict</div>
-                {[['good','--good'],['under','--under'],['over','--over'],['bad','--bad']].map(([v, cv]) => (
-                  <button type="button" key={v}
-                    className={`ghost-btn${editForm.verdict === v ? ' active' : ''}`}
-                    style={editForm.verdict === v ? { borderColor: `var(${cv})`, color: `var(${cv})` } : {}}
-                    onClick={() => setEditVerdict(v)}
-                  >{v}</button>
-                ))}
-              </div>
-              <div className="row" style={{ justifyContent: 'flex-end', gap: 8 }}>
-                <button type="button" className="ghost-btn" onClick={() => setEditing(null)}>Cancel</button>
+              <LandedSlider landed={form.landed} bad={form.bad} onChange={n => set('landed', n)} onBadChange={b => set('bad', b)} badLabel="Bad brew" />
+              <textarea value={form.notes} onChange={e => set('notes', e.target.value)} rows={3} placeholder="Notes" aria-label="Notes" />
+              <div className="row" style={{ justifyContent: 'flex-end' }}>
+                <button type="button" className="ghost-btn lg" onClick={() => setEditing(null)}>Cancel</button>
                 <button type="submit" className="primary-btn">Save changes</button>
               </div>
             </form>
           </div>
-        </div>
+        </Backdrop>
       )}
-    </div>
+    </>
   )
 }
