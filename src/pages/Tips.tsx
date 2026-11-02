@@ -23,7 +23,7 @@ function TipsColumn({ section, label, tips, onAdd, onEdit, onDelete }: TipsColum
   const categories = [...new Set(tips.map(t => t.category))].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }))
 
   return (
-    <div className="card">
+    <div className={`card tips-${section}`}>
       <div className="card-head">
         <span className="card-title">{label}</span><span>{tips.length}</span>
         <button className="link-btn" onClick={() => onAdd(section)}>+ Add a note</button>
@@ -65,6 +65,7 @@ export function TipsPage({ tips = [], onSaveTip, onUpdateTip, onDeleteTip }: Tip
   const [modal, setModal]   = useState<TipModal | null>(null)
   const [form, setForm]     = useState(EMPTY_TIP)
   const [saving, setSaving] = useState(false)
+  const [shown, setShown]   = useState<TipSection>('espresso')   // Extraction on a phone shows one column at a time
 
   const espressoTips = tips.filter(t => t.section === 'espresso')
   const filterTips   = tips.filter(t => t.section === 'filter')
@@ -107,10 +108,15 @@ export function TipsPage({ tips = [], onSaveTip, onUpdateTip, onDeleteTip }: Tip
   const saveLabel = isAdd ? 'Add note' : 'Save changes'
 
   return (
-    <div className="stack">
+    <div className="stack tips-page">
       <PageHead title="Tips." sub={`${tips.length} ${tips.length === 1 ? 'note' : 'notes'}`} />
 
-      <div className="tips-cols">
+      <div className="seg tips-seg">
+        <button className={shown === 'espresso' ? 'on' : ''} onClick={() => setShown('espresso')}>Espresso {espressoTips.length}</button>
+        <button className={shown === 'filter' ? 'on' : ''} onClick={() => setShown('filter')}>Filter {filterTips.length}</button>
+      </div>
+
+      <div className={`tips-cols shows-${shown}`}>
         <TipsColumn section="espresso" label="Espresso" tips={espressoTips} onAdd={openAdd} onEdit={openEdit} onDelete={handleDelete} />
         <TipsColumn section="filter" label="Filter" tips={filterTips} onAdd={openAdd} onEdit={openEdit} onDelete={handleDelete} />
       </div>

@@ -1,6 +1,7 @@
-import { useState, type ReactNode } from 'react'
+import { useEffect, useState, type MouseEvent, type ReactNode } from 'react'
 import Ico, { type IconName } from './Ico.tsx'
-import type { Route } from '../types.ts'
+import { beanLabel } from '../data/beans.ts'
+import type { Bean, Route } from '../types.ts'
 
 interface NavEntry { id: Route; label: string; icon: IconName }
 
@@ -43,13 +44,16 @@ export function BrandMark({ size = BRAND_SIZE }: { size?: number }) {
   )
 }
 
-export function Brand() {
-  return (
-    <div className="brand">
-      <BrandMark />
-      <div><span className="brand-bracket">[</span> grounded <span className="brand-bracket">]</span></div>
-    </div>
-  )
+/** A link to Home that keeps the hash routing (cmd/ctrl-click still opens a new tab) */
+function homeClick(onHome: () => void) {
+  return (e: MouseEvent<HTMLAnchorElement>) => { if (e.metaKey || e.ctrlKey) return; e.preventDefault(); onHome() }
+}
+
+/** The logo and name; with onHome it's a link to Home (sidebar, phone), without it just the mark (loading screens) */
+export function Brand({ onHome }: { onHome?: () => void }) {
+  const inner = <><BrandMark /><div><span className="brand-bracket">[</span> grounded <span className="brand-bracket">]</span></div></>
+  if (!onHome) return <div className="brand">{inner}</div>
+  return <a href="#/home" className="brand" title="Home" onClick={homeClick(onHome)}>{inner}</a>
 }
 
 interface NavLinkProps {
@@ -82,7 +86,7 @@ export function Sidebar({ route, setRoute, counts, onPull, onOpenSettings }: Sid
   const link = (e: NavEntry) => <NavLink key={e.id} entry={e} route={route} setRoute={setRoute} count={counts[e.id]} />
   return (
     <aside className="side">
-      <Brand />
+      <Brand onHome={() => setRoute('home')} />
       <button className="primary-btn pull-btn" onClick={onPull}><Ico name="plus" size={16} /> Pull a shot</button>
       {WORKSPACE.map(link)}
       <div className="nav-group">Library</div>
@@ -99,11 +103,72 @@ export function Sidebar({ route, setRoute, counts, onPull, onOpenSettings }: Sid
   )
 }
 
+// ── Extraction: an icon rail instead of the sidebar ─────────────────────
+interface RailEntry { id: Route; label: string; icon: IconName; also?: Route[] }
+
+const RAIL: RailEntry[] = [
+  { id: 'home',         label: 'Home',    icon: 'home' },
+  { id: 'dialin',       label: 'Dial-in', icon: 'timer' },
+  { id: 'shot-history', label: 'History', icon: 'history', also: ['brew-history'] },
+  { id: 'beans',        label: 'Beans',   icon: 'beans',   also: ['archived-beans'] },
+  { id: 'recipes',      label: 'Recipes', icon: 'book' },
+  { id: 'stats',        label: 'Stats',   icon: 'chart' },
+]
+const RAIL_MORE: NavEntry[] = [
+  { id: 'gear',  label: 'Gear',  icon: 'machine' },
+  { id: 'stock', label: 'Stock', icon: 'box' },
+  { id: 'tips',  label: 'Tips',  icon: 'note' },
+]
+const RAIL_ICON = 22
+
+interface RailProps {
+  route:          Route
+  setRoute:       (route: Route) => void
+  onPull:         () => void
+  onOpenSettings: () => void
+}
+
+export function Rail({ route, setRoute, onPull, onOpenSettings }: RailProps) {
+  const [moreOpen, setMoreOpen] = useState(false)
+  const go = (r: Route) => { setMoreOpen(false); setRoute(r) }
+  const inMore = RAIL_MORE.some(e => e.id === route)
+  useEffect(() => {
+    if (!moreOpen) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setMoreOpen(false) }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [moreOpen])
+  return (
+    <aside className="rail">
+      <a href="#/home" className="rail-logo" title={`Home (Grounded v${__APP_VERSION__})`} onClick={homeClick(() => go('home'))}>g</a>
+      <button className="rail-pull" aria-label="Pull a shot" title="Pull a shot" onClick={onPull}><Ico name="plus" size={24} /></button>
+      {RAIL.map(e => (
+        <a key={e.id} href={`#/${e.id}`} className={`rail-item${route === e.id || e.also?.includes(route) ? ' on' : ''}`}
+          onClick={ev => { if (ev.metaKey || ev.ctrlKey) return; ev.preventDefault(); go(e.id) }}>
+          <Ico name={e.icon} size={RAIL_ICON} />{e.label}
+        </a>
+      ))}
+      <button className={`rail-item${inMore || moreOpen ? ' on' : ''}`} onClick={() => setMoreOpen(o => !o)}>
+        <Ico name="more" size={RAIL_ICON} />More
+      </button>
+      {moreOpen && (
+        <div className="rail-flyout-backdrop" onClick={() => setMoreOpen(false)}>
+          <div className="rail-flyout" onClick={e => e.stopPropagation()}>
+            {RAIL_MORE.map(e => <NavLink key={e.id} entry={e} route={route} setRoute={go} />)}
+          </div>
+        </div>
+      )}
+      <button className="rail-item rail-foot" onClick={onOpenSettings}><Ico name="sliders" size={RAIL_ICON} />Settings</button>
+    </aside>
+  )
+}
+
 /** Phone only: brand and the Settings button above the page */
-export function PhoneTop({ onOpenSettings }: { onOpenSettings: () => void }) {
+export function PhoneTop({ onHome, onOpenSettings }: { onHome: () => void; onOpenSettings: () => void }) {
   return (
     <div className="phone-top">
-      <Brand />
+      <Brand onHome={onHome} />
+      <a href="#/home" className="phone-logo" aria-label="Home" onClick={homeClick(onHome)}>g</a>
       <button className="icon-btn" aria-label="Settings" onClick={onOpenSettings}><Ico name="sliders" size={18} /></button>
     </div>
   )
@@ -150,12 +215,25 @@ export function TabBar({ route, setRoute, onOpenSettings }: { route: Route; setR
   )
 }
 
+/** "Change bag" with the bag picker laid invisibly over it, so one click opens the list (Dial-in, both designs) */
+export function BagPicker({ beans, bean, onPick, className = '' }: { beans: Bean[]; bean: Bean | undefined; onPick: (id: string) => void; className?: string }) {
+  return (
+    <label className={`bag-picker ${className}`}>
+      Change bag
+      <select value={bean?.id ?? ''} aria-label="Bag" onChange={e => onPick(e.target.value)}>
+        {beans.map(b => <option key={b.id} value={b.id}>{beanLabel(b, beans)}</option>)}
+      </select>
+    </label>
+  )
+}
+
 /** Page title row: the serif title, a short line next to it, and tools on the right */
 export function PageHead({ title, sub, onBack, children }: { title: string; sub?: string; onBack?: () => void; children?: ReactNode }) {
   return (
     <div className="page-head">
       {onBack && <button className="back-btn" aria-label="Back" onClick={onBack}><Ico name="back" size={22} /></button>}
-      <h1 className="page-title">{title}</h1>
+      {/* Extraction drops the full stop after the title */}
+      <h1 className="page-title">{title.endsWith('.') ? <>{title.slice(0, -1)}<span className="title-dot">.</span></> : title}</h1>
       {sub && <span className="page-sub">{sub}</span>}
       {children && <div className="page-tools">{children}</div>}
     </div>

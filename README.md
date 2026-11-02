@@ -17,7 +17,7 @@ React + Express + SQLite in a single Docker container. No accounts, no cloud, no
 - **Gear** — machines, grinders, baskets, drippers, scales and kettles. Active gear feeds the dial-in dropdowns.
 - **Stats** — where your shots landed between sour and bitter, rating per day, espresso per basket, origins (with a world map) and spending.
 - **Works on a phone** — the same page in your phone's browser, with a tab bar at the bottom.
-- **Settings** — six themes (Moody, Midnight, Terminal, Parchment, Oat, Ember), a choice of bundled fonts, g/oz and °C/°F units, default dial-in values and custom water recipes. Settings are stored on the server, so every browser and device sees the same ones.
+- **Settings** — two designs: Refined (a sidebar, serif titles, six themes: Moody, Midnight, Terminal, Parchment, Oat, Ember) and Extraction (an icon rail, big numbers, a time dial, and the Roast and Crema themes), each with its own choice of bundled fonts, g/oz and °C/°F units, default dial-in values and custom water recipes. Settings are stored on the server, so every browser and device sees the same ones.
 
 ---
 
@@ -171,7 +171,7 @@ grounded/
 │   ├── pages/              # One file per page: Home, Dial-in, histories, beans, gear, stats…
 │   ├── components/         # Shell, charts, settings, world map, basket doses
 │   ├── data/               # Static data (world map, fonts, water recipes, brew modes)
-│   └── styles/global.css   # Themes via CSS custom properties
+│   └── styles/             # global.css (Refined, themes via CSS custom properties), extraction.css
 └── scripts/
     └── build-world-map.mjs # Regenerates src/data/worldMap.ts
 ```
@@ -206,7 +206,7 @@ All endpoints are JSON under `/api`.
 | Database | SQLite via better-sqlite3                   |
 | Styling  | Plain CSS with custom properties            |
 | Charts   | Hand-rolled SVG                             |
-| Fonts    | Bundled via Fontsource (Geist, Geist Mono, Instrument Serif by default) |
+| Fonts    | Bundled via Fontsource (Geist, Geist Mono, Instrument Serif on Refined; Fraunces, Instrument Sans on Extraction) |
 | Deploy   | Docker / Docker Compose                     |
 
 ---

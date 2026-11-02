@@ -69,7 +69,7 @@ export function GearPage({ gear = [], onSaveGear, onUpdateGear, onDeleteGear }: 
   }
 
   return (
-    <div className="stack">
+    <div className="stack gear-page">
       <PageHead title="Gear." sub={`${gear.length} ${gear.length === 1 ? 'item' : 'items'}`}>
         <button className="primary-btn" onClick={openAdd}><Ico name="plus" size={ICON} /> Add gear</button>
       </PageHead>
@@ -93,7 +93,7 @@ export function GearPage({ gear = [], onSaveGear, onUpdateGear, onDeleteGear }: 
                   </div>
                   {/* No price means free or included with another item */}
                   <span className="gi-price">€{money(g.price ?? 0)}</span>
-                  <span className={`status-pill${ACTIVE_STATUSES.has(g.status) ? ' on' : ''}`}>{g.status}</span>
+                  <span className={`status-pill${ACTIVE_STATUSES.has(g.status) ? ' on' : ''}${g.status === 'Primary' ? ' primary' : ''}`}>{g.status}</span>
                   <button className="icon-btn plain sm" aria-label={`Edit ${g.name}`} title="Edit" onClick={() => openEdit(g)}><Ico name="pencil" size={ICON} /></button>
                   <button className="icon-btn plain sm danger" aria-label={`Remove ${g.name}`} title="Remove" onClick={() => handleDelete(g)}><Ico name="trash" size={ICON} /></button>
                 </div>

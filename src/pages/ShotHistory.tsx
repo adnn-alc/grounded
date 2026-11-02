@@ -2,8 +2,9 @@ import { useState, type FormEvent } from 'react'
 import { Backdrop } from '../components/ui.tsx'
 import { FlavorRadar, FlavSliders } from '../components/charts.tsx'
 import { LandedSlider } from '../components/Landed.tsx'
-import { HistoryList, InspectorEmpty } from '../components/History.tsx'
-import { useUnits } from '../hooks/useUnits.ts'
+import { HistoryList, InspectorEmpty, type RowNumbers } from '../components/History.tsx'
+import { ExtractionInspector } from '../components/ExtractionInspector.tsx'
+import { shortNum, useUnits } from '../hooks/useUnits.ts'
 import Ico from '../components/Ico.tsx'
 import { DEFAULT_WATER_RECIPES } from '../data/waterRecipes.ts'
 import { RPM_OPTIONS } from '../data/grinderRpm.ts'
@@ -11,7 +12,7 @@ import { activeGear, BASKET_KIND, GRINDER_KIND, MACHINE_KIND, withCurrent } from
 import { beanLabel, daysOffRoast } from '../data/beans.ts'
 import { dayOf, whenText } from '../data/dates.ts'
 import { clampRating, ratioText } from '../data/taste.ts'
-import type { Bean, Gear, Route, Shot, ShotInput, Taste, Units } from '../types.ts'
+import type { Bean, Design, Gear, Route, Shot, ShotInput, Taste, Units } from '../types.ts'
 
 const RADAR_SIZE = 160
 const EDIT_RADAR_SIZE = 140
@@ -20,6 +21,7 @@ const ICON = 14
 
 // ── SHOT HISTORY ─────────────────────────────────────────────────────
 interface ShotHistoryProps {
+  design?:            Design
   shots:              Shot[]
   brewCount?:         number
   goTo?:              (route: Route) => void
@@ -49,7 +51,7 @@ interface ShotEditForm {
 
 const rpmLabel = (r: string) => r === 'manual' ? 'Manual' : `${r} RPM`
 
-export function ShotHistory({ shots, brewCount = 0, goTo, beans = [], gear = [], units, waterRecipes = DEFAULT_WATER_RECIPES, brewModes = [], onDelete, onUpdateShot, initialSelectedId, onReplicate, onFavorite }: ShotHistoryProps) {
+export function ShotHistory({ design, shots, brewCount = 0, goTo, beans = [], gear = [], units, waterRecipes = DEFAULT_WATER_RECIPES, brewModes = [], onDelete, onUpdateShot, initialSelectedId, onReplicate, onFavorite }: ShotHistoryProps) {
   const U = useUnits(units)
   const gearOpts = (re: RegExp) => activeGear(gear, re).map(g => g.name)
   const machineOpts = gearOpts(MACHINE_KIND)
@@ -59,6 +61,7 @@ export function ShotHistory({ shots, brewCount = 0, goTo, beans = [], gear = [],
   const [editing, setEditing] = useState<Shot | null>(null)
   const [form, setForm] = useState<ShotEditForm | null>(null)
   const selected = shots.find(s => s.id === selectedId) ?? null
+  const numbers = (s: Shot): RowNumbers => ({ dose: U.m(s.dose), out: U.m(s.yield), unit: U.mU(), time: String(s.time), timeUnit: 's' })
 
   const set = <K extends keyof ShotEditForm>(k: K, v: ShotEditForm[K]) => setForm(f => f && ({ ...f, [k]: v }))
 
@@ -118,7 +121,34 @@ export function ShotHistory({ shots, brewCount = 0, goTo, beans = [], gear = [],
     const bean = beans.find(b => b.id === selected.bean_id)
     const days = bean ? daysOffRoast(bean, dayOf(selected.date)) : null
     const number = shots.length - shots.indexOf(selected)
-    const sub = [selected.roaster, bean?.origin?.split('·')[0]?.trim(), bean?.process?.toLowerCase(), days != null && `day ${days}`].filter(Boolean).join(', ')
+    const origin = bean?.origin?.split('·')[0]?.trim()
+    const sub = [selected.roaster, origin, bean?.process?.toLowerCase(), days != null && `day ${days}`].filter(Boolean).join(', ')
+    if (design === 'extraction') {
+      const n = numbers(selected)
+      return (
+        <ExtractionInspector kind="shot" number={number} item={selected}
+          record={{ ...n, dose: shortNum(n.dose), out: shortNum(n.out) }}
+          pills={[origin, bean?.process, days != null ? `day ${days}` : null].filter((p): p is string => Boolean(p))}
+          facts={[
+            { k: 'Ratio', v: ratioText(selected.dose, selected.yield) },
+            { k: 'Grind', v: String(selected.grind) },
+            { k: 'Temp', v: shortNum(U.t(selected.temp)), u: U.tU() },
+            { k: 'Pre-infusion', v: String(selected.preinf ?? 0), u: 's' },
+          ]}
+          gear={[
+            { k: 'Machine', v: selected.machine },
+            { k: 'Grinder', v: selected.grinder_model, extra: rpmText(selected.grinder_rpm) },
+            { k: 'Basket', v: selected.basket },
+            { k: 'Water', v: selected.water_recipe },
+            { k: 'Brew mode', v: selected.brew_mode },
+          ]}
+          onClose={() => setSelectedId(null)}
+          onFavorite={onFavorite && (() => onFavorite(selected.id, !selected.favorited))}
+          onAgain={onReplicate && (() => onReplicate(selected))}
+          onEdit={onUpdateShot && (() => openEdit(selected))}
+          onDelete={onDelete && (() => handleDelete(selected.id))} />
+      )
+    }
     return (
       <div className="card inspector">
         <div className="ins-head">
@@ -172,9 +202,9 @@ export function ShotHistory({ shots, brewCount = 0, goTo, beans = [], gear = [],
 
   return (
     <>
-      <HistoryList kind="shot" items={shots} beans={beans} otherCount={brewCount} goTo={goTo}
+      <HistoryList kind="shot" design={design} items={shots} beans={beans} otherCount={brewCount} goTo={goTo}
         selectedId={selectedId} onSelect={s => setSelectedId(s?.id ?? null)}
-        rowText={s => `${U.m(s.dose)} → ${U.m(s.yield)} ${U.mU()}, ${s.time} s`}
+        rowNumbers={numbers}
         inspector={inspector} />
 
       {editing && form && (

@@ -1,3 +1,4 @@
+import { useLayoutEffect, useRef, useState } from 'react'
 import { FlavorRadar } from '../components/charts.tsx'
 import { MiniLanded } from '../components/Landed.tsx'
 import { PageHead } from '../components/Shell.tsx'
@@ -6,13 +7,13 @@ import Ico from '../components/Ico.tsx'
 import { SampleDataBanner } from '../components/SampleDataBanner.tsx'
 import { bagStatus, daysOffRoast, usualDose } from '../data/beans.ts'
 import { dayKey, dayOf, isoDaysAgo, timeOf, whenText } from '../data/dates.ts'
-import { landedLabel, mmss, ratioText } from '../data/taste.ts'
+import { LANDED_BALANCED, landedLabel, mmss, ratioText } from '../data/taste.ts'
 import type { Bean, Brew, DialinStart, Route, Shot, Units } from '../types.ts'
 
 const TREND_DAYS   = 14
 const RECENT_DAYS  = 3      // bars drawn brighter
 const RECENT_ITEMS = 3
-const FAVORITES_SHOWN = 6
+const FAVORITES_PER_PAGE = 4
 const RADAR_SIZE   = 190
 const NOON = 12
 const EVENING = 17
@@ -21,8 +22,9 @@ const GREETINGS: readonly [number, string][] = [[NOON, 'Good morning.'], [EVENIN
 const FALLBACK_DOSE = 18
 const RATING_DECIMALS = 1
 const PERCENT = 100
+const HALF = 2
 
-interface HomeProps {
+export interface HomeProps {
   shots: Shot[]
   brews: Brew[]
   beans: Bean[]
@@ -30,9 +32,28 @@ interface HomeProps {
   goTo:  (route: Route, id?: string) => void
   onRepull:      (shot: Shot) => void
   onStartDialin: (start: DialinStart) => void
+  onAddBag:      () => void     // Beans with the new-bag form open
   showSampleBanner?: boolean
   onRemoveSampleData?: () => Promise<void>
   onKeepSampleData?:   () => void
+}
+
+/** The landed label, centered under the bar's mark but never past either end of the bar */
+function MarkLabel({ at, text }: { at: number; text: string }) {
+  const ref = useRef<HTMLDivElement>(null)
+  useLayoutEffect(() => {
+    const el = ref.current
+    const bar = el?.parentElement
+    if (!el || !bar) return
+    const place = () => {
+      const w = el.offsetWidth
+      const room = bar.clientWidth - w
+      el.style.left = `${Math.min(room, Math.max(0, (at / PERCENT) * bar.clientWidth - w / HALF))}px`
+    }
+    place()
+    document.fonts?.ready.then(place)   // the label gets a little wider or narrower once the font loads
+  }, [at, text])
+  return <div ref={ref} className="lbl">{text}</div>
 }
 
 const avg = (xs: number[]): number | null => xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null
@@ -40,9 +61,10 @@ const fmt1 = (n: number | null): string => n == null ? '–' : n.toFixed(RATING_
 
 type Item = (Shot & { kind: 'shot' }) | (Brew & { kind: 'brew' })
 
-export default function Home({ shots, brews, beans, units, goTo, onRepull, onStartDialin, showSampleBanner, onRemoveSampleData, onKeepSampleData }: HomeProps) {
+export default function Home({ shots, brews, beans, units, goTo, onRepull, onStartDialin, onAddBag, showSampleBanner, onRemoveSampleData, onKeepSampleData }: HomeProps) {
   const U = useUnits(units)
   const now = new Date()
+  const [page, setPage] = useState(0)
   const hour = now.getHours()
   const greeting = GREETINGS.find(([until]) => hour < until)?.[1] ?? 'Good evening.'
   const dateStr = now.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })
@@ -87,6 +109,8 @@ export default function Home({ shots, brews, beans, units, goTo, onRepull, onSta
     ...shots.filter(s => s.favorited).map(s => ({ ...s, kind: 'shot' as const })),
     ...brews.filter(b => b.favorited).map(b => ({ ...b, kind: 'brew' as const })),
   ].sort((a, b) => b.date.localeCompare(a.date))
+  const pages = Math.max(1, Math.ceil(favorites.length / FAVORITES_PER_PAGE))
+  const shownPage = Math.min(page, pages - 1)
 
   const openBags = [...beans].sort((a, b) => (daysOffRoast(a) ?? Infinity) - (daysOffRoast(b) ?? Infinity))
   const totalLeft = beans.reduce((a, b) => a + (b.remaining || 0), 0)
@@ -123,14 +147,17 @@ export default function Home({ shots, brews, beans, units, goTo, onRepull, onSta
                 <div className="hero-nums">
                   {U.m(last.dose)}<small>{U.mU()}</small><span className="arrow">→</span>{U.m(last.yield)}<small>{U.mU()} in</small>{last.time}<small>s</small>
                 </div>
-                <div className="hero-meta">
-                  {[ratioText(last.dose, last.yield), last.basket, `grind ${last.grind}`, `${U.t(last.temp)} ${U.tU()}`].filter(Boolean).join(', ')}
-                </div>
+                <dl className="hero-facts">
+                  <div><dt>Ratio</dt><dd className="accent">{ratioText(last.dose, last.yield)}</dd></div>
+                  {last.basket && <div><dt>Basket</dt><dd>{last.basket}</dd></div>}
+                  {last.temp > 0 && <div><dt>Temperature</dt><dd>{U.t(last.temp)} {U.tU()}</dd></div>}
+                  {last.grind > 0 && <div><dt>Grind</dt><dd>{last.grind}</dd></div>}
+                </dl>
                 <div className="hero-land">
                   <span className="stat">{last.rating.toFixed(RATING_DECIMALS)}</span>
-                  <div>
+                  <div className="hero-land-bar">
                     <MiniLanded landed={last.landed} bad={last.bad} />
-                    <div className="lbl">{last.bad ? 'Bad shot' : landedLabel(last.landed)}</div>
+                    {!last.bad && <MarkLabel at={last.landed ?? LANDED_BALANCED} text={landedLabel(last.landed)} />}
                   </div>
                 </div>
                 {last.notes && <div className="hero-quote">“{last.notes}”</div>}
@@ -176,36 +203,43 @@ export default function Home({ shots, brews, beans, units, goTo, onRepull, onSta
         </div>
       </div>
 
+      {/* Open bags and favorites side by side, so Home fits a desktop window */}
+      <div className={`home-low${favorites.length ? '' : ' solo'}`}>
       <div className="card">
         <div className="card-head">
           <span className="card-title">Open bags</span>
           <span>{beans.length} {beans.length === 1 ? 'bag' : 'bags'}, {Math.ceil(parseFloat(U.m(totalLeft)))} {U.mU()} in total</span>
-          <button className="link-btn" onClick={() => goTo('beans')}>All beans</button>
         </div>
-        {openBags.length === 0 ? (
-          <div className="empty">No open bags. Add one in Beans.</div>
-        ) : (
-          <div className="bags-row">
-            {openBags.map(b => {
-              const pct = b.weight > 0 ? Math.min(PERCENT, (b.remaining / b.weight) * PERCENT) : 0
-              return (
-                <button key={b.id} className="bag-tile" title="Dial in with this bag" onClick={() => onStartDialin({ mode: 'espresso', beanId: b.id })}>
-                  <span className="nm">{b.name}</span>
-                  <span className="rs">{b.roaster}</span>
-                  <span className="stock-bar"><i className={b.stock} style={{ width: `${pct}%` }} /></span>
-                  <span className="ln"><span>{bagStatus(b, usualDose(b, fallbackDose), now)}</span><b>{Math.round(parseFloat(U.m(b.remaining)))} {U.mU()}</b></span>
-                </button>
-              )
-            })}
-          </div>
-        )}
+        <div className="bags-row">
+          {openBags.map(b => {
+            const pct = b.weight > 0 ? Math.min(PERCENT, (b.remaining / b.weight) * PERCENT) : 0
+            return (
+              <button key={b.id} className="bag-tile" title="Dial in with this bag" onClick={() => onStartDialin({ mode: 'espresso', beanId: b.id })}>
+                <span className="nm">{b.name}</span>
+                <span className="rs">{b.roaster}</span>
+                <span className="stock-bar"><i className={b.stock} style={{ width: `${pct}%` }} /></span>
+                <span className="ln"><span>{bagStatus(b, usualDose(b, fallbackDose), now)}</span><b>{Math.round(parseFloat(U.m(b.remaining)))} {U.mU()}</b></span>
+              </button>
+            )
+          })}
+          <button className="bag-tile add" onClick={onAddBag}>Add a bag</button>
+        </div>
       </div>
 
       {favorites.length > 0 && (
         <div className="card">
-          <div className="card-head"><span className="card-title">Favorites</span><span>{favorites.length}</span></div>
+          <div className="card-head">
+            <span className="card-title">Favorites</span><span>{favorites.length}</span>
+            {pages > 1 && (
+              <div className="pager-sm">
+                <button className="icon-btn sm" aria-label="Newer favorites" disabled={shownPage === 0} onClick={() => setPage(shownPage - 1)}><Ico name="back" size={14} /></button>
+                <span>{shownPage + 1} / {pages}</span>
+                <button className="icon-btn sm flip" aria-label="Older favorites" disabled={shownPage === pages - 1} onClick={() => setPage(shownPage + 1)}><Ico name="back" size={14} /></button>
+              </div>
+            )}
+          </div>
           <div className="mini-list" style={{ borderTop: 0, marginTop: 0, paddingTop: 0 }}>
-            {favorites.slice(0, FAVORITES_SHOWN).map(it => (
+            {favorites.slice(shownPage * FAVORITES_PER_PAGE, (shownPage + 1) * FAVORITES_PER_PAGE).map(it => (
               <button key={it.id} className="mini-item" onClick={() => openItem(it)}>
                 <span className="t">{dayKey(it.date).slice('YYYY-'.length)}</span>
                 <span className="d">{itemLine(it)}</span>
@@ -215,6 +249,7 @@ export default function Home({ shots, brews, beans, units, goTo, onRepull, onSta
           </div>
         </div>
       )}
+      </div>
     </div>
   )
 }

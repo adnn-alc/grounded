@@ -36,7 +36,8 @@ function legacySettings(current: Settings): Settings {
 
 function clearLegacySettings() {
   try {
-    for (const k of ['grounded-water-recipes', 'grounded-dialin-defaults']) localStorage.removeItem(k)
+    // grounded-theme and grounded-fonts were also the paint-early cache, now grounded-look
+    for (const k of ['grounded-water-recipes', 'grounded-dialin-defaults', 'grounded-theme', 'grounded-fonts']) localStorage.removeItem(k)
   } catch {}
 }
 

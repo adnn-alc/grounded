@@ -183,6 +183,15 @@ export type FontRole = 'sans' | 'mono' | 'serif'
 /** Font id per role, e.g. { sans: 'inter', mono: 'jetbrains-mono', serif: 'instrument-serif' } */
 export type Fonts = Record<FontRole, string>
 
+/** The two looks: Refined (sidebar, serif titles, mono numbers) or Extraction (icon rail, big numbers, time dial) */
+export type Design = 'refined' | 'extraction'
+
+/** Extraction keeps its own theme and fonts, so switching designs back and forth loses nothing */
+export interface ExtractionLook {
+  theme?: string                              // 'roast' or 'crema'
+  fonts?: Partial<Record<'sans' | 'serif', string>>   // text, and numbers and headings
+}
+
 export interface Units {
   mass: 'g' | 'oz'
   temp: 'C' | 'F'
@@ -206,8 +215,10 @@ export interface DialinDefaults {
 
 /** GET /api/settings: only the keys that have been saved. PUT takes any subset. */
 export interface Settings {
-  theme?:          string   // 'moody', 'midnight', 'terminal', 'parchment', 'oat' or 'ember'
-  fonts?:          Partial<Fonts>
+  design?:         Design   // missing = 'refined'
+  theme?:          string   // Refined: 'moody', 'midnight', 'terminal', 'parchment', 'oat' or 'ember'
+  fonts?:          Partial<Fonts>   // Refined's fonts
+  extraction?:     ExtractionLook
   units?:          Partial<Units>
   waterRecipes?:   string[]
   dialinDefaults?: DialinDefaults

@@ -39,7 +39,7 @@ All `fetch()` calls are centralised in [src/api/client.ts](src/api/client.ts). P
 
 Hash-based (`#/route`) with no router library. `App.tsx` maps route strings to page components in a plain object. Valid routes (`VALID_ROUTES` in `App.tsx`, and the `Route` type in `src/types.ts`): `home`, `dialin`, `shot-history`, `brew-history`, `beans`, `archived-beans`, `recipes`, `gear`, `stats`, `stock`, `tips`.
 
-One file per page in `src/pages/` (`Home.tsx`, `Dialin.tsx`, `ShotHistory.tsx`, `Beans.tsx`, …).
+One file per page in `src/pages/` (`Home.tsx`, `Dialin.tsx`, `ShotHistory.tsx`, `Beans.tsx`, …). `App.tsx` shows `ExtractionHome.tsx` instead of `Home.tsx` when the Extraction design is on, and `Dialin.tsx` shows `ExtractionDialin.tsx`'s layout. Both Dial-in layouts keep their form state in `useShotForm` / `useBrewForm` (`src/hooks/useDialinForm.ts`), so they save the same shot or brew.
 
 ### Backend
 
@@ -61,7 +61,7 @@ The author's live database has a few leftovers that the code doesn't create or u
 
 ### Settings
 
-App-wide preferences live in the `settings` table (one row per key, JSON value), so every browser sees the same ones: `theme`, `fonts`, `units`, `waterRecipes`, `dialinDefaults`, `brewModes`. API: `GET /api/settings` returns one object; `PUT /api/settings` takes a partial object and only accepts those keys (`settingsSchema` in `server/validation.ts`).
+App-wide preferences live in the `settings` table (one row per key, JSON value), so every browser sees the same ones: `design`, `theme`, `fonts`, `extraction`, `units`, `waterRecipes`, `dialinDefaults`, `brewModes`. API: `GET /api/settings` returns one object; `PUT /api/settings` takes a partial object and only accepts those keys (`settingsSchema` in `server/validation.ts`).
 
 `sampleData` is only ever set on a brand-new install (`'present'`, by `db.ts`). While it's `'present'`, Home shows a banner whose button calls `POST /api/sample-data/clear`. That deletes exactly the rows in `SAMPLE_IDS` (`db.ts`; recipes are kept), unlinks the user's own shots from removed sample beans and sets `'cleared'`; it answers 409 on any install not marked `'present'`. "Keep them" sets `'dismissed'`. Keep `SAMPLE_IDS` in sync with the seed data.
 
@@ -69,11 +69,16 @@ App-wide preferences live in the `settings` table (one row per key, JSON value),
 
 Older versions kept theme, water recipes and dial-in defaults in `localStorage`. On first load, `useData` moves any of those the database doesn't have yet into it, then deletes the old keys.
 
-### Units, theme & fonts
+### Units, designs, themes & fonts
 
 `useUnits.ts` provides g↔oz and °C↔°F helpers. Units are passed as props; there is no unit context.
 
-Theme (`moody` by default; also `midnight`, `terminal`, `parchment`, `oat`, `ember`, listed in `THEMES` in `Settings.tsx` and defined in `global.css`) is applied as a `data-theme` attribute on `<html>`. Fonts are three CSS variables — `--font-sans` (text), `--font-mono` (numbers & labels), `--font-serif` (headings) — defined in `global.css` and overridden at runtime. Use the variables, never a hard-coded font name. The font list, the `@fontsource` imports and `applyAppearance()` are in [src/data/fonts.ts](src/data/fonts.ts). The last-used theme and fonts are also cached in `localStorage` (`grounded-theme`, `grounded-fonts`) only so the next page load paints correctly before settings arrive. The database stays the source of truth.
+There are two designs, set by the `design` setting (missing = `refined`, the default for fresh installs) and applied as `data-design` on `<html>`:
+
+- **Refined**: the sidebar, serif titles, mono numbers. Its theme is the `theme` setting (`moody` by default; also `midnight`, `terminal`, `parchment`, `oat`, `ember`, listed in `THEMES` in `Settings.tsx`) and its fonts are `fonts` (three roles).
+- **Extraction**: an icon rail (`Rail` in `Shell.tsx`), its own Home (`src/pages/ExtractionHome.tsx`) and its own Dial-in (`src/pages/ExtractionDialin.tsx`: bag and recipe, the time dial `TimeDial` from `Fields.tsx`, and taste in three columns). Its History is Refined's `HistoryList` with its own rows and `ExtractionInspector` (`src/components/ExtractionInspector.tsx`) as the panel, picked by the `design` prop on `ShotHistory` / `BrewHistory`; Beans works the same way with `ExtractionBeans` (`src/components/ExtractionBeans.tsx`), while the add/edit popups stay in `Beans.tsx`. Stats, Gear, Stock, Tips and Recipes keep Refined's markup and are restyled in `extraction.css` under their page class (`stats-page`, `gear-page`, …); the few Extraction-only elements (`si-bag`, `tips-seg`, `title-dot`) are hidden on Refined in `global.css`. Every other page is Refined's markup restyled in `src/styles/extraction.css` under `[data-design="extraction"]`. Its theme and fonts live in the `extraction` setting (`{ theme: 'roast' | 'crema', fonts: { sans, serif } }`), so switching designs keeps each one's choices. It has two font roles: numbers and headings share one face, so `--font-mono` is set to the serif.
+
+`lookFrom(settings)` in [src/data/fonts.ts](src/data/fonts.ts) works out the design, theme and fonts with their defaults, and `applyAppearance()` puts them on `<html>` (`data-design`, `data-theme`, the font variables). The theme colors are defined in `global.css` (Refined) and `extraction.css`; a theme id is only valid in its own design. Fonts are three CSS variables — `--font-sans` (text), `--font-mono` (numbers & labels), `--font-serif` (headings) — overridden at runtime. Use the variables, never a hard-coded font name (the design and theme preview cards in Settings are the exception). Main buttons use `--primary` (the accent on Refined, cherry on Extraction). The font lists and the `@fontsource` imports are in `fonts.ts`. The last look is also cached in `localStorage` (`grounded-look`) only so the next page load paints correctly before settings arrive. The database stays the source of truth.
 
 ### Docker / env vars
 

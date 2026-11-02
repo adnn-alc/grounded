@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef, type ReactElement } from 'react'
-import { Sidebar, PhoneTop, TabBar, Brand, ROUTE_LABELS } from './components/Shell.tsx'
+import { Sidebar, Rail, PhoneTop, TabBar, Brand, ROUTE_LABELS } from './components/Shell.tsx'
 import Settings from './components/Settings.tsx'
 import { Toaster } from './components/Toast.tsx'
 import Home from './pages/Home.tsx'
+import ExtractionHome from './pages/ExtractionHome.tsx'
 import Dialin from './pages/Dialin.tsx'
 import { ShotHistory } from './pages/ShotHistory.tsx'
 import { BrewHistory } from './pages/BrewHistory.tsx'
@@ -15,7 +16,7 @@ import { Stock } from './pages/Stock.tsx'
 import { TipsPage } from './pages/Tips.tsx'
 import { useData } from './hooks/useData.ts'
 import { DEFAULT_WATER_RECIPES } from './data/waterRecipes.ts'
-import { DEFAULT_FONTS, applyAppearance } from './data/fonts.ts'
+import { DEFAULT_FONTS, applyAppearance, lookFrom } from './data/fonts.ts'
 import type { Bean, Brew, BrewInput, DialinPreset, DialinStart, Fonts, Route, Shot, ShotInput, Units } from './types.ts'
 
 function LoadingScreen() {
@@ -54,6 +55,7 @@ export default function App() {
   const [openBrewId, setOpenBrewId] = useState<string | null>(null)
   const [dialinPreset, setDialinPreset] = useState<DialinPreset | null>(null)
   const [dialinStart, setDialinStart] = useState<DialinStart | null>(null)
+  const [addBagOnOpen, setAddBagOnOpen] = useState(false)
   const contentRef = useRef<HTMLElement>(null)
   const [footer, setFooter] = useState<HTMLDivElement | null>(null)
   // The page before this one, for Dial-in's back button
@@ -79,6 +81,7 @@ export default function App() {
   } = useData()
 
   // Preferences live in the database (shared by every browser), with defaults
+  const look           = lookFrom(settings)
   const theme          = settings.theme || 'moody'
   const fonts: Fonts    = { ...DEFAULT_FONTS, ...settings.fonts }
   const units: Units    = { ...DEFAULT_UNITS, ...settings.units }
@@ -87,8 +90,8 @@ export default function App() {
   const brewModes      = settings.brewModes || []
 
   useEffect(() => {
-    if (!loading) applyAppearance(theme, fonts)
-  }, [loading, theme, fonts.sans, fonts.mono, fonts.serif]) // eslint-disable-line react-hooks/exhaustive-deps
+    if (!loading) applyAppearance(look)
+  }, [loading, look.design, look.theme, look.fonts.sans, look.fonts.mono, look.fonts.serif]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     window.location.hash = '/' + route
@@ -147,17 +150,20 @@ export default function App() {
   }
   const openSettings = () => setSettingsOpen(true)
 
+  const HomePage = look.design === 'extraction' ? ExtractionHome : Home
   const pages: Record<Route, ReactElement> = {
-    home:          <Home        shots={shots} brews={brews} beans={beans} units={units} goTo={goTo}
+    home:          <HomePage    shots={shots} brews={brews} beans={beans} units={units} goTo={goTo}
                      onRepull={onReplicateShot} onStartDialin={startDialin}
+                     onAddBag={() => { setAddBagOnOpen(true); setRoute('beans') }}
                      showSampleBanner={settings.sampleData === 'present'}
                      onRemoveSampleData={clearSampleData}
                      onKeepSampleData={() => updateSettings({ sampleData: 'dismissed' })} />,
-    dialin:        <Dialin      shots={shots} beans={beans} gear={gear} units={units} waterRecipes={waterRecipes} dialinDefaults={dialinDefaults} brewModes={brewModes} onSaveShot={handleSaveShot} onSaveBrew={handleSaveBrew} onUpdateBean={updateBean} preset={dialinPreset} onPresetConsumed={() => setDialinPreset(null)}
+    dialin:        <Dialin      design={look.design} shots={shots} beans={beans} gear={gear} units={units} waterRecipes={waterRecipes} dialinDefaults={dialinDefaults} brewModes={brewModes} onSaveShot={handleSaveShot} onSaveBrew={handleSaveBrew} onUpdateBean={updateBean} preset={dialinPreset} onPresetConsumed={() => setDialinPreset(null)}
                      start={dialinStart} onStartConsumed={() => setDialinStart(null)} brews={brews} onBack={() => setRoute(prevRoute.current)} footer={footer} />,
-    'shot-history': <ShotHistory shots={shots} brewCount={brews.length} goTo={goTo} beans={beans} gear={gear} units={units} waterRecipes={waterRecipes} brewModes={brewModes} onDelete={deleteShot} onUpdateShot={updateShot} initialSelectedId={openShotId} onReplicate={onReplicateShot} onFavorite={favoriteShot} />,
-    'brew-history': <BrewHistory brews={brews} shotCount={shots.length} goTo={goTo} beans={beans} units={units} waterRecipes={waterRecipes} onDeleteBrew={deleteBrew} onUpdateBrew={updateBrew} initialSelectedId={openBrewId} onReplicate={onReplicateBrew} onFavorite={favoriteBrew} />,
-    beans:   <Beans   beans={beans} gear={gear} units={units} archivedCount={archivedBeans.length} goTo={goTo} onDialIn={dialInBean} onSaveBean={saveBean} onUpdateBean={updateBean} onArchiveBean={archiveBean} />,
+    'shot-history': <ShotHistory design={look.design} shots={shots} brewCount={brews.length} goTo={goTo} beans={beans} gear={gear} units={units} waterRecipes={waterRecipes} brewModes={brewModes} onDelete={deleteShot} onUpdateShot={updateShot} initialSelectedId={openShotId} onReplicate={onReplicateShot} onFavorite={favoriteShot} />,
+    'brew-history': <BrewHistory design={look.design} brews={brews} shotCount={shots.length} goTo={goTo} beans={beans} units={units} waterRecipes={waterRecipes} onDeleteBrew={deleteBrew} onUpdateBrew={updateBrew} initialSelectedId={openBrewId} onReplicate={onReplicateBrew} onFavorite={favoriteBrew} />,
+    beans:   <Beans   beans={beans} shots={shots} brews={brews} design={look.design} gear={gear} units={units} archivedCount={archivedBeans.length} goTo={goTo} onDialIn={dialInBean} onSaveBean={saveBean} onUpdateBean={updateBean} onArchiveBean={archiveBean}
+                startAdding={addBagOnOpen} onStartConsumed={() => setAddBagOnOpen(false)} />,
     'archived-beans': <ArchivedBeans beans={archivedBeans} openCount={beans.length} units={units} goTo={goTo} onUnarchive={unarchiveBean} onDelete={deleteBean} />,
     recipes: <RecipesPage recipes={recipes} units={units} onSaveRecipe={saveRecipe} onUpdateRecipe={updateRecipe} onDeleteRecipe={deleteRecipe} />,
     gear:    <GearPage gear={gear} onSaveGear={saveGear} onUpdateGear={updateGear} onDeleteGear={deleteGear} />,
@@ -169,10 +175,12 @@ export default function App() {
   // On a phone, Dial-in has its own save bar instead of the tab bar
   return (
     <div className={`app${route === 'dialin' ? ' no-tabs' : ''}`}>
-      <Sidebar route={route} setRoute={setRoute} counts={counts}
-        onPull={() => startDialin({ mode: 'espresso' })} onOpenSettings={openSettings} />
+      {look.design === 'extraction'
+        ? <Rail route={route} setRoute={setRoute} onPull={() => startDialin({ mode: 'espresso' })} onOpenSettings={openSettings} />
+        : <Sidebar route={route} setRoute={setRoute} counts={counts}
+            onPull={() => startDialin({ mode: 'espresso' })} onOpenSettings={openSettings} />}
       <div className="main">
-        <PhoneTop onOpenSettings={openSettings} />
+        <PhoneTop onHome={() => setRoute('home')} onOpenSettings={openSettings} />
         <main className="content scroll" ref={contentRef}>
           {pages[route]}
         </main>
@@ -181,6 +189,8 @@ export default function App() {
       <TabBar route={route} setRoute={setRoute} onOpenSettings={openSettings} />
       <Settings
         open={settingsOpen} onClose={() => setSettingsOpen(false)}
+        design={look.design} setDesign={d => updateSettings({ design: d })}
+        extraction={settings.extraction ?? {}} setExtraction={x => updateSettings({ extraction: x })}
         theme={theme} setTheme={t => updateSettings({ theme: t })}
         fonts={fonts} setFonts={f => updateSettings({ fonts: f })}
         units={units} setUnits={u => updateSettings({ units: u })}

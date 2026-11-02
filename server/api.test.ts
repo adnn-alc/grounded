@@ -123,6 +123,14 @@ test('settings update only the keys sent and reject unknown ones', async () => {
   assert.equal((await api.call('PUT', '/api/settings', { bogus: true })).status, BAD_REQUEST)
 })
 
+test('settings keep the design, and Extraction keeps its own theme and fonts', async () => {
+  const look = { theme: 'crema', fonts: { sans: 'geist', serif: 'fraunces' } }
+  const res = await api.call<Settings>('PUT', '/api/settings', { design: 'extraction', extraction: look })
+  assert.equal(res.body.design, 'extraction')
+  assert.deepEqual(res.body.extraction, look)
+  assert.equal((await api.call('PUT', '/api/settings', { design: 'flavor' })).status, BAD_REQUEST)
+})
+
 test('responses carry the security headers and hide Express', async () => {
   const res = await api.call('GET', '/api/health')
   assert.equal(res.headers.get('x-content-type-options'), 'nosniff')

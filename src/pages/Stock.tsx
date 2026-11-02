@@ -1,6 +1,7 @@
+import type { CSSProperties } from 'react'
 import { PageHead } from '../components/Shell.tsx'
 import { useUnits } from '../hooks/useUnits.ts'
-import { daysOffRoast, shotsLeftText, usualDose } from '../data/beans.ts'
+import { bagColor, daysOffRoast, shotsLeftText, usualDose } from '../data/beans.ts'
 import type { Bean, BeanInput, Shot, StockLevel, Units } from '../types.ts'
 
 // ── STOCK ─────────────────────────────────────────────────────────────
@@ -30,7 +31,7 @@ export function Stock({ beans, shots = [], units }: StockProps) {
   const low = beans.filter(b => b.stock !== 'good').length
 
   return (
-    <div className="stack">
+    <div className="stack stock-page">
       <PageHead title="Stock." sub={`${beans.length} open ${beans.length === 1 ? 'bag' : 'bags'}`} />
 
       <div className="card">
@@ -50,14 +51,17 @@ export function Stock({ beans, shots = [], units }: StockProps) {
         <div className="card">
           {sorted.map(b => {
             const days = daysOffRoast(b)
+            const pct = Math.min(PERCENT, fraction(b) * PERCENT)
             return (
-              <div key={b.id} className="stock-item">
+              <div key={b.id} className="stock-item" style={{ '--bag': bagColor(b.id) } as CSSProperties}>
+                {/* Extraction only: the bag in its shelf color, filled to what's left */}
+                <span className="si-bag"><i style={{ height: `${pct}%` }} /></span>
                 <div className="si-main">
                   <div className="si-name">{b.name}</div>
                   <div className="si-sub">{[b.roaster, days != null && `day ${days}`].filter(Boolean).join(', ')}</div>
                 </div>
                 <div className="si-bar">
-                  <div className="stock-bar"><i className={b.stock} style={{ width: `${Math.min(PERCENT, fraction(b) * PERCENT)}%` }} /></div>
+                  <div className="stock-bar"><i className={b.stock} style={{ width: `${pct}%` }} /></div>
                   <div className="si-left">
                     <span>{shotsLeftText(b, usualDose(b, fallbackDose), g => `${U.m(g)} ${U.mU()}`)}</span>
                     <b>{U.m(b.remaining)} <small>of {U.m(b.weight)} {U.mU()}</small></b>

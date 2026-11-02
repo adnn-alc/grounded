@@ -3,9 +3,9 @@ import { Backdrop } from './ui.tsx'
 import Ico, { type IconName } from './Ico.tsx'
 import DataSettings from './DataSettings.tsx'
 import type { DataSettingsProps } from './DataSettings.tsx'
-import { FONT_ROLES, FONT_OPTIONS, fontStack } from '../data/fonts.ts'
+import { DESIGNS, EXTRACTION_FONT_IDS, FONT_ROLES, FONT_OPTIONS, fontStack, lookFrom } from '../data/fonts.ts'
 import { RPM_OPTIONS } from '../data/grinderRpm.ts'
-import type { DialinDefaults, EspressoDefaults, FilterDefaults, Fonts, Units } from '../types.ts'
+import type { Design, DialinDefaults, EspressoDefaults, ExtractionLook, FilterDefaults, Fonts, Units } from '../types.ts'
 
 interface ThemeSwatch { id: string; name: string; tag: string; bg: string; sb: string; card: string; accent: string; txt: string }
 
@@ -16,6 +16,14 @@ export const THEMES: ThemeSwatch[] = [
   { id: 'parchment', name: 'Parchment', tag: 'warm light',     bg: '#f3ead8', sb: '#e9dfca', card: '#fbf6ea', accent: '#9a5a2c', txt: '#2e2518' },
   { id: 'oat',       name: 'Oat',       tag: 'gray light',     bg: '#e9e6e0', sb: '#dedad2', card: '#f6f4f0', accent: '#8a5a2b', txt: '#2a2622' },
   { id: 'ember',     name: 'Ember',     tag: 'oxblood',        bg: '#1d0f0e', sb: '#251412', card: '#2e1a17', accent: '#e0a35a', txt: '#f6e7df' },
+]
+
+// Extraction's themes, previewed as a little Home: the last shot in big numbers
+interface XSwatch { id: string; name: string; tag: string; bg: string; card: string; txt: string; muted: string; crema: string; cherry: string; arrow: string }
+
+const XTHEMES: XSwatch[] = [
+  { id: 'roast', name: 'Roast', tag: 'Oxblood, crema and cherry', bg: '#1c100e', card: '#2e1a16', txt: '#fbefe6', muted: '#a88f81', crema: '#f2b35a', cherry: '#e2483d', arrow: '#6d4a3f' },
+  { id: 'crema', name: 'Crema', tag: 'Warm light, same accents',  bg: '#f6ece0', card: '#ead9c6', txt: '#2a160f', muted: '#8a6a58', crema: '#b8741f', cherry: '#c7362b', arrow: '#c9ad95' },
 ]
 
 const ESP_FALLBACK: EspressoDefaults = { dose: '18', yield: '36', temp: '92', grind: '3', preinf: '0', waterRecipe: 'Light and Bright', grinderRpm: '800' }
@@ -37,6 +45,10 @@ const SECTIONS: { id: Section; label: string; icon: IconName }[] = [
 interface SettingsProps {
   open:              boolean
   onClose:           () => void
+  design:            Design
+  setDesign:         (design: Design) => void
+  extraction:        ExtractionLook
+  setExtraction:     (look: ExtractionLook) => void
   theme:             string
   setTheme:          (theme: string) => void
   fonts:             Fonts
@@ -72,6 +84,20 @@ function ThemeCard({ t, on, onPick }: { t: ThemeSwatch; on: boolean; onPick: () 
   )
 }
 
+function XThemeCard({ t, on, onPick }: { t: XSwatch; on: boolean; onPick: () => void }) {
+  return (
+    <button className={`xtheme-card${on ? ' on' : ''}`} onClick={onPick} aria-pressed={on}>
+      <div className="xtheme-preview" style={{ background: t.bg, color: t.txt }}>
+        <span className="xt-l" style={{ color: t.muted }}>Last shot</span>
+        <span className="xt-n">18<i style={{ color: t.arrow }}>→</i>48.5<b style={{ color: t.cherry }}>14</b></span>
+        <span className="xt-g" />
+        <span className="xt-b"><em style={{ background: t.cherry }}>Pull again</em><em style={{ background: t.card }}>Details</em></span>
+      </div>
+      <div className="meta"><span className="name">{t.name}</span><span className="tag">{t.tag}</span></div>
+    </button>
+  )
+}
+
 function DefaultsField({ label, value, step, onChange }: { label: string; value: string; step: string; onChange: (v: string) => void }) {
   return (
     <div className="dial-input">
@@ -94,7 +120,7 @@ function DefaultsSelect({ label, value, options, render = (o: string) => o, onCh
 
 const rpmLabel = (r: string) => r === 'manual' ? 'Manual' : `${r} RPM`
 
-export default function Settings({ open, onClose, theme, setTheme, fonts, setFonts, units, setUnits, waterRecipes, setWaterRecipes, dialinDefaults, setDialinDefaults, brewModes, setBrewModes, onPreviewBackup, onRestoreBackup }: SettingsProps) {
+export default function Settings({ open, onClose, design, setDesign, extraction, setExtraction, theme, setTheme, fonts, setFonts, units, setUnits, waterRecipes, setWaterRecipes, dialinDefaults, setDialinDefaults, brewModes, setBrewModes, onPreviewBackup, onRestoreBackup }: SettingsProps) {
   const [section, setSection] = useState<Section>('appearance')
   const [defs, setDefs] = useState(dialinDefaults)
   const [newRecipe, setNewRecipe] = useState('')
@@ -131,6 +157,7 @@ export default function Settings({ open, onClose, theme, setTheme, fonts, setFon
   const mU  = units.mass === 'oz' ? 'oz' : 'g'
   const tU  = units.temp === 'F'  ? '°F' : '°C'
   const current = SECTIONS.find(s => s.id === section)!
+  const xLook   = lookFrom({ design: 'extraction', extraction })
 
   return (
     <Backdrop onClose={onClose}>
@@ -159,27 +186,74 @@ export default function Settings({ open, onClose, theme, setTheme, fonts, setFon
             {section === 'appearance' && (
               <>
                 <div className="settings-section">
-                  <h4>Themes</h4>
-                  <div className="theme-grid">
-                    {THEMES.map(t => <ThemeCard key={t.id} t={t} on={theme === t.id} onPick={() => setTheme(t.id)} />)}
+                  <div className="desc">Each design keeps its own theme and fonts. Every browser on this server sees the one you pick.</div>
+                  <div className="design-grid">
+                    {DESIGNS.map(d => (
+                      <button key={d.id} className={`design-card ${d.id}${design === d.id ? ' on' : ''}`} aria-pressed={design === d.id} onClick={() => setDesign(d.id)}>
+                        <span className="dc-mark">{d.id === 'refined' ? 'Aa' : '18'}</span>
+                        <span><b>{d.name}</b><span>{d.desc}</span></span>
+                      </button>
+                    ))}
                   </div>
                 </div>
-                <div className="settings-section">
-                  <h4>Fonts</h4>
-                  {FONT_ROLES.map(({ role, label, desc }) => (
-                    <div key={role} className="font-row">
-                      <div><div className="label">{label}</div><div className="desc">{desc}</div></div>
-                      <div className="font-chips">
-                        {FONT_OPTIONS[role].map(f => (
-                          <button key={f.id} className={`font-chip${role === 'serif' ? ' serif' : ''}${fonts[role] === f.id ? ' on' : ''}`}
-                            style={{ fontFamily: fontStack(role, f.id) }} onClick={() => setFonts({ ...fonts, [role]: f.id })}>
-                            {f.name}
+                {design === 'refined' ? (
+                  <>
+                    <div className="settings-section">
+                      <h4>Themes</h4>
+                      <div className="theme-grid">
+                        {THEMES.map(t => <ThemeCard key={t.id} t={t} on={theme === t.id} onPick={() => setTheme(t.id)} />)}
+                      </div>
+                    </div>
+                    <div className="settings-section">
+                      <h4>Fonts</h4>
+                      {FONT_ROLES.map(({ role, label, desc }) => (
+                        <div key={role} className="font-row">
+                          <div><div className="label">{label}</div><div className="desc">{desc}</div></div>
+                          <div className="font-chips">
+                            {FONT_OPTIONS[role].map(f => (
+                              <button key={f.id} className={`font-chip${role === 'serif' ? ' serif' : ''}${fonts[role] === f.id ? ' on' : ''}`}
+                                style={{ fontFamily: fontStack(role, f.id) }} onClick={() => setFonts({ ...fonts, [role]: f.id })}>
+                                {f.name}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="settings-section">
+                      <h4>Themes</h4>
+                      <div className="xtheme-grid">
+                        {XTHEMES.map(t => <XThemeCard key={t.id} t={t} on={xLook.theme === t.id} onPick={() => setExtraction({ ...extraction, theme: t.id })} />)}
+                      </div>
+                    </div>
+                    <div className="settings-section">
+                      <h4>Numbers and headings</h4>
+                      <div className="xfont-grid">
+                        {EXTRACTION_FONT_IDS.serif.map(id => (
+                          <button key={id} className={`xfont-card${xLook.fonts.serif === id ? ' on' : ''}`}
+                            onClick={() => setExtraction({ ...extraction, fonts: { ...extraction.fonts, serif: id } })}>
+                            <span style={{ fontFamily: fontStack('serif', id) }}>15 s</span>
+                            {FONT_OPTIONS.serif.find(f => f.id === id)?.name}
                           </button>
                         ))}
                       </div>
                     </div>
-                  ))}
-                </div>
+                    <div className="settings-section">
+                      <h4>Text</h4>
+                      <div className="font-chips">
+                        {EXTRACTION_FONT_IDS.sans.map(id => (
+                          <button key={id} className={`font-chip${xLook.fonts.sans === id ? ' on' : ''}`} style={{ fontFamily: fontStack('sans', id) }}
+                            onClick={() => setExtraction({ ...extraction, fonts: { ...extraction.fonts, sans: id } })}>
+                            {FONT_OPTIONS.sans.find(f => f.id === id)?.name}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </>
+                )}
               </>
             )}
 

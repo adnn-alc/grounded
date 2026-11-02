@@ -2,8 +2,9 @@ import { useState, type ReactNode } from 'react'
 import Ico from './Ico.tsx'
 import { MiniLanded } from './Landed.tsx'
 import { PageHead } from './Shell.tsx'
+import { shortNum } from '../hooks/useUnits.ts'
 import { dayKey, dayName, daysAgo, longDate, timeOf } from '../data/dates.ts'
-import type { Bean, Route } from '../types.ts'
+import type { Bean, Design, Route } from '../types.ts'
 
 /** What the list needs from a shot or a brew */
 export interface HistoryItem {
@@ -18,6 +19,17 @@ export interface HistoryItem {
   notes:     string
 }
 
+/** A row's numbers: 18.0 → 48.5 g in 14 s, or 15.0 → 250.0 g in 3:05 */
+export interface RowNumbers {
+  dose:      string
+  out:       string    // yield or water
+  unit:      string
+  time:      string
+  timeUnit?: string    // 's' for a shot; a brew's m:ss has none
+}
+
+const rowText = (n: RowNumbers): string => `${n.dose} → ${n.out} ${n.unit}, ${n.time}${n.timeUnit ? ` ${n.timeUnit}` : ''}`
+
 type Period = '7' | '30' | '90' | 'all'
 const PERIODS: { id: Period; label: string }[] = [
   { id: '7', label: 'Last 7 days' }, { id: '30', label: 'Last 30 days' }, { id: '90', label: 'Last 90 days' }, { id: 'all', label: 'All time' },
@@ -29,13 +41,14 @@ const STAR_SIZE = 13
 
 interface HistoryListProps<T extends HistoryItem> {
   kind:        'shot' | 'brew'
+  design?:     Design
   items:       T[]
   beans:       Bean[]
   otherCount:  number                 // brews on the Shots page and the other way round
   goTo?:       (route: Route) => void
   selectedId:  string | null
   onSelect:    (item: T | null) => void
-  rowText:     (item: T) => string    // '18.0 → 48.5 g, 14 s'
+  rowNumbers:  (item: T) => RowNumbers
   inspector:   ReactNode              // the selected item's panel, or an empty state
 }
 
@@ -53,13 +66,17 @@ function initialPeriod(items: HistoryItem[], selectedId: string | null): Period 
  * the period, and a search over the bean, roaster and notes. The selected one
  * opens in the panel on the right (full screen on a phone).
  */
-export function HistoryList<T extends HistoryItem>({ kind, items, beans, otherCount, goTo, selectedId, onSelect, rowText, inspector }: HistoryListProps<T>) {
+export function HistoryList<T extends HistoryItem>({ kind, design, items, beans, otherCount, goTo, selectedId, onSelect, rowNumbers, inspector }: HistoryListProps<T>) {
   const [beanFilter, setBeanFilter] = useState('')
   const [period, setPeriod] = useState<Period>(() => initialPeriod(items, selectedId))
   const [search, setSearch] = useState('')
   const [shown, setShown] = useState(PAGE)
 
   const plural = kind === 'shot' ? 'shots' : 'brews'
+  const extraction = design === 'extraction'
+  // Extraction has one History in the rail; Refined names the page after what's in it
+  const refinedTitle = kind === 'shot' ? 'Shots.' : 'Brews.'
+  const title = extraction ? 'History' : refinedTitle
   const q = search.trim().toLowerCase()
   const filtered = items.filter(i =>
     (!beanFilter || i.bean === beanFilter) &&
@@ -88,11 +105,12 @@ export function HistoryList<T extends HistoryItem>({ kind, items, beans, otherCo
 
   return (
     <div className="stack">
-      <PageHead title={kind === 'shot' ? 'Shots.' : 'Brews.'} sub={`${items.length} ${plural}, ${thisWeek} this week`}>
+      <PageHead title={title} sub={`${items.length} ${plural}, ${thisWeek} this week`}>
         {goTo && (
-          <div className="seg phone-only">
-            <button className={kind === 'shot' ? 'on' : ''} onClick={() => goTo('shot-history')}>Shots</button>
-            <button className={kind === 'brew' ? 'on' : ''} onClick={() => goTo('brew-history')}>Brews {otherCount > 0 && kind === 'shot' ? otherCount : ''}</button>
+          <div className="seg hist-switch">
+            {/* The other tab shows how many it has */}
+            <button className={kind === 'shot' ? 'on' : ''} onClick={() => goTo('shot-history')}>Shots {kind === 'brew' && otherCount > 0 ? otherCount : ''}</button>
+            <button className={kind === 'brew' ? 'on' : ''} onClick={() => goTo('brew-history')}>Brews {kind === 'shot' && otherCount > 0 ? otherCount : ''}</button>
           </div>
         )}
         <select className="fchip" value={beanFilter} onChange={e => { setBeanFilter(e.target.value); setShown(PAGE) }} aria-label="Bag">
@@ -112,7 +130,7 @@ export function HistoryList<T extends HistoryItem>({ kind, items, beans, otherCo
         <input className="search" type="search" placeholder="Search beans and notes" value={search} onChange={e => setSearch(e.target.value)} />
       </PageHead>
 
-      <div className="hist-cols">
+      <div className={`hist-cols${extraction ? ' xhist' : ''}`}>
         <div>
           {filtered.length === 0 && (
             <div className="card empty">
@@ -128,16 +146,24 @@ export function HistoryList<T extends HistoryItem>({ kind, items, beans, otherCo
                 <b>{dayName(day.items[0]!.date, now)}</b> {dateNote(day.items[0]!.date)}
                 <span>{day.items.length} {day.items.length === 1 ? kind : plural}, avg {average(day.items.filter(i => !i.bad).map(i => i.rating)).toFixed(RATING_DECIMALS)}</span>
               </div>
-              {day.items.map(i => (
+              {day.items.map(i => {
+                const n = rowNumbers(i)
+                return (
                 <button key={i.id} className={`hist-row${i.id === selectedId ? ' active' : ''}`}
                   onClick={() => onSelect(i.id === selectedId ? null : i)}>
                   <span className="t">{timeOf(i.date)}</span>
                   <span className="b"><span>{i.bean || '–'}</span>{i.favorited && <Ico name="star" size={STAR_SIZE} style={{ fill: 'currentColor' }} />}</span>
-                  <span className="r">{rowText(i)}</span>
+                  {extraction ? (
+                    <>
+                      <span className="r">{shortNum(n.dose)} → {shortNum(n.out)}<small> {n.unit}</small></span>
+                      <span className="tm">{n.time}{n.timeUnit && <small> {n.timeUnit}</small>}</span>
+                    </>
+                  ) : <span className="r">{rowText(n)}</span>}
                   <span className="ml-cell"><MiniLanded landed={i.landed} bad={i.bad} badLabel={kind === 'shot' ? 'Bad shot' : 'Bad brew'} /></span>
                   <span className={`s${i.bad ? ' low' : ''}`}>{i.rating.toFixed(RATING_DECIMALS)}</span>
                 </button>
-              ))}
+                )
+              })}
             </div>
           ))}
           {filtered.length > shown && (

@@ -114,7 +114,7 @@ function LandedHistogram({ entries, noun }: { entries: Entry[]; noun: string }) 
 
 function SummaryCard({ title, entries, noun, U, outLabel, timeText }: { title: string; entries: Entry[]; noun: string; U: UnitHelpers; outLabel: string; timeText: (s: number) => string }) {
   return (
-    <div className="card">
+    <div className="card stats-sum">
       <div className="card-head"><span className="card-title">{title}</span><span>{entries.length} {noun}</span></div>
       {entries.length === 0 ? <div className="empty">Nothing logged in this period.</div> : (
         <>
@@ -188,7 +188,7 @@ export function Stats({ shots, brews = [], beans = [], gear = [], units }: Stats
     </div>
   )
   const spendingCard = (
-    <div className="card">
+    <div className="card stats-spend">
       <div className="card-head"><span className="card-title">Spending</span><span>bags {periodText}</span></div>
       {priced.length === 0 ? <div className="empty">No bags with a price {periodText}.</div> : (
         <>
@@ -225,7 +225,7 @@ export function Stats({ shots, brews = [], beans = [], gear = [], units }: Stats
   )
 
   return (
-    <div className="stack">
+    <div className="stack stats-page">
       <PageHead title="Stats." sub={`${shots.length} shots and ${brews.length} brews`}>
         <div className="seg">
           {PERIODS.map(p => <button key={p.id} className={period === p.id ? 'on' : ''} onClick={() => setPeriod(p.id)}>{p.label}</button>)}
@@ -241,7 +241,7 @@ export function Stats({ shots, brews = [], beans = [], gear = [], units }: Stats
       <div className="stats-low">{originsCard}{spendingCard}</div>
 
       {beans.some(b => b.origin?.trim()) && (
-        <div className="card">
+        <div className="card stats-map">
           <div className="card-head"><span className="card-title">Where your coffee comes from</span><span>all bags</span></div>
           <CoffeeMap beans={beans} />
         </div>

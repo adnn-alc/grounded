@@ -27,6 +27,10 @@ export function dayName(date: string, now: Date = new Date()): string {
   return longDate(date, now)
 }
 
+/** 'Today', 'Yesterday', 'Monday' this week, else '20 Oct', so it fits on one line */
+export const shortDay = (date: string, now: Date = new Date()): string =>
+  daysAgo(date, now) < DAYS_IN_WEEK ? dayName(date, now) : dayOf(date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+
 /** 'Friday 30 October', with the year when it isn't this year */
 export function longDate(date: string, now: Date = new Date()): string {
   const d = dayOf(date)

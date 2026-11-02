@@ -1,3 +1,4 @@
+import { dayOf } from './dates.ts'
 import type { Bean } from '../types.ts'
 
 /** Bean name for pickers; adds the roast date when two open bags share a name */
@@ -11,6 +12,18 @@ const TOO_FRESH_UNTIL = 7     // days off roast
 const WINDOW_UNTIL    = 28
 const AGING_UNTIL     = 42
 const FEW_SHOTS       = 3     // "about 2 shots left" below this
+const CENTS           = 2
+
+// Extraction's shelves: each bag gets its own color, picked from its id so it stays the same
+const BAG_COLORS = ['#c27a1c', '#b8452f', '#2f7d76', '#9e3d5f', '#4d5c9e', '#687f2e']
+export const bagColor = (id: string): string =>
+  BAG_COLORS[[...id].reduce((sum, ch) => sum + ch.charCodeAt(0), 0) % BAG_COLORS.length]!
+
+/** 'Roasted 20 Oct', for the bag's tags */
+export const roastedText = (date: string): string => `Roasted ${dayOf(date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`
+
+/** '€24' or '€12.50' */
+export const priceText = (price: number): string => `€${price % 1 === 0 ? price : price.toFixed(CENTS)}`
 
 /** Whole days since the roast date, or null without a usable date */
 export function daysOffRoast(bean: Bean, now: Date = new Date()): number | null {

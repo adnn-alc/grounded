@@ -1,12 +1,13 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { Backdrop } from '../components/ui.tsx'
 import { useUnits } from '../hooks/useUnits.ts'
 import Ico from '../components/Ico.tsx'
 import { PageHead } from '../components/Shell.tsx'
-import { BeanDosesModal } from '../components/BeanDoses.tsx'
-import { daysOffRoast, freshness, FRESHNESS_TEXT } from '../data/beans.ts'
+import { ExtractionBeans } from '../components/ExtractionBeans.tsx'
+import { BeanDosesModal, doseKey } from '../components/BeanDoses.tsx'
+import { daysOffRoast, freshness, FRESHNESS_TEXT, roastedText } from '../data/beans.ts'
 import { activeGear, BASKET_KIND } from '../data/gear.ts'
-import type { Bean, BeanInput, Gear, Route, Units } from '../types.ts'
+import type { Bean, BeanInput, Brew, Design, Gear, Route, Shot, Units } from '../types.ts'
 
 const PERCENT = 100
 const ICON = 14
@@ -27,6 +28,9 @@ const EMPTY_BEAN: BeanForm = {
 
 interface BeansProps {
   beans:         Bean[]
+  shots?:        Shot[]
+  brews?:        Brew[]
+  design?:       Design
   gear?:         Gear[]
   archivedCount?: number
   goTo?:         (route: Route) => void
@@ -35,16 +39,20 @@ interface BeansProps {
   onSaveBean:    (bean: BeanInput) => Promise<Bean>
   onUpdateBean:  (id: string, data: BeanInput) => Promise<Bean>
   onArchiveBean: (id: string) => Promise<Bean>
+  startAdding?:  boolean      // open the new-bag form right away (Home's Add a bag)
+  onStartConsumed?: () => void
 }
 
-export function Beans({ beans, gear = [], archivedCount = 0, goTo, onDialIn, units, onSaveBean, onUpdateBean, onArchiveBean }: BeansProps) {
+export function Beans({ beans, shots = [], brews = [], design, gear = [], archivedCount = 0, goTo, onDialIn, units, onSaveBean, onUpdateBean, onArchiveBean, startAdding = false, onStartConsumed }: BeansProps) {
   const U = useUnits(units)
   const basketOpts = activeGear(gear, BASKET_KIND).map(g => g.name)
-  const [adding, setAdding]   = useState(false)
+  const [adding, setAdding]   = useState(startAdding)
   const [editing, setEditing] = useState<Bean | null>(null)  // bean being edited
   const [dosesFor, setDosesFor] = useState<Bean | null>(null) // bean whose basket doses are open
   const [form, setForm]       = useState(EMPTY_BEAN)
   const [saving, setSaving]   = useState(false)
+
+  useEffect(() => { onStartConsumed?.() }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const setField = (k: keyof BeanForm, v: string) => setForm(f => ({ ...f, [k]: v }))
 
@@ -148,9 +156,11 @@ export function Beans({ beans, gear = [], archivedCount = 0, goTo, onDialIn, uni
   const whole = (g: number) => Math.round(parseFloat(U.m(g)))
   const sub = `${Math.ceil(parseFloat(U.m(totalLeft)))} ${U.mU()} available${ages.length ? `, roasted ${Math.min(...ages)} to ${Math.max(...ages)} days ago` : ''}`
 
+  const extraction = design === 'extraction'
+
   return (
     <div className="stack">
-      <PageHead title="Beans." sub={sub}>
+      <PageHead title={extraction ? 'Beans' : 'Beans.'} sub={sub}>
         <div className="seg">
           <button className="on">Open {beans.length}</button>
           <button onClick={() => goTo?.('archived-beans')}>Finished {archivedCount}</button>
@@ -158,13 +168,18 @@ export function Beans({ beans, gear = [], archivedCount = 0, goTo, onDialIn, uni
         <button className="primary-btn" onClick={openAdd}><Ico name="plus" size={ICON} /> Add bean</button>
       </PageHead>
 
-      {beans.length === 0 && <div className="card empty">No open bags. Add the one you're drinking now.</div>}
+      {extraction && (
+        <ExtractionBeans beans={beans} shots={shots} brews={brews} U={U} onAdd={openAdd}
+          onEdit={openEdit} onDoses={setDosesFor} onArchive={handleArchive} onDialIn={onDialIn} />
+      )}
 
-      <div className="bean-grid">
+      {!extraction && beans.length === 0 && <div className="card empty">No open bags. Add the one you're drinking now.</div>}
+
+      {!extraction && <div className="bean-grid">
         {beans.map(b => {
           const pct = b.weight > 0 ? Math.min(PERCENT, (b.remaining / b.weight) * PERCENT) : 0
           const days = daysOffRoast(b)
-          const tags = [b.process, b.roast, b.variety].filter(Boolean)
+          const tags = [b.process, b.roast, b.variety, b.roast_date && roastedText(b.roast_date)].filter(Boolean)
           return (
             <div key={b.id} className="card bean-card">
               <div style={{ minWidth: 0 }}>
@@ -174,7 +189,7 @@ export function Beans({ beans, gear = [], archivedCount = 0, goTo, onDialIn, uni
                 {b.notes?.length > 0 && <div className="notes">{b.notes.join(', ')}</div>}
                 <div className="dose-list">
                   {(b.doses || []).map(d => (
-                    <div key={d.basket} className="dose-row">
+                    <div key={doseKey(d)} className="dose-row">
                       <span>{d.basket}</span>
                       <span><b>{U.m(d.dose)} {U.mU()}</b></span>
                       <span className="g">{d.grind ? <>grind <b>{d.grind}</b></> : ''}</span>
@@ -212,7 +227,7 @@ export function Beans({ beans, gear = [], archivedCount = 0, goTo, onDialIn, uni
             </div>
           )
         })}
-      </div>
+      </div>}
 
       {showModal && (
         <Backdrop onClose={closeModal}>

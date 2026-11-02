@@ -2,6 +2,7 @@
 // the tests in server/*.test.ts import it directly.
 import express from 'express'
 import type { NextFunction, Request, Response } from 'express'
+import { randomUUID } from 'crypto'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import db, { SAMPLE_IDS, readSettings } from './db.ts'
@@ -191,6 +192,11 @@ function restock(before: { bean_id: string | null, dose: number | null }, after:
   adjustStock(after.bean_id, after.dose == null ? null : -after.dose)
 }
 
+// A new row's id when the client didn't send one: the time, plus a random part so two
+// rows saved in the same millisecond don't collide ('shot-1730550000000-3f9c2a1b')
+const ID_RANDOM_CHARS = 8
+const newId = (prefix: string): string => `${prefix}-${Date.now()}-${randomUUID().slice(0, ID_RANDOM_CHARS)}`
+
 // ── SHOTS ────────────────────────────────────────────────────────────
 app.get('/api/shots', (req, res) => {
   const rows = db.prepare<[], ShotRow>('SELECT * FROM shots ORDER BY date DESC').all()
@@ -199,7 +205,7 @@ app.get('/api/shots', (req, res) => {
 
 app.post('/api/shots', (req, res) => {
   const s = parseBody(shotSchema, req.body)
-  const id = s.id || 'shot-' + Date.now()
+  const id = s.id || newId('shot')
   const ref = resolveBean(s)
   const t = tasteResult(s)
   db.transaction(() => {
@@ -266,7 +272,7 @@ app.get('/api/brews', (req, res) => {
 
 app.post('/api/brews', (req, res) => {
   const b = parseBody(brewSchema, req.body)
-  const id = b.id || 'brew-' + Date.now()
+  const id = b.id || newId('brew')
   const ref = resolveBean(b)
   const t = tasteResult(b)
   db.transaction(() => {
@@ -338,7 +344,7 @@ app.get('/api/beans/archived', (req, res) => {
 
 app.post('/api/beans', (req, res) => {
   const b = parseBody(beanSchema, req.body)
-  const id = b.id || 'bean-' + Date.now()
+  const id = b.id || newId('bean')
   db.prepare(`
     INSERT INTO beans (id, name, roaster, origin, process, variety, roast_date, roast, altitude, notes, price, weight, remaining, stock, doses)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -387,7 +393,7 @@ app.get('/api/gear', (req, res) => {
 
 app.post('/api/gear', (req, res) => {
   const g = parseBody(gearSchema, req.body)
-  const id = g.id || 'gear-' + Date.now()
+  const id = g.id || newId('gear')
   db.prepare('INSERT INTO gear (id, kind, name, owned, status, meta, price) VALUES (?, ?, ?, ?, ?, ?, ?)')
     .run(id, g.kind, g.name, g.owned, g.status, g.meta, g.price || null)
   res.status(CREATED).json(getGear(id))
@@ -419,7 +425,7 @@ app.get('/api/recipes', (req, res) => {
 
 app.post('/api/recipes', (req, res) => {
   const r = parseBody(recipeSchema, req.body)
-  const id = r.id || 'recipe-' + Date.now()
+  const id = r.id || newId('recipe')
   db.prepare(`INSERT INTO recipes (id, name, type, time, dose, water, ratio, temp, grind, author, tags, steps)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
     .run(id, r.name, r.type, r.time, r.dose, r.water, r.ratio, r.temp, r.grind, r.author,
@@ -448,7 +454,7 @@ app.get('/api/tips', (req, res) => {
 
 app.post('/api/tips', (req, res) => {
   const t = parseBody(tipSchema, req.body)
-  const id = t.id || 'tip-' + Date.now()
+  const id = t.id || newId('tip')
   db.prepare('INSERT INTO tips (id, section, category, body, sort_order) VALUES (?, ?, ?, ?, ?)')
     .run(id, t.section, t.category, t.body || '', t.sort_order || 0)
   res.status(CREATED).json(getTip(id))

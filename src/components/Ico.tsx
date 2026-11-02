@@ -11,6 +11,7 @@ const paths = {
   chart:     <><path d="M3 21V5"/><path d="M3 21h18"/><path d="M7 17v-4M11 17V9M15 17v-7M19 17V7"/></>,
   box:       <><path d="M3 7 12 3l9 4v10l-9 4-9-4z"/><path d="M3 7l9 4 9-4M12 11v10"/></>,
   plus:      <><path d="M12 5v14M5 12h14"/></>,
+  minus:     <path d="M5 12h14"/>,
   search:    <><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></>,
   check:     <path d="M5 12l5 5L20 7"/>,
   arrow:     <><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></>,

@@ -8,6 +8,7 @@ interface LandedSliderProps {
   onBadChange?: (bad: boolean) => void
   title?:       string    // 'How did it land?' on Dial-in, 'Landed' in history
   badLabel?:    string    // 'Bad shot' / 'Bad brew'
+  labelBelow?:  boolean   // Extraction: where it landed goes between Sour and Bitter, not in the heading
 }
 
 /**
@@ -15,7 +16,7 @@ interface LandedSliderProps {
  * slider out: a channeled or gushing shot isn't placed anywhere. Without onChange
  * it only shows where a saved shot landed.
  */
-export function LandedSlider({ landed, bad, onChange, onBadChange, title = 'How did it land?', badLabel = 'Bad shot' }: LandedSliderProps) {
+export function LandedSlider({ landed, bad, onChange, onBadChange, title = 'How did it land?', badLabel = 'Bad shot', labelBelow = false }: LandedSliderProps) {
   const trackRef = useRef<HTMLDivElement>(null)
   const editable = Boolean(onChange) && !bad
 
@@ -41,7 +42,7 @@ export function LandedSlider({ landed, bad, onChange, onBadChange, title = 'How 
     <div>
       <div className="landed-head">
         <b>{title}</b>
-        <em className={bad || landed == null ? 'off' : ''}>{label}</em>
+        {!labelBelow && <em className={bad || landed == null ? 'off' : ''}>{label}</em>}
         {onBadChange && (
           <label className={`bad-check${bad ? ' on' : ''}`}>
             {badLabel}
@@ -58,7 +59,11 @@ export function LandedSlider({ landed, bad, onChange, onBadChange, title = 'How 
         {/* Not placed yet: a hollow knob in the middle shows the slider can be dragged */}
         {landed == null && editable && <div className="knob ghost" style={{ left: `${LANDED_BALANCED}%` }} />}
       </div>
-      <div className="landed-ends"><span>Sour</span><span>Balanced</span><span>Bitter</span></div>
+      <div className="landed-ends">
+        <span>Sour</span>
+        {labelBelow ? <b className={bad || landed == null ? 'off' : ''}>{label}</b> : <span>Balanced</span>}
+        <span>Bitter</span>
+      </div>
     </div>
   )
 }
@@ -70,5 +75,16 @@ export function MiniLanded({ landed, bad, badLabel = 'Bad shot' }: { landed: num
     <span className={`mini-landed${landed == null ? ' unset' : ''}`} title={landedLabel(landed)}>
       {landed != null && <i style={{ left: `${landed}%` }} />}
     </span>
+  )
+}
+
+/** Extraction's read-only sour-to-bitter bar: a marker where it landed and the word for it under the middle (grayed out for a bad one) */
+export function LandedGauge({ landed, bad, badLabel = 'Bad shot' }: { landed: number | null; bad: boolean; badLabel?: string }) {
+  const placed = landed != null && !bad
+  return (
+    <div className="xg">
+      <div className={`xg-bar${placed ? '' : ' off'}`}>{placed && <i style={{ left: `${landed}%` }} />}</div>
+      <div className="xg-ends"><span>Sour</span><b className={bad ? 'bad' : ''}>{bad ? badLabel : landedLabel(landed)}</b><span>Bitter</span></div>
+    </div>
   )
 }

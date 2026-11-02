@@ -116,7 +116,7 @@ export function RecipesPage({ recipes = [], units, onSaveRecipe, onUpdateRecipe,
   const formRatio = ratioText(parseFloat(form.dose) || 0, parseFloat(form.water) || 0, 'filter')
 
   return (
-    <div className="stack">
+    <div className="stack recipes-page">
       <PageHead title="Recipes." sub={`${recipes.length} saved`}>
         <button className="primary-btn" onClick={() => setAdding(true)}><Ico name="plus" size={ICON} /> Add recipe</button>
       </PageHead>

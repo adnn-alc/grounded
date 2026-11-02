@@ -4,15 +4,23 @@ import Ico from './Ico.tsx'
 import type { UnitHelpers } from '../hooks/useUnits.ts'
 import type { Bean, BeanDose, BeanInput } from '../types.ts'
 
-// A bean's doses are [{ basket, dose, grind? }] — one measured dose per basket.
-// grind is the reference grind setting the dose was measured at (optional).
-// Adding a basket that already has an entry replaces its dose.
+// A bean's doses are [{ basket, dose, grind? }] — one measured dose per basket and grind.
+// grind is the grind setting the dose was measured at (optional), so one basket can have a
+// dose for each grind. Adding a basket and grind that already have an entry replaces its dose.
+const sameEntry = (d: BeanDose, basket: string, grind: number | undefined) => d.basket === basket && (d.grind || 0) === (grind || 0)
+
+/** One basket and grind, as a React key */
+export const doseKey = (d: BeanDose): string => `${d.basket}|${d.grind ?? ''}`
+
 export function upsertDose(doses: BeanDose[] = [], basket: string, dose: number, grind: number): BeanDose[] {
   const entry: BeanDose = grind > 0 ? { basket, dose, grind } : { basket, dose }
-  return [...doses.filter(d => d.basket !== basket), entry].sort((a, b) => a.dose - b.dose)
+  return [...doses.filter(d => !sameEntry(d, basket, entry.grind)), entry].sort((a, b) => a.dose - b.dose || (a.grind || 0) - (b.grind || 0))
 }
 
 const withCurrent = (opts: string[], cur: string) => cur && !opts.includes(cur) ? [cur, ...opts] : opts
+
+// Compact chips next to saved doses only need a +
+const addLabel = (compact: boolean, hasDoses: boolean): string => compact && hasDoses ? '+' : '+ Add basket'
 
 // ── Dial-in: the selected bag's doses as chips ────────────────────────
 // Tapping a chip uses that basket and dose. The basket is the same value as the
@@ -25,9 +33,12 @@ interface BasketChipsProps {
   onUpdateBean:   (id: string, data: BeanInput) => Promise<Bean>
   onApply:        (dose: BeanDose) => void
   onSelectBasket: (basket: string) => void
+  currentDose?:   string    // with two doses for one basket, the one matching these is marked
+  currentGrind?:  string
+  compact?:       boolean   // Extraction: no heading, and a small + to add one
 }
 
-export function BasketChips({ bean, basketOpts, currentBasket, U, onUpdateBean, onApply, onSelectBasket }: BasketChipsProps) {
+export function BasketChips({ bean, basketOpts, currentBasket, U, onUpdateBean, onApply, onSelectBasket, currentDose, currentGrind, compact = false }: BasketChipsProps) {
   const doses = bean.doses || []
   const [editing,  setEditing]  = useState(false)
   const [newDose,  setNewDose]  = useState('')
@@ -49,6 +60,13 @@ export function BasketChips({ bean, basketOpts, currentBasket, U, onUpdateBean, 
     setEditing(false)
   }
 
+  // The chip in use: its basket, and when that basket has more than one dose, also its dose and grind
+  const isOn = (d: BeanDose) => {
+    if (d.basket !== currentBasket) return false
+    if (doses.filter(x => x.basket === d.basket).length === 1) return true
+    return parseFloat(currentDose ?? '') === d.dose && (!d.grind || parseFloat(currentGrind ?? '') === d.grind)
+  }
+
   const pickBasket = (b: string) => {
     const saved = doses.find(d => d.basket === b)
     if (saved) onApply(saved)
@@ -57,18 +75,20 @@ export function BasketChips({ bean, basketOpts, currentBasket, U, onUpdateBean, 
 
   return (
     <div>
-      <div className="card-head" style={{ marginBottom: 8 }}>
-        <span>Basket doses for this bag</span>
-        <span className="card-more">{doses.length ? 'tap one to use it' : ''}</span>
-      </div>
+      {!compact && (
+        <div className="card-head" style={{ marginBottom: 8 }}>
+          <span>Basket doses for this bag</span>
+          <span className="card-more">{doses.length ? 'tap one to use it' : ''}</span>
+        </div>
+      )}
       <div className="chip-grid">
         {doses.map(d => (
-          <div key={d.basket} className={`chip${d.basket === currentBasket ? ' on' : ''}`} role="button" tabIndex={0}
+          <div key={doseKey(d)} className={`chip${isOn(d) ? ' on' : ''}`} role="button" tabIndex={0}
             title={d.grind ? `Measured at grind ${d.grind}` : 'Use this basket and dose'}
             onClick={() => onApply(d)} onKeyDown={e => { if (e.key === 'Enter') onApply(d) }}>
             <span className="c-k">{d.basket}{editing && (
               <button type="button" aria-label={`Remove ${d.basket}`} disabled={saving} style={{ marginLeft: 6, color: 'var(--text-4)' }}
-                onClick={e => { e.stopPropagation(); save(doses.filter(x => x.basket !== d.basket)) }}>×</button>
+                onClick={e => { e.stopPropagation(); save(doses.filter(x => doseKey(x) !== doseKey(d))) }}>×</button>
             )}</span>
             <span className="c-row">
               <span className="c-v">{U.m(d.dose)} {U.mU()}</span>
@@ -76,7 +96,10 @@ export function BasketChips({ bean, basketOpts, currentBasket, U, onUpdateBean, 
             </span>
           </div>
         ))}
-        <button type="button" className="chip add" onClick={() => setEditing(e => !e)}>{editing ? 'Done' : '+ Add basket'}</button>
+        <button type="button" className="chip add" onClick={() => setEditing(e => !e)}
+          aria-label={compact && !editing ? 'Add a basket dose' : undefined} title={compact && !editing ? 'Add a basket dose' : undefined}>
+          {editing ? 'Done' : addLabel(compact, doses.length > 0)}
+        </button>
       </div>
       {editing && (
         <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 80px 80px auto', gap: 8, marginTop: 10 }}>
@@ -122,7 +145,7 @@ export function BeanDosesModal({ bean, basketOpts, onSave, onClose }: BeanDosesM
 
   const handleSave = async (e: FormEvent) => {
     e.preventDefault()
-    // Last row wins if the same basket is listed twice
+    // Last row wins if the same basket and grind are listed twice
     const doses = rows.reduce<BeanDose[]>((acc, r) => {
       const dose = parseFloat(r.dose)
       return r.basket && dose > 0 ? upsertDose(acc, r.basket, dose, parseFloat(r.grind)) : acc
