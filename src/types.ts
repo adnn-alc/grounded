@@ -188,7 +188,7 @@ export type Design = 'refined' | 'extraction'
 
 /** Extraction keeps its own theme and fonts, so switching designs back and forth loses nothing */
 export interface ExtractionLook {
-  theme?: string                              // 'roast' or 'crema'
+  theme?: string                              // 'roast', 'mocha', 'latte' or 'crema'
   fonts?: Partial<Record<'sans' | 'serif', string>>   // text, and numbers and headings
 }
 

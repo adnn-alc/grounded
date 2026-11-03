@@ -89,7 +89,7 @@ export const EXTRACTION_FONT_IDS: Record<'serif' | 'sans', string[]> = {
   sans:  ['instrument-sans', 'geist', 'dm-sans', 'inter'],
 }
 const EXTRACTION_FONTS = { serif: 'fraunces', sans: 'instrument-sans' }
-export const EXTRACTION_THEME_IDS = ['roast', 'crema']
+export const EXTRACTION_THEME_IDS = ['roast', 'mocha', 'latte', 'crema']
 
 /** What <html> gets: the design, its theme and a font id per role */
 export interface Look { design: Design; theme: string; fonts: Fonts }
@@ -115,7 +115,7 @@ export function applyAppearance(look: Look) {
   const root = document.documentElement
   root.setAttribute('data-design', look.design)
   root.setAttribute('data-theme', look.theme)
-  for (const { role } of FONT_ROLES) root.style.setProperty(`--font-${role}`, stackFor(look, role))
+  FONT_ROLES.forEach(({ role }) => root.style.setProperty(`--font-${role}`, stackFor(look, role)))
   try { localStorage.setItem('grounded-look', JSON.stringify(look)) } catch {}
 }
 

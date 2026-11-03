@@ -8,6 +8,8 @@ All notable changes to Grounded are listed here. Versions follow [Semantic Versi
 
 ## [Unreleased]
 
+- Extraction has two more themes in Settings → Appearance: **Mocha**, a dark cocoa brown that's easier on the eyes than Roast's near-black, and **Latte**, a muted milky beige that's softer than Crema's near-white
+
 ## [1.4.0] — 2026-11-02
 
 A redesign (Refined), a second design to switch to (Extraction), a page that works on a phone, and a sour-to-bitter slider instead of the verdict buttons. Your database is upgraded automatically on the first start, after a backup copy is saved next to it. An older version can still read the upgraded database.

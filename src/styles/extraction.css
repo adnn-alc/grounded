@@ -41,6 +41,78 @@
   --shadow-2:    0 18px 60px rgb(0 0 0 / 0.55);
 }
 
+/* ── Mocha — Roast lifted off black: cocoa brown, softer text ── */
+[data-design="extraction"][data-theme="mocha"] {
+  --bg:          #33251f;
+  --bg-2:        #2b1f1a;
+  --surface:     #3a2a23;
+  --surface-2:   #46352d;
+  --surface-3:   #523f35;
+  --border:      #4f3d34;
+  --border-strong: #604b41;
+  --text:        #f7ece3;
+  --text-2:      #d9c7b9;
+  --text-3:      #b29c8d;
+  --text-4:      #937868;
+  --crema:       #f4bc68;
+  --crema-2:     #dca452;
+  --crema-dim:   #a27c4f;
+  --cherry:      #ef5e50;
+  --sour:        #6fc3cc;
+  --sweet:       #f4bc68;
+  --bitter:      #d76c4c;
+  --good:        #a9da96;
+  --under:       #f4bc68;
+  --over:        #d76c4c;
+  --bad:         #ff9786;
+  --on-accent:   #2e1c14;
+  --primary:     #ef5e50;
+  --on-primary:  #fff5f0;
+  --gauge:       linear-gradient(90deg, #4a8d96 0%, #6fc3cc 22%, #f4bc68 42%, #f4bc68 62%, #d76c4c 82%, #ab3a2f 100%);
+  --coffee:      #7f5d4e;
+  --bloom:       #d3a07a;
+  --body:        #d3a07a;
+  --finish:      #ddb2d0;
+  --shadow-1:    0 2px 8px rgb(0 0 0 / 0.28);
+  --shadow-2:    0 18px 60px rgb(0 0 0 / 0.45);
+}
+
+/* ── Latte — Crema turned down: milky beige, dark brown text ── */
+[data-design="extraction"][data-theme="latte"] {
+  --bg:          #d8cbbb;
+  --bg-2:        #cfc0ae;
+  --surface:     #e1d6c9;
+  --surface-2:   #cab9a7;
+  --surface-3:   #bfad9a;
+  --border:      #c3b29f;
+  --border-strong: #ad9884;
+  --text:        #2c2019;
+  --text-2:      #4e3c30;
+  --text-3:      #725d4e;
+  --text-4:      #8b7363;
+  --crema:       #985b16;
+  --crema-2:     #82490e;
+  --crema-dim:   #b48f69;
+  --cherry:      #ae352b;
+  --sour:        #367f88;
+  --sweet:       #985b16;
+  --bitter:      #a2442a;
+  --good:        #467a3d;
+  --under:       #985b16;
+  --over:        #a2442a;
+  --bad:         #ae352b;
+  --on-accent:   #faf2e9;
+  --primary:     #ae352b;
+  --on-primary:  #faf0e8;
+  --gauge:       linear-gradient(90deg, #2a666e 0%, #3f8b95 22%, #c4852f 42%, #c4852f 62%, #a8482b 82%, #7a1f17 100%);
+  --coffee:      #74513f;
+  --bloom:       #a4714b;
+  --body:        #966442;
+  --finish:      #93587f;
+  --shadow-1:    0 1px 3px rgb(50 28 16 / 0.10);
+  --shadow-2:    0 18px 50px rgb(50 28 16 / 0.20);
+}
+
 /* ── Crema — warm light, same accents ── */
 [data-design="extraction"][data-theme="crema"] {
   --bg:          #f6ece0;

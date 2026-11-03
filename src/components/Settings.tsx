@@ -23,6 +23,8 @@ interface XSwatch { id: string; name: string; tag: string; bg: string; card: str
 
 const XTHEMES: XSwatch[] = [
   { id: 'roast', name: 'Roast', tag: 'Oxblood, crema and cherry', bg: '#1c100e', card: '#2e1a16', txt: '#fbefe6', muted: '#a88f81', crema: '#f2b35a', cherry: '#e2483d', arrow: '#6d4a3f' },
+  { id: 'mocha', name: 'Mocha', tag: 'Cocoa brown, softer dark',  bg: '#33251f', card: '#46352d', txt: '#f7ece3', muted: '#b29c8d', crema: '#f4bc68', cherry: '#ef5e50', arrow: '#7f5d4e' },
+  { id: 'latte', name: 'Latte', tag: 'Milky beige, softer light', bg: '#d8cbbb', card: '#cab9a7', txt: '#2c2019', muted: '#725d4e', crema: '#985b16', cherry: '#ae352b', arrow: '#a08a75' },
   { id: 'crema', name: 'Crema', tag: 'Warm light, same accents',  bg: '#f6ece0', card: '#ead9c6', txt: '#2a160f', muted: '#8a6a58', crema: '#b8741f', cherry: '#c7362b', arrow: '#c9ad95' },
 ]
 
