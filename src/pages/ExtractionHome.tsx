@@ -1,11 +1,13 @@
 import { useState, type CSSProperties } from 'react'
 import Ico from '../components/Ico.tsx'
 import { SampleDataBanner } from '../components/SampleDataBanner.tsx'
+import { CareReminder } from '../components/Care.tsx'
+import { Frost } from '../components/Frost.tsx'
 import { useUnits } from '../hooks/useUnits.ts'
 import { bagColor, daysOffRoast, usualDose } from '../data/beans.ts'
 import { LandedGauge, MiniLanded } from '../components/Landed.tsx'
 import { dayKey, dayOf, isoDaysAgo, shortDay, timeOf, whenText } from '../data/dates.ts'
-import { mmss, ratioText } from '../data/taste.ts'
+import { mmss, ratingsOf, ratingText, ratioText } from '../data/taste.ts'
 import type { Bean, Brew, Shot } from '../types.ts'
 import type { HomeProps } from './Home.tsx'
 
@@ -63,10 +65,11 @@ function Activity({ items, now }: { items: { date: string }[]; now: Date }) {
   )
 }
 
-/** Under a bag: how many shots when it's nearly gone, else how many days off roast */
-function shelfFoot(left: number, days: number | null): string {
+/** Under a bag: how many shots when it's nearly gone, 'frozen' in the freezer, else how many days off roast */
+function shelfFoot(left: number, days: number | null, frozen: boolean): string {
   if (left < 1) return 'too little'
   if (left < FEW_SHOTS) return plural(left, 'shot', 'shots')
+  if (frozen) return 'frozen'
   return days == null ? '' : `day ${days}`
 }
 
@@ -75,11 +78,12 @@ function BagOnShelf({ bean, dose, U, onPick }: { bean: Bean; dose: number; U: Re
   const days = daysOffRoast(bean)
   const left = dose > 0 ? Math.floor(bean.remaining / dose) : 0
   const low = bean.stock !== 'good' || left < FEW_SHOTS
-  const foot = shelfFoot(left, days)
+  const foot = shelfFoot(left, days, !!bean.frozen_at)
   return (
-    <button className={`xbag${low ? ' low' : ''}`} title="Dial in with this bag" onClick={onPick}
+    <button className={`xbag${low ? ' low' : ''}${bean.frozen_at ? ' frozen' : ''}`} title="Dial in with this bag" onClick={onPick}
       style={{ '--bag': bagColor(bean.id) } as CSSProperties}>
       <span className="xbag-fill" style={{ height: `${pct}%` }} />
+      <Frost bean={bean} />
       <span className="xbag-lab">
         <b>{bean.name}</b>
         <span>{bean.roaster}</span>
@@ -90,7 +94,7 @@ function BagOnShelf({ bean, dose, U, onPick }: { bean: Bean; dose: number; U: Re
   )
 }
 
-export default function ExtractionHome({ shots, brews, beans, units, goTo, onRepull, onStartDialin, onAddBag, showSampleBanner, onRemoveSampleData, onKeepSampleData }: HomeProps) {
+export default function ExtractionHome({ shots, brews, beans, units, goTo, onRepull, onStartDialin, onAddBag, showSampleBanner, onRemoveSampleData, onKeepSampleData, care }: HomeProps) {
   const U = useUnits(units)
   const [now] = useState(() => new Date())
   const [page, setPage] = useState(0)
@@ -107,9 +111,9 @@ export default function ExtractionHome({ shots, brews, beans, units, goTo, onRep
   const weekShots = shots.filter(s => inWeek(s.date))
   const weekBrews = brews.filter(b => inWeek(b.date))
   const coffeesToday = [...shots, ...brews].filter(x => dayKey(x.date) === today).length
-  const shotAvg = avg(weekShots.map(s => s.rating))
-  const prevAvg = avg(shots.filter(s => inPrev(s.date)).map(s => s.rating))
-  const brewAvg = avg(weekBrews.map(b => b.rating))
+  const shotAvg = avg(ratingsOf(weekShots))
+  const prevAvg = avg(ratingsOf(shots.filter(s => inPrev(s.date))))
+  const brewAvg = avg(ratingsOf(weekBrews))
   const delta = shotAvg != null && prevAvg != null ? shotAvg - prevAvg : null
 
   const last = shots[0]
@@ -138,6 +142,8 @@ export default function ExtractionHome({ shots, brews, beans, units, goTo, onRep
         <SampleDataBanner onRemove={onRemoveSampleData} onKeep={onKeepSampleData} />
       )}
 
+      {care && <CareReminder {...care} />}
+
       <div className="xhero">
       {!last ? (
         <div className="xhero-empty">
@@ -163,7 +169,7 @@ export default function ExtractionHome({ shots, brews, beans, units, goTo, onRep
             <LandedGauge landed={last.landed} bad={Boolean(last.bad)} />
           </div>
           <div className="xhero-side">
-            <div className="xscore"><span className="xnum">{last.rating.toFixed(RATING_DECIMALS)}</span><span>/ 10</span></div>
+            <div className="xscore"><span className="xnum">{ratingText(last.rating, RATING_DECIMALS)}</span><span>/ 10</span></div>
             <div className="xbean">{[last.bean || 'Espresso', last.roaster].filter(Boolean).join(', ')}</div>
             {last.notes && <div className="xnote">{last.notes}</div>}
             <div className="xacts">
@@ -222,7 +228,7 @@ export default function ExtractionHome({ shots, brews, beans, units, goTo, onRep
                     <span>{it.kind === 'brew' && `${it.dripper || 'Filter'}, `}{itemNums(it, U)}</span>
                   </span>
                   <MiniLanded landed={it.landed} bad={Boolean(it.bad)} badLabel={it.kind === 'shot' ? 'Bad shot' : 'Bad brew'} />
-                  <span className="score">{it.rating.toFixed(RATING_DECIMALS)}</span>
+                  <span className="score">{ratingText(it.rating, RATING_DECIMALS)}</span>
                 </button>
               ))}
             </div>

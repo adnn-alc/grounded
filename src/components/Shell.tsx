@@ -24,9 +24,14 @@ const BAGS: NavEntry[] = [
 ]
 
 /** Page names, also used for the browser tab title */
-export const ROUTE_LABELS: Record<Route, string> = Object.fromEntries(
-  [...WORKSPACE, ...LIBRARY, ...BAGS].map(e => [e.id, e.label])
-) as Record<Route, string>
+export const ROUTE_LABELS: Record<Route, string> = {
+  ...Object.fromEntries([...WORKSPACE, ...LIBRARY, ...BAGS].map(e => [e.id, e.label])),
+  bean: 'Bag',
+} as Record<Route, string>
+
+/** Pages that light up another page's link: a bag's page belongs to Beans */
+const PART_OF: Partial<Record<Route, Route>> = { bean: 'beans' }
+const isOn = (route: Route, id: Route): boolean => route === id || PART_OF[route] === id
 
 const BRAND_SIZE = 26
 
@@ -65,7 +70,7 @@ interface NavLinkProps {
 
 function NavLink({ entry, route, setRoute, count }: NavLinkProps) {
   return (
-    <a href={`#/${entry.id}`} className={`nav-item${route === entry.id ? ' active' : ''}`}
+    <a href={`#/${entry.id}`} className={`nav-item${isOn(route, entry.id) ? ' active' : ''}`}
       onClick={e => { if (e.metaKey || e.ctrlKey) return; e.preventDefault(); setRoute(entry.id) }}>
       <Ico name={entry.icon} size={17} className="ico" />
       <span>{entry.label}</span>
@@ -110,7 +115,7 @@ const RAIL: RailEntry[] = [
   { id: 'home',         label: 'Home',    icon: 'home' },
   { id: 'dialin',       label: 'Dial-in', icon: 'timer' },
   { id: 'shot-history', label: 'History', icon: 'history', also: ['brew-history'] },
-  { id: 'beans',        label: 'Beans',   icon: 'beans',   also: ['archived-beans'] },
+  { id: 'beans',        label: 'Beans',   icon: 'beans',   also: ['archived-beans', 'bean'] },
   { id: 'recipes',      label: 'Recipes', icon: 'book' },
   { id: 'stats',        label: 'Stats',   icon: 'chart' },
 ]
@@ -196,7 +201,7 @@ export function TabBar({ route, setRoute, onOpenSettings }: { route: Route; setR
         <a href="#/dialin" className="tab" onClick={e => { e.preventDefault(); go('dialin') }}>
           <span className="fab"><Ico name="plus" size={22} /></span>Pull
         </a>
-        {tab('beans', 'Beans', 'beans', route === 'beans')}
+        {tab('beans', 'Beans', 'beans', isOn(route, 'beans'))}
         <button className={`tab${inMore || moreOpen ? ' on' : ''}`} onClick={() => setMoreOpen(o => !o)}>
           <Ico name="more" size={22} />More
         </button>

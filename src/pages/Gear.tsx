@@ -1,8 +1,9 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { Backdrop } from '../components/ui.tsx'
 import Ico from '../components/Ico.tsx'
 import { Field } from '../components/Fields.tsx'
 import { PageHead } from '../components/Shell.tsx'
+import { CarePanel, type CarePanelProps } from '../components/Care.tsx'
 import type { Gear, GearInput } from '../types.ts'
 
 // ── GEAR ──────────────────────────────────────────────────────────────
@@ -29,9 +30,15 @@ interface GearPageProps {
   onSaveGear:   (g: GearInput) => Promise<Gear>
   onUpdateGear: (id: string, g: GearInput) => Promise<Gear>
   onDeleteGear: (id: string) => Promise<void>
+  care:         Omit<CarePanelProps, 'gear'>   // the Care tab
+  startOnCare?: boolean                         // Home's reminder opens the Care tab
+  onStartConsumed?: () => void
 }
 
-export function GearPage({ gear = [], onSaveGear, onUpdateGear, onDeleteGear }: GearPageProps) {
+export function GearPage({ gear = [], onSaveGear, onUpdateGear, onDeleteGear, care, startOnCare = false, onStartConsumed }: GearPageProps) {
+  const [tab, setTab] = useState<'gear' | 'care'>(startOnCare ? 'care' : 'gear')
+  useEffect(() => { onStartConsumed?.() }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  const anyDue = care.statuses.some(s => s.due && s.gear)
   // null: closed, 'new': adding, otherwise the item being edited
   const [open, setOpen]     = useState<Gear | 'new' | null>(null)
   const [form, setForm]     = useState(EMPTY_FORM)
@@ -64,21 +71,29 @@ export function GearPage({ gear = [], onSaveGear, onUpdateGear, onDeleteGear }: 
   }
 
   const handleDelete = async (g: Gear) => {
-    if (!confirm(`Remove ${g.name} from your gear? Shots that used it keep its name.`)) return
+    if (!confirm(`Remove ${g.name} from your gear? Shots that used it keep its name. Its care tasks are deleted; the care log stays.`)) return
     await onDeleteGear(g.id)
   }
 
   return (
     <div className="stack gear-page">
       <PageHead title="Gear." sub={`${gear.length} ${gear.length === 1 ? 'item' : 'items'}`}>
-        <button className="primary-btn" onClick={openAdd}><Ico name="plus" size={ICON} /> Add gear</button>
+        <div className="seg">
+          <button className={tab === 'gear' ? 'on' : ''} onClick={() => setTab('gear')}>Gear</button>
+          <button className={tab === 'care' ? 'on' : ''} onClick={() => setTab('care')}>Care{anyDue && <span className="due-dot" aria-label="something is due" />}</button>
+        </div>
+        {/* On Care the button keeps its place (hidden), so the tabs don't move when switching */}
+        <button className="primary-btn" style={tab === 'care' ? { visibility: 'hidden' } : undefined} aria-hidden={tab === 'care'} tabIndex={tab === 'care' ? -1 : undefined}
+          onClick={openAdd}><Ico name="plus" size={ICON} /> Add gear</button>
       </PageHead>
 
-      {gear.length === 0 && (
+      {tab === 'care' && <CarePanel gear={gear} {...care} />}
+
+      {tab === 'gear' && gear.length === 0 && (
         <div className="card"><div className="empty">No gear yet. Add your machine, grinder and baskets, and Dial-in offers them when you log a shot.</div></div>
       )}
 
-      <div className="gear-grid-page">
+      {tab === 'gear' && <div className="gear-grid-page">
         {kinds.map(kind => {
           const items = gear.filter(g => g.kind === kind)
           return (
@@ -101,7 +116,7 @@ export function GearPage({ gear = [], onSaveGear, onUpdateGear, onDeleteGear }: 
             </div>
           )
         })}
-      </div>
+      </div>}
 
       {open && (
         <Backdrop onClose={close}>

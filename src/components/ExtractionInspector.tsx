@@ -81,10 +81,12 @@ export function ExtractionInspector({ kind, number, item, record, pills, facts, 
 
       <div className="xins-taste">
         <div className="xins-score">
-          <div className={`xscore${item.bad ? ' low' : ''}`}><span className="xnum">{item.rating.toFixed(RATING_DECIMALS)}</span><span>/ 10</span></div>
+          {item.rating == null
+            ? <Untasted onEdit={onEdit} />
+            : <div className={`xscore${item.bad ? ' low' : ''}`}><span className="xnum">{item.rating.toFixed(RATING_DECIMALS)}</span><span>/ 10</span></div>}
           {item.notes && <p className="xins-note">{item.notes}</p>}
         </div>
-        <FlavorRadar taste={item.taste} size={RADAR_SIZE} />
+        {item.rating != null && <FlavorRadar taste={item.taste} size={RADAR_SIZE} />}
       </div>
 
       {shownGear.length > 0 && (
@@ -99,6 +101,17 @@ export function ExtractionInspector({ kind, number, item, record, pills, facts, 
         {onDelete && <button className="ghost-btn lg danger" onClick={onDelete}><Ico name="trash" size={ICON} /> Delete</button>}
       </div>
     </section>
+  )
+}
+
+/** In place of the rating, for a quick shot: it was saved without tasting it, and taste can be added now */
+export function Untasted({ onEdit }: { onEdit?: () => void }) {
+  return (
+    <div className="untasted">
+      <b>Not tasted yet</b>
+      <span>Saved with quick log, so it has no rating or taste.</span>
+      {onEdit && <button className="ghost-btn lg" onClick={onEdit}><Ico name="plus" size={ICON} /> Add taste</button>}
+    </div>
   )
 }
 

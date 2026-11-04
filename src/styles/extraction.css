@@ -43,17 +43,17 @@
 
 /* ── Mocha — Roast lifted off black: cocoa brown, softer text ── */
 [data-design="extraction"][data-theme="mocha"] {
-  --bg:          #33251f;
-  --bg-2:        #2b1f1a;
-  --surface:     #3a2a23;
-  --surface-2:   #46352d;
-  --surface-3:   #523f35;
-  --border:      #4f3d34;
-  --border-strong: #604b41;
-  --text:        #f7ece3;
-  --text-2:      #d9c7b9;
-  --text-3:      #b29c8d;
-  --text-4:      #937868;
+  --bg:          #2e211b;
+  --bg-2:        #261b16;
+  --surface:     #3b2b23;
+  --surface-2:   #493730;
+  --surface-3:   #57433a;
+  --border:      #534037;
+  --border-strong: #67524a;
+  --text:        #fbf2ea;
+  --text-2:      #e5d4c7;
+  --text-3:      #c1ab9c;
+  --text-4:      #a28979;
   --crema:       #f4bc68;
   --crema-2:     #dca452;
   --crema-dim:   #a27c4f;
@@ -314,6 +314,10 @@
 .xbag-d { position: absolute; right: 12px; bottom: 14px; font-size: 12px; opacity: 0.85; }
 /* Nearly gone: a cherry ring so it stands out whatever its color */
 .xbag.low { box-shadow: inset 0 0 0 3px var(--cherry); }
+/* In the freezer: the bag goes pale and icy under the frost, with a snowflake by its foot */
+.xbag.frozen { background: color-mix(in srgb, var(--bag) 30%, #1d2a36); }
+.xbag.frozen .xbag-fill { filter: saturate(0.45) brightness(1.1); }
+.xbag.frozen .xbag-d { display: inline-flex; align-items: center; gap: 4px; color: #e3f3ff; opacity: 1; z-index: 3; }
 .xbag-add { border: 2px dashed var(--border-strong); color: var(--text-3); font-size: 14px; }
 .xbag-add:hover { color: var(--text); border-color: var(--text-4); }
 
@@ -561,6 +565,8 @@
 .xbean-left .xnum small { font-family: var(--font-sans); font-size: 18px; font-weight: 400; color: var(--text-3); margin-left: 6px; letter-spacing: 0; }
 .xbean-left p { margin: 10px 0 16px; color: var(--text-3); font-size: 14px; line-height: 1.6; }
 .xbean-acts { display: flex; gap: 8px; }
+/* The freezer switch and its 'since …' line get some room above the buttons */
+.xbean-left .freezer { margin: 0 0 20px; gap: 4px; }
 .xbean-acts .sq { width: 42px; padding: 0; justify-content: center; }
 .xbean-best { margin-top: 26px; padding-top: 20px; border-top: 1px solid var(--border); }
 .xbean-best-list { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
@@ -748,6 +754,7 @@
   .xbean-det { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 28px 36px; }
   .xbean-left { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 12px 28px; }
   .xbean-left p { margin: 0; }
+  .xbean-left .freezer { margin: 0; }
   .xbean-acts { margin-left: auto; }
 }
 
@@ -792,6 +799,7 @@
   .xbean-left { display: block; grid-row: 2; }
   .xbean-left .xnum { font-size: 52px; }
   .xbean-left p { margin: 8px 0 14px; }
+  .xbean-left .freezer { margin: 0 0 18px; }
   .xbean-acts { margin-left: 0; }
   .xbean-acts .primary-btn { flex: 1; }
   .xbean-best-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
@@ -896,3 +904,26 @@
   .xins-rec .xu { font-size: 16px; }
   .xins-name { font-size: 22px; }
 }
+
+/* A bag's own page: open sections on the page background, big serif numbers */
+[data-design="extraction"] .bag-sec { background: transparent; border-radius: 0; padding: 18px 0 0; border-top: 1px solid var(--border); }
+[data-design="extraction"] .bag-lbl b { font-weight: 600; }
+[data-design="extraction"] .bag-num { font-weight: 700; font-variation-settings: var(--num-soft); letter-spacing: -0.03em; line-height: 0.86; }
+[data-design="extraction"] .bag-rec .bag-num { font-size: 58px; }
+[data-design="extraction"] .bag-tm .bag-num.t { font-size: 46px; }
+[data-design="extraction"] .bag-score .bag-num { font-size: 40px; }
+[data-design="extraction"] .bag-row b, [data-design="extraction"] .bag-row em, [data-design="extraction"] .bag-row .r { font-family: var(--font-serif); font-weight: 600; font-size: 16px; }
+[data-design="extraction"] .bag-page .page-title { font-style: italic; }
+[data-design="extraction"] .bag-best .xg { margin-top: 6px; }
+
+/* Quick log: the same blocks, with Extraction's serif numbers */
+[data-design="extraction"] .qstep input { font-family: var(--font-serif); font-weight: 700; font-size: 46px; font-variation-settings: var(--num-soft); letter-spacing: -0.03em; }
+[data-design="extraction"] .qratio b { font-family: var(--font-serif); }
+
+/* Care: open sections like the rest of Gear, serif counts */
+/* Each machine or grinder on its own soft tile, like the gear list (beats the gear page's plain .card) */
+[data-design="extraction"] .gear-page .care-unit.card { background: var(--surface); border: 0; border-radius: 18px; padding: 18px 20px 14px; }
+[data-design="extraction"] .care-task:last-of-type { border-bottom: 0; }
+[data-design="extraction"] .care-uh > b { font-size: 28px; }
+[data-design="extraction"] .care-num { font-family: var(--font-serif); font-weight: 700; font-size: 30px; font-variation-settings: var(--num-soft); }
+[data-design="extraction"] .hist-row .b .quick-tag { font-family: var(--font-sans); font-style: normal; font-weight: 600; font-size: 11px; flex-shrink: 0; }

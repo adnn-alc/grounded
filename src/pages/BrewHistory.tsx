@@ -229,7 +229,7 @@ export function BrewHistory({ design, brews = [], shotCount = 0, goTo, beans = [
                 </div>
               )}
               <LandedSlider landed={form.landed} bad={form.bad} onChange={n => set('landed', n)} onBadChange={b => set('bad', b)} badLabel="Bad brew" />
-              <textarea value={form.notes} onChange={e => set('notes', e.target.value)} rows={3} placeholder="Notes" aria-label="Notes" />
+              <textarea className="edit-notes" value={form.notes} onChange={e => set('notes', e.target.value)} rows={5} placeholder="Notes" aria-label="Notes" />
               <div className="row" style={{ justifyContent: 'flex-end' }}>
                 <button type="button" className="ghost-btn lg" onClick={() => setEditing(null)}>Cancel</button>
                 <button type="submit" className="primary-btn">Save changes</button>

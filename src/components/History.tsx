@@ -4,6 +4,7 @@ import { MiniLanded } from './Landed.tsx'
 import { PageHead } from './Shell.tsx'
 import { shortNum } from '../hooks/useUnits.ts'
 import { dayKey, dayName, daysAgo, longDate, timeOf } from '../data/dates.ts'
+import { ratingsOf, ratingText } from '../data/taste.ts'
 import type { Bean, Design, Route } from '../types.ts'
 
 /** What the list needs from a shot or a brew */
@@ -12,7 +13,7 @@ export interface HistoryItem {
   date:      string
   bean:      string
   roaster:   string
-  rating:    number
+  rating:    number | null   // null: a quick shot, not tasted yet
   landed:    number | null
   bad:       boolean
   favorited: boolean
@@ -52,7 +53,7 @@ interface HistoryListProps<T extends HistoryItem> {
   inspector:   ReactNode              // the selected item's panel, or an empty state
 }
 
-const average = (xs: number[]) => xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0
+const average = (xs: number[]): number | null => xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null
 
 /** Starts on the last 30 days, unless there's nothing in them (or the item to open is older) */
 function initialPeriod(items: HistoryItem[], selectedId: string | null): Period {
@@ -144,7 +145,7 @@ export function HistoryList<T extends HistoryItem>({ kind, design, items, beans,
             <div key={day.key}>
               <div className="day-head">
                 <b>{dayName(day.items[0]!.date, now)}</b> {dateNote(day.items[0]!.date)}
-                <span>{day.items.length} {day.items.length === 1 ? kind : plural}, avg {average(day.items.filter(i => !i.bad).map(i => i.rating)).toFixed(RATING_DECIMALS)}</span>
+                <span>{day.items.length} {day.items.length === 1 ? kind : plural}, avg {ratingText(average(ratingsOf(day.items.filter(i => !i.bad))), RATING_DECIMALS)}</span>
               </div>
               {day.items.map(i => {
                 const n = rowNumbers(i)
@@ -152,7 +153,7 @@ export function HistoryList<T extends HistoryItem>({ kind, design, items, beans,
                 <button key={i.id} className={`hist-row${i.id === selectedId ? ' active' : ''}`}
                   onClick={() => onSelect(i.id === selectedId ? null : i)}>
                   <span className="t">{timeOf(i.date)}</span>
-                  <span className="b"><span>{i.bean || '–'}</span>{i.favorited && <Ico name="star" size={STAR_SIZE} style={{ fill: 'currentColor' }} />}</span>
+                  <span className="b"><span>{i.bean || '–'}</span>{i.favorited && <Ico name="star" size={STAR_SIZE} style={{ fill: 'currentColor' }} />}{i.rating == null && <span className="quick-tag">Quick</span>}</span>
                   {extraction ? (
                     <>
                       <span className="r">{shortNum(n.dose)} → {shortNum(n.out)}<small> {n.unit}</small></span>
@@ -160,7 +161,7 @@ export function HistoryList<T extends HistoryItem>({ kind, design, items, beans,
                     </>
                   ) : <span className="r">{rowText(n)}</span>}
                   <span className="ml-cell"><MiniLanded landed={i.landed} bad={i.bad} badLabel={kind === 'shot' ? 'Bad shot' : 'Bad brew'} /></span>
-                  <span className={`s${i.bad ? ' low' : ''}`}>{i.rating.toFixed(RATING_DECIMALS)}</span>
+                  <span className={`s${i.bad ? ' low' : ''}`}>{ratingText(i.rating, RATING_DECIMALS)}</span>
                 </button>
                 )
               })}

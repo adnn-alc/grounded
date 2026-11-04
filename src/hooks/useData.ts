@@ -4,6 +4,7 @@ import { showError, markShown } from '../components/Toast.tsx'
 import type {
   Shot, ShotInput, Brew, BrewInput, Bean, BeanInput, Gear, GearInput,
   Recipe, RecipeInput, Tip, TipInput, Settings, Backup, ImportMode, ImportResult,
+  CareTask, CareTaskInput, CareLogEntry, CareDoneInput,
 } from '../types.ts'
 
 /** Shows a toast when a mutation fails, then rethrows so the caller stops (e.g. keeps its form open) */
@@ -55,6 +56,8 @@ export function useData() {
   const [recipes,       setRecipes]       = useState<Recipe[]>([])
   const [tips,          setTips]          = useState<Tip[]>([])
   const [settings,      setSettings]      = useState<Settings>({})
+  const [careTasks,     setCareTasks]     = useState<CareTask[]>([])
+  const [careLog,       setCareLog]       = useState<CareLogEntry[]>([])
   const [loading,       setLoading]       = useState(true)
   const [error,         setError]         = useState<string | null>(null)
 
@@ -62,7 +65,7 @@ export function useData() {
     setLoading(true)
     setError(null)
     try {
-      const [s, bw, b, ab, g, r, ti, st] = await Promise.all([
+      const [s, bw, b, ab, g, r, ti, st, ct, cl] = await Promise.all([
         api.getShots(),
         api.getBrews(),
         api.getBeans(),
@@ -71,6 +74,8 @@ export function useData() {
         api.getRecipes(),
         api.getTips(),
         api.getSettings(),
+        api.getCareTasks(),
+        api.getCareLog(),
       ])
       let loadedSettings = st
       const legacy = legacySettings(st)
@@ -86,6 +91,8 @@ export function useData() {
       setRecipes(r)
       setTips(ti)
       setSettings(loadedSettings)
+      setCareTasks(ct)
+      setCareLog(cl)
     } catch (e) {
       setError((e as Error).message)
     } finally {
@@ -231,6 +238,40 @@ export function useData() {
   const deleteGear = async (id: string) => {
     await api.deleteGear(id)
     setGear(prev => prev.filter(g => g.id !== id))
+    setCareTasks(prev => prev.filter(t => t.gear_id !== id))   // the server deleted them too
+  }
+
+  // ── Care ────────────────────────────────────────────────────────
+  const saveCareTask = async (t: CareTaskInput) => {
+    const saved = await api.createCareTask(t)
+    setCareTasks(prev => [...prev, saved])
+    return saved
+  }
+
+  const updateCareTask = async (id: string, t: CareTaskInput) => {
+    const updated = await api.updateCareTask(id, t)
+    setCareTasks(prev => prev.map(x => x.id === id ? updated : x))
+    return updated
+  }
+
+  const deleteCareTask = async (id: string) => {
+    await api.deleteCareTask(id)
+    setCareTasks(prev => prev.filter(x => x.id !== id))
+  }
+
+  /** Logs the task as done; its count starts again */
+  const careDone = async (id: string, d: CareDoneInput) => {
+    const { task, entry } = await api.careDone(id, d)
+    if (task) setCareTasks(prev => prev.map(x => x.id === id ? task : x))
+    setCareLog(prev => [entry, ...prev])
+    return entry
+  }
+
+  /** Takes a Done back: the entry goes and the count runs from where it did before */
+  const undoCare = async (entryId: string) => {
+    const { task } = await api.undoCare(entryId)
+    if (task) setCareTasks(prev => prev.map(x => x.id === task.id ? task : x))
+    setCareLog(prev => prev.filter(e => e.id !== entryId))
   }
 
   // ── Recipe mutations ────────────────────────────────────────────
@@ -283,9 +324,10 @@ export function useData() {
 
   // Reloads everything quietly, without the full-page loading screen
   const refreshAll = async () => {
-    const [s, bw, b, ab, g, r, ti, st] = await Promise.all([
+    const [s, bw, b, ab, g, r, ti, st, ct, cl] = await Promise.all([
       api.getShots(), api.getBrews(), api.getBeans(), api.getArchivedBeans(),
       api.getGear(), api.getRecipes(), api.getTips(), api.getSettings(),
+      api.getCareTasks(), api.getCareLog(),
     ])
     setShots(s)
     setBrews(bw)
@@ -295,6 +337,8 @@ export function useData() {
     setRecipes(r)
     setTips(ti)
     setSettings(st)
+    setCareTasks(ct)
+    setCareLog(cl)
   }
 
   // ── Sample data ─────────────────────────────────────────────────
@@ -317,7 +361,7 @@ export function useData() {
 
   return {
     // Data
-    shots, brews, beans, archivedBeans, gear, recipes, tips, settings,
+    shots, brews, beans, archivedBeans, gear, recipes, tips, settings, careTasks, careLog,
     loading, error,
     reload: load,
 
@@ -338,6 +382,11 @@ export function useData() {
     saveGear:      reportErrors("Couldn't save the gear", saveGear),
     updateGear:    reportErrors("Couldn't save the gear", updateGear),
     deleteGear:    reportErrors("Couldn't delete the gear", deleteGear),
+    saveCareTask:   reportErrors("Couldn't save the care task", saveCareTask),
+    updateCareTask: reportErrors("Couldn't save the care task", updateCareTask),
+    deleteCareTask: reportErrors("Couldn't delete the care task", deleteCareTask),
+    careDone:       reportErrors("Couldn't log it as done", careDone),
+    undoCare:       reportErrors("Couldn't undo it", undoCare),
     saveRecipe:    reportErrors("Couldn't save the recipe", saveRecipe),
     updateRecipe:  reportErrors("Couldn't save the recipe", updateRecipe),
     deleteRecipe:  reportErrors("Couldn't delete the recipe", deleteRecipe),

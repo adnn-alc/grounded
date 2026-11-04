@@ -14,7 +14,7 @@ import { hasNote, MAX_POURS, ROUND_POUR_TO, toggleNote, useBrewForm, useShotForm
 import { RPM_OPTIONS, rpmLabel } from '../data/grinderRpm.ts'
 import { daysOffRoast } from '../data/beans.ts'
 import { withCurrent } from '../data/gear.ts'
-import { clampRating, mmss, RATING_STEP, ratioText } from '../data/taste.ts'
+import { clampRating, mmss, RATING_STEP, ratedText, ratioText } from '../data/taste.ts'
 import type { Bean, Taste } from '../types.ts'
 import type { EspressoDialinProps, FilterDialinProps } from './Dialin.tsx'
 
@@ -260,7 +260,7 @@ export function ExtractionEspresso({ units, brewModes, onUpdateBean, modeSwitch,
           {f.recentTimes.length > 0 && <div className="xd-recent"><i />{recentText(f.recentTimes, secs, 'shot')}</div>}
           {last && (
             <div className="xd-last">
-              Last time {U.m(last.dose)} → {U.m(last.yield)} {U.mU()}, grind {last.grind}, rated {last.rating.toFixed(1)}
+              Last time {U.m(last.dose)} → {U.m(last.yield)} {U.mU()}, grind {last.grind}, {ratedText(last.rating)}
               <button className="link-btn" onClick={() => f.loadShot(last)}>Start from it</button>
             </div>
           )}
@@ -349,7 +349,7 @@ export function ExtractionFilter({ units, modeSwitch, onBack, footer, ...args }:
           {f.recentTimes.length > 0 && <div className="xd-recent"><i />{recentText(f.recentTimes, mmss, 'brew')}</div>}
           {last && (
             <div className="xd-last">
-              Last time {U.m(last.dose)} → {wholeMass(U, last.water)} {U.mU()}, grind {last.grind}, rated {last.rating.toFixed(1)}
+              Last time {U.m(last.dose)} → {wholeMass(U, last.water)} {U.mU()}, grind {last.grind}, {ratedText(last.rating)}
               <button className="link-btn" onClick={() => f.loadBrew(last)}>Start from it</button>
             </div>
           )}

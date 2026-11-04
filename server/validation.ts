@@ -24,6 +24,7 @@ const MAX_MONEY     = 10_000_000
 const MAX_GRAMS     = 1_000_000
 const GRIND_RANGE   = 100_000   // grind settings are whatever the grinder uses, ± this
 const MAX_SORT      = 1_000_000
+const MAX_DAYS      = 36_500   // a hundred years
 const SHOWN_ISSUES  = 5
 
 // ── Building blocks ─────────────────────────────────────────────────
@@ -56,7 +57,7 @@ const shotOrBrewCommon = {
   temp:          optNum(MAX_TEMP),
   grind,
   time:          optNum(MAX_SECONDS),
-  rating:        z.number().min(0).max(MAX_TASTE),   // the UI always sends it, and lists show it
+  rating:        optNum(MAX_TASTE),   // null: a quick shot, not tasted yet
   taste,
   notes:         optText(LEN.notes),
   verdict,
@@ -105,6 +106,8 @@ export const beanSchema = z.object({
   doses:       z.array(z.looseObject({ basket: text(), dose: optNum(MAX_DOSE_G), grind })).max(MAX_ITEMS).nullish(),
   archived:    z.union([z.boolean(), z.number()]).nullish(),
   archived_at: optText(LEN.short),
+  frozen_at:   optText(LEN.short),
+  frozen_days: optNum(MAX_DAYS),
 })
 
 export const gearSchema = z.object({
@@ -140,6 +143,25 @@ export const tipSchema = z.object({
   sort_order: optNum(MAX_SORT, -MAX_SORT),
 })
 
+// Care: a task repeats every so many shots, days or grams; the counts on a Done come from the UI
+const MAX_EVERY = 10_000_000
+export const careTaskSchema = z.object({
+  id:            optId,
+  gear_id:       text().min(1, 'Gear is required'),
+  name:          text().trim().min(1, 'Name is required'),
+  every:         z.number().positive().max(MAX_EVERY),
+  unit:          z.enum(['shots', 'days', 'grams']),
+  since:         text(LEN.short).min(1).optional(),
+  snoozed_until: optText(LEN.short),
+})
+
+export const careDoneSchema = z.object({
+  done_at: text(LEN.short).min(1),
+  shots:   optNum(MAX_EVERY),
+  grams:   optNum(MAX_EVERY),
+  days:    optNum(MAX_EVERY),
+})
+
 export const favoriteSchema = z.object({ favorited: z.boolean() })
 
 const fontId = optText(LEN.short)
@@ -152,6 +174,7 @@ export const settingsSchema = z.strictObject({
   waterRecipes:   z.array(text().min(1)).max(MAX_ITEMS).optional(),
   dialinDefaults: z.record(z.string().max(LEN.short), z.record(z.string().max(LEN.short), z.union([z.string().max(LEN.name), z.number(), z.null()]))).optional(),
   brewModes:      z.array(text(LEN.short).trim().min(1)).max(MAX_ITEMS).optional(),
+  careHidden:     z.array(text().min(1)).max(MAX_ITEMS).optional(),
   sampleData:     z.enum(['present', 'cleared', 'dismissed']).optional(),
 })
 
@@ -173,6 +196,7 @@ export const importSchema = z.object({
     exportedAt:    z.string().max(LEN.short).optional(),
     tables: z.object({
       beans: backupRows, shots: backupRows, brews: backupRows, gear: backupRows, recipes: backupRows, tips: backupRows,
+      care_tasks: backupRows, care_log: backupRows,   // older backups don't have these
     }),
     // Checked key by key against settingsSchema on import; unknown or invalid keys are skipped
     settings: z.record(z.string(), z.unknown()).optional(),

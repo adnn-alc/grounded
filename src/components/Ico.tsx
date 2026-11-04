@@ -40,6 +40,8 @@ const paths = {
   note:      <><path d="M5 3h10l4 4v14H5z"/><path d="M9 12h6M9 16h6"/></>,
   back:      <path d="m15 6-6 6 6 6"/>,
   chevronD:  <path d="m6 9 6 6 6-6"/>,
+  snow:      <><path d="M12 2v20M3.3 7l17.4 10M3.3 17 20.7 7"/><path d="m9.5 3.5 2.5 2 2.5-2M9.5 20.5l2.5-2 2.5 2M4 10.5l3-.5-1-3M20 13.5l-3 .5 1 3M4 13.5l3 .5-1 3M20 10.5l-3-.5 1-3"/></>,
+  wrench:    <path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z"/>,
 } satisfies Record<string, ReactElement>
 
 export type IconName = keyof typeof paths

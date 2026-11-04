@@ -1,4 +1,4 @@
-import { dayOf } from './dates.ts'
+import { dayOf, daysAgo, isoDaysAgo } from './dates.ts'
 import type { Bean } from '../types.ts'
 
 /** Bean name for pickers; adds the roast date when two open bags share a name */
@@ -32,14 +32,55 @@ export function daysOffRoast(bean: Bean, now: Date = new Date()): number | null 
   return isNaN(roasted) ? null : Math.max(0, Math.floor((now.getTime() - roasted) / MS_PER_DAY))
 }
 
-export type Freshness = 'resting' | 'window' | 'aging' | 'past'
-export const FRESHNESS_TEXT: Record<Freshness, string> = { resting: 'resting', window: 'in its window', aging: 'aging', past: 'past its best' }
+export type Freshness = 'resting' | 'window' | 'aging' | 'past' | 'frozen'
+export const FRESHNESS_TEXT: Record<Freshness, string> = {
+  resting: 'resting', window: 'in its window', aging: 'aging', past: 'past its best', frozen: 'in the freezer',
+}
 
 export function freshness(days: number): Freshness {
   if (days < TOO_FRESH_UNTIL) return 'resting'
   if (days <= WINDOW_UNTIL) return 'window'
   if (days <= AGING_UNTIL) return 'aging'
   return 'past'
+}
+
+// ── Freezer ──
+// A frozen bag stops aging: its freshness goes by its days off roast without the days it spent frozen.
+
+/** Days in the freezer: earlier stays plus the current one */
+export const frozenDays = (bean: Bean, now: Date = new Date()): number => (bean.frozen_days ?? 0) + thisStay(bean, now)
+
+/** 'frozen' while it's in the freezer, else its freshness by the days it has aged; null without a roast date */
+export function beanFreshness(bean: Bean, now: Date = new Date()): Freshness | null {
+  if (bean.frozen_at) return 'frozen'
+  const days = daysOffRoast(bean, now)
+  return days == null ? null : freshness(Math.max(0, days - frozenDays(bean, now)))
+}
+
+/**
+ * The freezer fields to save when a bag goes in on `frozenAt` ('YYYY-MM-DD') or stays in,
+ * or comes out (`frozenAt` null): then the stay that just ended is added to its frozen days.
+ */
+export function freezerFields(bean: Bean | null, frozenAt: string | null, now: Date = new Date()): Pick<Bean, 'frozen_at' | 'frozen_days'> {
+  const before = bean?.frozen_days ?? 0
+  if (frozenAt) return { frozen_at: frozenAt, frozen_days: before }
+  return { frozen_at: null, frozen_days: before + (bean ? thisStay(bean, now) : 0) }
+}
+
+/** The bag with the freezer switched on (in today) or off (the stay that just ended is kept) */
+export const withFreezer = (bean: Bean, frozen: boolean, now: Date = new Date()): Bean =>
+  ({ ...bean, ...freezerFields(bean, frozen ? isoDaysAgo(0, now) : null, now) })
+
+/** Whole days of the current stay in the freezer (0 when it isn't frozen) */
+const thisStay = (bean: Bean, now: Date): number => bean.frozen_at ? Math.max(0, daysAgo(bean.frozen_at, now)) : 0
+
+/** 'since today', 'since 2 Nov, 1 day' or 'since 20 Oct, 14 days': this stay in the freezer */
+export function frozenSinceText(bean: Bean, now: Date = new Date()): string {
+  if (!bean.frozen_at) return ''
+  const days = thisStay(bean, now)
+  if (days === 0) return 'since today'
+  const since = dayOf(bean.frozen_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+  return `since ${since}, ${days} ${days === 1 ? 'day' : 'days'}`
 }
 
 /** The dose to count shots with: the bag's smallest basket dose, else the given fallback */
@@ -52,7 +93,8 @@ export function bagStatus(bean: Bean, dose: number, now: Date = new Date()): str
   const day = days == null ? '' : `Day ${days}, `
   if (left < 1) return `${day}not enough for a shot`
   if (left < FEW_SHOTS) return `${day}about ${left} ${left === 1 ? 'shot' : 'shots'} left`
-  return days == null ? '' : `${day}${FRESHNESS_TEXT[freshness(days)]}`
+  const fresh = beanFreshness(bean, now)
+  return fresh == null ? '' : `${day}${FRESHNESS_TEXT[fresh]}`
 }
 
 /** '7 shots at 18.0 g' / 'Less than one shot' */

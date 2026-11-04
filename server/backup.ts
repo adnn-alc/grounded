@@ -16,7 +16,7 @@ import type {
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const APP_VERSION: string = JSON.parse(fs.readFileSync(path.join(__dirname, '../package.json'), 'utf8')).version
 
-const BACKUP_TABLES: readonly BackupTable[] = ['beans', 'shots', 'brews', 'gear', 'recipes', 'tips']
+const BACKUP_TABLES: readonly BackupTable[] = ['beans', 'shots', 'brews', 'gear', 'recipes', 'tips', 'care_tasks', 'care_log']
 
 // Only set by a brand-new install; never exported or restored, so a restored
 // database doesn't offer to remove sample data it may not have

@@ -74,10 +74,18 @@ interface ShotFormArgs {
   brewModes:      string[]
   preset:         Shot | null
   startBeanId?:   string
+  carried?:       CarriedShot | null   // from Quick to Full: what was entered there besides the recipe
   onSaveShot:     (shot: ShotInput) => void
 }
 
-export function useShotForm({ shots, beans, gear, waterRecipes, dialinDefaults, brewModes, preset, startBeanId, onSaveShot }: ShotFormArgs) {
+/** Switching from quick log to the full form keeps the time and where it landed, not just the recipe */
+export interface CarriedShot {
+  time:   string
+  landed: number | null
+  bad:    boolean
+}
+
+export function useShotForm({ shots, beans, gear, waterRecipes, dialinDefaults, brewModes, preset, startBeanId, carried, onSaveShot }: ShotFormArgs) {
   const machineGear    = activeGear(gear, MACHINE_KIND)
   const grinderGear    = activeGear(gear, GRINDER_KIND)
   const basketGear     = activeGear(gear, BASKET_KIND)
@@ -104,6 +112,13 @@ export function useShotForm({ shots, beans, gear, waterRecipes, dialinDefaults, 
   })
   const tasting = useTasting()
   const { taste, landed, bad, notes, shownRating } = tasting
+  const [carriedInit] = useState(carried)
+  useEffect(() => {
+    if (!carriedInit) return
+    setShotTime(carriedInit.time)
+    tasting.setLanded(carriedInit.landed)
+    tasting.setBad(carriedInit.bad)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const bean      = beans.find(b => b.id === selectedBean)
   const onBag     = shots.filter(s => s.bean_id === selectedBean)
@@ -141,7 +156,8 @@ export function useShotForm({ shots, beans, gear, waterRecipes, dialinDefaults, 
     if (isManualGrinder(grinderGear.find(g => g.name === name))) setGrinderRpm('manual')
   }
 
-  const saveShot = () => {
+  /** Quick log saves it untasted: no rating until taste is added in History */
+  const save = (quick: boolean) => {
     if (!canSave) return
     onSaveShot({
       id:      's-' + Date.now(),
@@ -155,13 +171,15 @@ export function useShotForm({ shots, beans, gear, waterRecipes, dialinDefaults, 
       basket: basket || null,
       brew_mode: brewMode || null,
       water_recipe: waterRecipe,
-      rating: shownRating,
+      rating: quick ? null : shownRating,
       taste: { ...taste },
       notes,
       landed: bad ? null : landed,
       bad,
     })
   }
+  const saveShot = () => save(false)
+  const saveQuickShot = () => save(true)
 
   return {
     ...tasting,
@@ -170,7 +188,7 @@ export function useShotForm({ shots, beans, gear, waterRecipes, dialinDefaults, 
     shotTime, setShotTime, dose, setDose, yieldG, setYieldG, grind, setGrind, temp, setTemp, preinf, setPreinf,
     machine, setMachine, grinderModel, pickGrinder, grinderRpm, setGrinderRpm, basket, setBasket,
     waterRecipe, setWaterRecipe, brewMode, setBrewMode,
-    doseNum, yieldNum, timeNum, canSave, loadShot, saveShot,
+    doseNum, yieldNum, timeNum, canSave, loadShot, saveShot, saveQuickShot,
   }
 }
 

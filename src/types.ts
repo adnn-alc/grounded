@@ -26,7 +26,7 @@ export interface Shot {
   preinf:        number   // seconds
   temp:          number   // °C
   grind:         number
-  rating:        number   // average of the taste axes
+  rating:        number | null   // average of the taste axes; null = a quick shot, not tasted yet (taste then holds the middle values)
   taste:         Taste
   notes:         string
   verdict:       Verdict | ''
@@ -108,6 +108,8 @@ export interface Bean {
   doses:       BeanDose[]
   archived:    number | null   // 0/1 as stored in SQLite
   archived_at: string | null
+  frozen_at:   string | null   // 'YYYY-MM-DD' it went into the freezer; null = not frozen
+  frozen_days: number | null   // days spent frozen before (earlier stays)
   created_at:  string
 }
 
@@ -115,11 +117,13 @@ export interface Bean {
  * Body of POST /api/beans and PUT /api/beans/:id. On PUT, doses are only
  * replaced when sent, and `archived` decides whether the bean is archived.
  */
-export type BeanInput = Omit<Bean, 'id' | 'doses' | 'archived' | 'archived_at' | 'created_at'> & {
+export type BeanInput = Omit<Bean, 'id' | 'doses' | 'archived' | 'archived_at' | 'frozen_at' | 'frozen_days' | 'created_at'> & {
   id?:          string
   doses?:       BeanDose[]
   archived?:    boolean | number | null
   archived_at?: string | null
+  frozen_at?:   string | null   // left as it is when not sent
+  frozen_days?: number | null
   created_at?:  string
 }
 
@@ -176,6 +180,58 @@ export interface Tip {
 
 export type TipInput = Pick<Tip, 'section' | 'category'> & Partial<Pick<Tip, 'id' | 'body' | 'sort_order' | 'created_at'>>
 
+// ── Care (maintenance) ──────────────────────────────────────────────
+
+/** What a care task counts: shots and brews made with the gear, days, or grams of coffee through it */
+export type CareUnit = 'shots' | 'days' | 'grams'
+
+export interface CareTask {
+  id:            string
+  gear_id:       string
+  name:          string    // 'Backflush with detergent'
+  every:         number    // how often, in `unit`
+  unit:          CareUnit
+  since:         string    // 'YYYY-MM-DD HH:MM' the count runs from: when it was last done, or added
+  snoozed_until: string | null   // 'YYYY-MM-DD': Home doesn't remind about it before then
+  created_at:    string
+}
+
+/** Body of POST /api/care-tasks and PUT /api/care-tasks/:id. On PUT, since and snoozed_until stay as they are when not sent. */
+export type CareTaskInput = Pick<CareTask, 'gear_id' | 'name' | 'every' | 'unit'> & {
+  id?:            string
+  since?:         string
+  snoozed_until?: string | null
+}
+
+/** One time a task was done, with what had built up since the time before */
+export interface CareLogEntry {
+  id:         string
+  task_id:    string | null
+  gear_id:    string | null
+  task:       string          // names at the time, so the log still reads right after a rename or delete
+  gear:       string | null
+  started:    string          // when the count it ended started (the task's since before)
+  done_at:    string          // 'YYYY-MM-DD HH:MM'
+  shots:      number | null   // shots and brews made with it since the time before
+  grams:      number | null   // coffee through it since the time before
+  days:       number | null
+  created_at: string
+}
+
+/** Body of POST /api/care-tasks/:id/done: the counts are worked out by the UI, which has the shots */
+export interface CareDoneInput {
+  done_at: string
+  shots?:  number | null
+  grams?:  number | null
+  days?:   number | null
+}
+
+/** Response of POST /api/care-tasks/:id/done and DELETE /api/care-log/:id (task: null when it was deleted) */
+export interface CareChange {
+  task:   CareTask | null
+  entry:  CareLogEntry
+}
+
 // ── Settings ────────────────────────────────────────────────────────
 
 export type FontRole = 'sans' | 'mono' | 'serif'
@@ -223,6 +279,7 @@ export interface Settings {
   waterRecipes?:   string[]
   dialinDefaults?: DialinDefaults
   brewModes?:      string[]   // espresso machine buttons/programs; empty or missing = field hidden
+  careHidden?:     string[]   // gear ids left out of Gear → Care (machines and grinders show there by default)
   sampleData?:     SampleDataState
 }
 
@@ -239,7 +296,7 @@ export type SettingKey = keyof Settings
 // ── Backups ─────────────────────────────────────────────────────────
 
 /** The tables a backup holds, besides the settings */
-export type BackupTable = 'beans' | 'shots' | 'brews' | 'gear' | 'recipes' | 'tips'
+export type BackupTable = 'beans' | 'shots' | 'brews' | 'gear' | 'recipes' | 'tips' | 'care_tasks' | 'care_log'
 
 /** One database row as stored (taste as flat columns, lists as JSON strings) */
 export type BackupRow = { id: string } & Record<string, string | number | null>
@@ -309,6 +366,9 @@ export type RecipeRow = Omit<Recipe, 'tags' | 'steps'> & {
 
 export type TipRow = Tip
 
+export type CareTaskRow = CareTask
+export type CareLogRow = CareLogEntry
+
 export interface SettingRow {
   key:        string
   value:      string   // JSON
@@ -325,7 +385,7 @@ export interface OkResponse {
 /** Hash routes (#/route) */
 export type Route =
   | 'home' | 'dialin' | 'shot-history' | 'brew-history' | 'beans' | 'archived-beans'
-  | 'recipes' | 'gear' | 'stats' | 'stock' | 'tips'
+  | 'recipes' | 'gear' | 'stats' | 'stock' | 'tips' | 'bean'
 
 /** How Dial-in opens from a button elsewhere ("Pull a shot", "Brew filter", a bag's "Dial in") */
 export interface DialinStart {

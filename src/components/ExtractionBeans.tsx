@@ -1,9 +1,10 @@
 import { useState, type CSSProperties } from 'react'
 import Ico from './Ico.tsx'
 import { doseKey } from './BeanDoses.tsx'
-import { bagColor, daysOffRoast, freshness, FRESHNESS_TEXT, priceText, roastedText } from '../data/beans.ts'
+import { FreezerSwitch, Frost } from './Frost.tsx'
+import { bagColor, beanFreshness, daysOffRoast, FRESHNESS_TEXT, priceText, roastedText } from '../data/beans.ts'
 import { shortDay } from '../data/dates.ts'
-import { mmss } from '../data/taste.ts'
+import { mmss, ratingOrder, ratingText } from '../data/taste.ts'
 import type { UnitHelpers } from '../hooks/useUnits.ts'
 import type { Bean, Brew, Shot } from '../types.ts'
 
@@ -26,7 +27,9 @@ interface ExtractionBeansProps {
   onEdit:    (bean: Bean) => void
   onDoses:   (bean: Bean) => void
   onArchive: (id: string) => void
+  onFreeze:  (bean: Bean, frozen: boolean) => void
   onDialIn?: (bean: Bean) => void
+  onOpen?:   (bean: Bean) => void   // the bag's own page: a second click on the picked bag
 }
 
 /** 'Light roast' from 'Light', left alone when it already says roast */
@@ -46,7 +49,7 @@ function coffeeWord(list: Coffee[]): string {
   return hasBrews ? 'Brews' : 'Shots'
 }
 
-export function ExtractionBeans({ beans, shots, brews, U, onAdd, onEdit, onDoses, onArchive, onDialIn }: ExtractionBeansProps) {
+export function ExtractionBeans({ beans, shots, brews, U, onAdd, onEdit, onDoses, onArchive, onFreeze, onDialIn, onOpen }: ExtractionBeansProps) {
   const [pickedId, setPickedId] = useState<string | null>(null)
   // After a bag is finished the first one is picked again
   const bean = beans.find(b => b.id === pickedId) ?? beans[0]
@@ -60,16 +63,21 @@ export function ExtractionBeans({ beans, shots, brews, U, onAdd, onEdit, onDoses
           const pct = b.weight > 0 ? Math.min(PERCENT, (b.remaining / b.weight) * PERCENT) : 0
           const days = daysOffRoast(b)
           const on = b.id === bean?.id
+          // The first click picks the bag and shows it below; a click on the bag you picked opens its page
+          const opens = Boolean(onOpen) && b.id === pickedId
           return (
-            <button key={b.id} className={`xbag${b.stock !== 'good' ? ' low' : ''}${on ? ' on' : ''}`} aria-pressed={on}
-              onClick={() => setPickedId(b.id)} style={{ '--bag': bagColor(b.id) } as CSSProperties}>
+            <button key={b.id} className={`xbag${b.stock !== 'good' ? ' low' : ''}${on ? ' on' : ''}${b.frozen_at ? ' frozen' : ''}`} aria-pressed={on}
+              title={opens ? `Open ${b.name}` : `Show ${b.name}`}
+              onClick={() => (opens ? onOpen?.(b) : setPickedId(b.id))} style={{ '--bag': bagColor(b.id) } as CSSProperties}>
               <span className="xbag-fill" style={{ height: `${pct}%` }} />
+              <Frost bean={b} />
               <span className="xbag-lab">
                 <b>{b.name}</b>
                 <span>{b.roaster}</span>
               </span>
               <span className="xbag-g">{whole(b.remaining)} {U.mU()}</span>
-              {days != null && <span className="xbag-d">day {days}</span>}
+              {b.frozen_at && <span className="xbag-d"><Ico name="snow" size={ICON} /> frozen</span>}
+              {!b.frozen_at && days != null && <span className="xbag-d">day {days}</span>}
             </button>
           )
         })}
@@ -78,7 +86,7 @@ export function ExtractionBeans({ beans, shots, brews, U, onAdd, onEdit, onDoses
 
       {!bean && <div className="xbeans-empty">No open bags. Add the one you're drinking now.</div>}
       {bean && <BagDetails bean={bean} shots={shots} brews={brews} U={U} whole={whole} num={num}
-        onEdit={onEdit} onDoses={onDoses} onArchive={onArchive} onDialIn={onDialIn} />}
+        onEdit={onEdit} onDoses={onDoses} onArchive={onArchive} onFreeze={onFreeze} onDialIn={onDialIn} onOpen={onOpen} />}
     </div>
   )
 }
@@ -93,11 +101,14 @@ interface BagDetailsProps {
   onEdit:    (bean: Bean) => void
   onDoses:   (bean: Bean) => void
   onArchive: (id: string) => void
+  onFreeze:  (bean: Bean, frozen: boolean) => void
   onDialIn?: (bean: Bean) => void
+  onOpen?:   (bean: Bean) => void
 }
 
-function BagDetails({ bean, shots, brews, U, whole, num, onEdit, onDoses, onArchive, onDialIn }: BagDetailsProps) {
+function BagDetails({ bean, shots, brews, U, whole, num, onEdit, onDoses, onArchive, onFreeze, onDialIn, onOpen }: BagDetailsProps) {
   const days = daysOffRoast(bean)
+  const fresh = beanFreshness(bean)
   const doses = bean.doses || []
   const from = [bean.roaster, bean.origin?.replace(' · ', ', '), bean.altitude].filter(Boolean).join(', ')
   const pills = [bean.process, bean.roast && roastText(bean.roast), bean.variety, bean.roast_date && roastedText(bean.roast_date)].filter(Boolean)
@@ -107,13 +118,14 @@ function BagDetails({ bean, shots, brews, U, whole, num, onEdit, onDoses, onArch
   const best: Coffee[] = [
     ...shots.filter(s => s.bean_id === bean.id).map(s => ({ ...s, kind: 'shot' as const })),
     ...brews.filter(b => b.bean_id === bean.id).map(b => ({ ...b, kind: 'brew' as const })),
-  ].sort((a, b) => b.rating - a.rating || b.date.localeCompare(a.date)).slice(0, BEST_SHOWN)
+  ].sort((a, b) => ratingOrder(b.rating) - ratingOrder(a.rating) || b.date.localeCompare(a.date)).slice(0, BEST_SHOWN)
 
   return (
     <>
       <div className="xbean-det">
         <div className="xbean-about">
           <div className="xbean-name">{bean.name}</div>
+          {onOpen && <button className="link-btn xbean-open" onClick={() => onOpen(bean)}>Open the bag's page <Ico name="chevronR" size={ICON} /></button>}
           {from && <div className="xbean-from">{from}</div>}
           {pills.length > 0 && <div className="xd-facts">{pills.map(p => <span key={String(p)}>{p}</span>)}</div>}
           {bean.notes?.length > 0 && <div className="xbean-notes">{bean.notes.join(', ')}</div>}
@@ -135,9 +147,10 @@ function BagDetails({ bean, shots, brews, U, whole, num, onEdit, onDoses, onArch
         <div className="xbean-left">
           <div className="xnum">{whole(bean.remaining)}<small>{U.mU()} left</small></div>
           <p>
-            {days != null && <>Day {days}, {FRESHNESS_TEXT[freshness(days)]}<br /></>}
+            {days != null && fresh && <>Day {days}, {FRESHNESS_TEXT[fresh]}<br /></>}
             {bagLine}
           </p>
+          <FreezerSwitch bean={bean} onChange={frozen => onFreeze(bean, frozen)} />
           <div className="xbean-acts">
             {onDialIn && <button className="primary-btn" onClick={() => onDialIn(bean)}>Dial in</button>}
             <button className="ghost-btn lg" onClick={() => onEdit(bean)}><Ico name="pencil" size={ICON} /> Edit</button>
@@ -158,7 +171,7 @@ function BagDetails({ bean, shots, brews, U, whole, num, onEdit, onDoses, onArch
                   {num(c.dose)} → {num(c.kind === 'shot' ? c.yield : c.water)}
                   <em>{c.kind === 'shot' ? c.time : mmss(c.time)}</em>
                 </b>
-                <span>{c.bad ? `Bad ${c.kind}` : c.rating.toFixed(RATING_DECIMALS)}, {dayWord(c.date)}</span>
+                <span>{c.bad ? `Bad ${c.kind}` : ratingText(c.rating, RATING_DECIMALS)}, {dayWord(c.date)}</span>
               </div>
             ))}
           </div>

@@ -11,11 +11,11 @@ import { createBackup, restoreBackup, shotsCsv, brewsCsv, today } from './backup
 import { HttpError, NOT_FOUND, FORBIDDEN, CONFLICT, errorHandler, found } from './errors.ts'
 import {
   parseBody, shotSchema, brewSchema, beanSchema, gearSchema, recipeSchema, tipSchema,
-  favoriteSchema, settingsSchema,
+  favoriteSchema, settingsSchema, careTaskSchema, careDoneSchema,
 } from './validation.ts'
 import type {
   Shot, ShotRow, Brew, BrewRow, Bean, BeanRow, GearRow, Recipe, RecipeRow, TipRow,
-  StockLevel,
+  StockLevel, CareTaskRow, CareLogRow, CareChange,
 } from '../src/types.ts'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -139,6 +139,10 @@ const getBean   = (id: string): BeanRow   => found(db.prepare<[string], BeanRow>
 const getGear   = (id: string): GearRow   => found(db.prepare<[string], GearRow>('SELECT * FROM gear WHERE id = ?').get(id), 'Gear')
 const getRecipe = (id: string): RecipeRow => found(db.prepare<[string], RecipeRow>('SELECT * FROM recipes WHERE id = ?').get(id), 'Recipe')
 const getTip    = (id: string): TipRow    => found(db.prepare<[string], TipRow>('SELECT * FROM tips WHERE id = ?').get(id), 'Tip')
+const getCareTask = (id: string): CareTaskRow => found(db.prepare<[string], CareTaskRow>('SELECT * FROM care_tasks WHERE id = ?').get(id), 'Care task')
+const getCareLog  = (id: string): CareLogRow  => found(db.prepare<[string], CareLogRow>('SELECT * FROM care_log WHERE id = ?').get(id), 'Care log entry')
+const findCareTask = (id: string | null): CareTaskRow | null =>
+  id ? db.prepare<[string], CareTaskRow>('SELECT * FROM care_tasks WHERE id = ?').get(id) ?? null : null
 
 const deleteById = (table: string, id: string, what: string): void => {
   if (db.prepare(`DELETE FROM ${table} WHERE id = ?`).run(id).changes === 0) throw new HttpError(NOT_FOUND, `${what} not found`)
@@ -346,28 +350,32 @@ app.post('/api/beans', (req, res) => {
   const b = parseBody(beanSchema, req.body)
   const id = b.id || newId('bean')
   db.prepare(`
-    INSERT INTO beans (id, name, roaster, origin, process, variety, roast_date, roast, altitude, notes, price, weight, remaining, stock, doses)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO beans (id, name, roaster, origin, process, variety, roast_date, roast, altitude, notes, price, weight, remaining, stock, doses,
+      frozen_at, frozen_days)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(id, b.name, b.roaster ?? '', b.origin, b.process, b.variety, b.roast_date,
     b.roast, b.altitude, JSON.stringify(b.notes || []), b.price, b.weight, b.remaining, b.stock || 'good',
-    JSON.stringify(b.doses || []))
+    JSON.stringify(b.doses || []), b.frozen_at || null, b.frozen_days ?? 0)
   res.status(CREATED).json(rowToBean(getBean(id)))
 })
 
 app.put('/api/beans/:id', (req, res) => {
   const b = parseBody(beanSchema, req.body)
-  getBean(req.params.id)
+  const old = getBean(req.params.id)
   db.transaction(() => {
     db.prepare(`
       UPDATE beans SET name=?, roaster=?, origin=?, process=?, variety=?, roast_date=?, roast=?,
         altitude=?, notes=?, price=?, weight=?, remaining=?, stock=?, archived=?, archived_at=?,
-        doses=COALESCE(?, doses)
+        doses=COALESCE(?, doses), frozen_at=?, frozen_days=?
       WHERE id=?
     `).run(b.name, b.roaster ?? '', b.origin, b.process, b.variety, b.roast_date,
       b.roast, b.altitude, JSON.stringify(b.notes || []), b.price, b.weight, b.remaining, b.stock,
       b.archived ? 1 : 0, b.archived ? (b.archived_at || new Date().toISOString().slice(0, DATE_LENGTH)) : null,
       // Only overwrite doses when the client sends them, so other bean edits can't wipe them
       Array.isArray(b.doses) ? JSON.stringify(b.doses) : null,
+      // The same for the freezer: a client that doesn't know about it leaves it as it is
+      b.frozen_at === undefined ? old.frozen_at : b.frozen_at || null,
+      b.frozen_days ?? old.frozen_days ?? 0,
       req.params.id)
     // Keep the name shown on this bean's shots and brews in step with a rename
     BEAN_LINKED_TABLES.forEach(t => {
@@ -414,8 +422,83 @@ app.put('/api/gear/:id', (req, res) => {
 })
 
 app.delete('/api/gear/:id', (req, res) => {
-  deleteById('gear', req.params.id, 'Gear')
+  db.transaction(() => {
+    deleteById('gear', req.params.id, 'Gear')
+    // Its care tasks go with it; the log of what was done stays
+    db.prepare('DELETE FROM care_tasks WHERE gear_id = ?').run(req.params.id)
+  })()
   res.json({ ok: true })
+})
+
+// ── CARE ─────────────────────────────────────────────────────────────
+// Maintenance tasks per gear item and a log of each time one was done. How much
+// has built up (shots, grams, days) is worked out by the UI, which has the shots.
+
+/** 'YYYY-MM-DD HH:MM' in the server's local time, like the dates shots are saved with */
+const STAMP_LENGTH = 'YYYY-MM-DD HH:MM'.length
+const MS_PER_MINUTE = 60_000
+const nowStamp = (): string => {
+  const d = new Date()
+  return new Date(d.getTime() - d.getTimezoneOffset() * MS_PER_MINUTE).toISOString().replace('T', ' ').slice(0, STAMP_LENGTH)
+}
+
+app.get('/api/care-tasks', (req, res) => {
+  res.json(db.prepare<[], CareTaskRow>('SELECT * FROM care_tasks ORDER BY created_at, rowid').all())
+})
+
+app.post('/api/care-tasks', (req, res) => {
+  const t = parseBody(careTaskSchema, req.body)
+  getGear(t.gear_id)
+  const id = t.id || newId('care')
+  db.prepare('INSERT INTO care_tasks (id, gear_id, name, every, unit, since, snoozed_until) VALUES (?, ?, ?, ?, ?, ?, ?)')
+    .run(id, t.gear_id, t.name, t.every, t.unit, t.since || nowStamp(), t.snoozed_until || null)
+  res.status(CREATED).json(getCareTask(id))
+})
+
+app.put('/api/care-tasks/:id', (req, res) => {
+  const t = parseBody(careTaskSchema, req.body)
+  const old = getCareTask(req.params.id)
+  getGear(t.gear_id)
+  db.prepare('UPDATE care_tasks SET gear_id=?, name=?, every=?, unit=?, since=?, snoozed_until=? WHERE id=?')
+    .run(t.gear_id, t.name, t.every, t.unit, t.since || old.since,
+      t.snoozed_until === undefined ? old.snoozed_until : t.snoozed_until || null, req.params.id)
+  res.json(getCareTask(req.params.id))
+})
+
+app.delete('/api/care-tasks/:id', (req, res) => {
+  deleteById('care_tasks', req.params.id, 'Care task')
+  res.json({ ok: true })
+})
+
+// Done: logs it with what had built up, and the count starts again from then
+app.post('/api/care-tasks/:id/done', (req, res) => {
+  const d = parseBody(careDoneSchema, req.body)
+  const task = getCareTask(req.params.id)
+  const gear = db.prepare<[string], GearRow>('SELECT * FROM gear WHERE id = ?').get(task.gear_id)
+  const id = newId('done')
+  db.transaction(() => {
+    db.prepare(`INSERT INTO care_log (id, task_id, gear_id, task, gear, started, done_at, shots, grams, days)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      .run(id, task.id, task.gear_id, task.name, gear?.name ?? null, task.since, d.done_at, d.shots ?? null, d.grams ?? null, d.days ?? null)
+    db.prepare('UPDATE care_tasks SET since=?, snoozed_until=NULL WHERE id=?').run(d.done_at, task.id)
+  })()
+  const change: CareChange = { task: getCareTask(task.id), entry: getCareLog(id) }
+  res.status(CREATED).json(change)
+})
+
+app.get('/api/care-log', (req, res) => {
+  res.json(db.prepare<[], CareLogRow>('SELECT * FROM care_log ORDER BY done_at DESC, rowid DESC').all())
+})
+
+// Undo a Done: the entry goes, and if it was the task's latest, the count runs from where it did before
+app.delete('/api/care-log/:id', (req, res) => {
+  const entry = getCareLog(req.params.id)
+  db.transaction(() => {
+    deleteById('care_log', entry.id, 'Care log entry')
+    db.prepare('UPDATE care_tasks SET since=? WHERE id=? AND since=?').run(entry.started, entry.task_id, entry.done_at)
+  })()
+  const change: CareChange = { task: findCareTask(entry.task_id), entry }
+  res.json(change)
 })
 
 // ── RECIPES ──────────────────────────────────────────────────────────
@@ -511,6 +594,8 @@ app.post('/api/sample-data/clear', (req, res) => {
     // Shots you logged against a sample bean keep its name, just not the link
     const marks = SAMPLE_IDS.beans.map(() => '?').join(', ')
     BEAN_LINKED_TABLES.forEach(t => db.prepare(`UPDATE ${t} SET bean_id = NULL WHERE bean_id IN (${marks})`).run(...SAMPLE_IDS.beans))
+    // Care tasks you added to sample gear go with it
+    db.prepare('DELETE FROM care_tasks WHERE gear_id NOT IN (SELECT id FROM gear)').run()
     db.prepare(`UPDATE settings SET value = '"cleared"', updated_at = datetime('now') WHERE key = 'sampleData'`).run()
     return counts
   })()

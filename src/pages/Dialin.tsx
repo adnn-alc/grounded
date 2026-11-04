@@ -7,13 +7,14 @@ import { NumField, Readout, TimeField } from '../components/Fields.tsx'
 import { BasketChips } from '../components/BeanDoses.tsx'
 import { BagPicker, PageHead } from '../components/Shell.tsx'
 import { ExtractionEspresso, ExtractionFilter } from './ExtractionDialin.tsx'
+import { QuickShot } from './QuickShot.tsx'
 import { useUnits, type UnitHelpers } from '../hooks/useUnits.ts'
-import { hasNote, MAX_POURS, ROUND_POUR_TO, toAmounts, toggleNote, useBrewForm, useShotForm } from '../hooks/useDialinForm.ts'
+import { hasNote, MAX_POURS, ROUND_POUR_TO, toAmounts, toggleNote, useBrewForm, useShotForm, type CarriedShot } from '../hooks/useDialinForm.ts'
 import { DEFAULT_WATER_RECIPES } from '../data/waterRecipes.ts'
 import { RPM_OPTIONS, rpmLabel } from '../data/grinderRpm.ts'
 import { daysOffRoast } from '../data/beans.ts'
 import { withCurrent } from '../data/gear.ts'
-import { clampRating, landedLabel, mmss, RATING_STEP, ratioText } from '../data/taste.ts'
+import { clampRating, landedLabel, mmss, RATING_STEP, ratedText, ratioText } from '../data/taste.ts'
 import type { Bean, BeanInput, Brew, BrewInput, Design, DialinDefaults, DialinPreset, DialinStart, Gear, Shot, ShotInput, Taste, Units } from '../types.ts'
 
 const SHOT_SLIDER_MAX   = 60    // seconds; typing more is fine
@@ -158,6 +159,7 @@ export interface EspressoDialinProps {
   onUpdateBean:   (id: string, data: BeanInput) => Promise<Bean>
   preset:         Shot | null
   startBeanId?:   string
+  carried?:       CarriedShot | null
   modeSwitch:     ReactNode
   onBack:         () => void
   footer:         HTMLElement | null
@@ -182,7 +184,7 @@ function EspressoDialin({ units, brewModes, onUpdateBean, modeSwitch, onBack, fo
       <div className="dialin-cols" style={{ marginTop: '16px' }}>
         <div className="stack">
           <BagCard beans={beans} bean={bean} onPick={setSelectedBean} U={U}
-            lastLine={lastShot && <><span className="mono">{U.m(lastShot.dose)} → {U.m(lastShot.yield)} {U.mU()} in {lastShot.time} s</span>, rated {lastShot.rating.toFixed(1)}</>}
+            lastLine={lastShot && <><span className="mono">{U.m(lastShot.dose)} → {U.m(lastShot.yield)} {U.mU()} in {lastShot.time} s</span>, {ratedText(lastShot.rating)}</>}
             onUseLast={lastShot ? () => loadShot(lastShot) : undefined}>
             {bean && (
               <BasketChips bean={bean} basketOpts={basketOpts} currentBasket={basket} currentDose={dose} currentGrind={grind} U={U} onUpdateBean={onUpdateBean}
@@ -379,7 +381,24 @@ function FilterDialin({ units, modeSwitch, onBack, footer, ...args }: FilterDial
   )
 }
 
-// ── Page: Espresso / Filter switch ────────────────────────────────────
+// ── Page: Espresso / Filter switch, and Quick / Full for espresso ──
+// Quick log is made for the phone: it's the default on a narrow screen until you pick one, and
+// the choice is remembered on each device (localStorage; not a setting, as it differs per device).
+const QUICK_KEY = 'grounded-quick-log'
+const PHONE_QUERY = '(max-width: 760px)'
+
+function quickByDefault(): boolean {
+  try {
+    const saved = localStorage.getItem(QUICK_KEY)
+    if (saved != null) return saved === '1'
+  } catch {}
+  return window.matchMedia?.(PHONE_QUERY).matches ?? false
+}
+
+function rememberQuick(on: boolean): void {
+  try { localStorage.setItem(QUICK_KEY, on ? '1' : '0') } catch {}
+}
+
 interface DialinProps {
   design:           Design
   shots:            Shot[]
@@ -403,24 +422,41 @@ interface DialinProps {
 
 export default function Dialin({ design, shots, brews, beans, gear = [], units, waterRecipes = DEFAULT_WATER_RECIPES, dialinDefaults = {}, brewModes = [], onSaveShot, onSaveBrew, onUpdateBean, preset, onPresetConsumed, start, onStartConsumed, onBack, footer }: DialinProps) {
   const [mode, setMode] = useState<'espresso' | 'filter'>(preset?.type ?? start?.mode ?? 'espresso')
+  // Quick log or the full form; a re-pull always opens the full one
+  const [quick, setQuick] = useState(() => !preset && quickByDefault())
+  const [handoff, setHandoff] = useState<{ shot: Shot; carried: CarriedShot } | null>(null)
+  const pickQuick = (on: boolean) => { setQuick(on); rememberQuick(on) }
   // Read once: Re-pull / Dial in buttons set these before opening the page
   const [startBeanId] = useState(start?.beanId)
   useEffect(() => { onPresetConsumed?.(); onStartConsumed?.() }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const modeSwitch = (
-    <div className="seg">
-      {(['espresso', 'filter'] as const).map(m => (
-        <button key={m} className={mode === m ? 'on' : ''} onClick={() => setMode(m)}>{m === 'espresso' ? 'Espresso' : 'Filter'}</button>
-      ))}
-    </div>
+    <>
+      {mode === 'espresso' && (
+        <div className="seg quick-seg">
+          <button className={quick ? 'on' : ''} onClick={() => pickQuick(true)}>Quick</button>
+          <button className={quick ? '' : 'on'} onClick={() => pickQuick(false)}>Full</button>
+        </div>
+      )}
+      <div className="seg">
+        {(['espresso', 'filter'] as const).map(m => (
+          <button key={m} className={mode === m ? 'on' : ''} onClick={() => setMode(m)}>{m === 'espresso' ? 'Espresso' : 'Filter'}</button>
+        ))}
+      </div>
+    </>
   )
   const common = { beans, gear, units, waterRecipes, dialinDefaults, startBeanId, modeSwitch, onBack, footer }
   // Extraction lays the same form out in three columns around its time dial
   const Espresso = design === 'extraction' ? ExtractionEspresso : EspressoDialin
   const Filter   = design === 'extraction' ? ExtractionFilter : FilterDialin
 
-  return mode === 'espresso'
-    ? <Espresso {...common} key="espresso" shots={shots} brewModes={brewModes} onSaveShot={onSaveShot} onUpdateBean={onUpdateBean} preset={preset?.type === 'espresso' ? preset : null} />
-    : <Filter {...common} key="filter" brews={brews} onSaveBrew={onSaveBrew} preset={preset?.type === 'filter' ? preset : null} />
+  if (mode === 'filter') return <Filter {...common} key="filter" brews={brews} onSaveBrew={onSaveBrew} preset={preset?.type === 'filter' ? preset : null} />
+  if (quick) {
+    return <QuickShot {...common} key="quick" shots={shots} brewModes={brewModes} onSaveShot={onSaveShot} preset={null}
+      onFull={(shot, carried) => { setHandoff({ shot, carried }); pickQuick(false) }} />
+  }
+  const shotPreset = handoff?.shot ?? (preset?.type === 'espresso' ? preset : null)
+  return <Espresso {...common} key="espresso" shots={shots} brewModes={brewModes} onSaveShot={onSaveShot} onUpdateBean={onUpdateBean}
+    preset={shotPreset} carried={handoff?.carried} />
 }
 

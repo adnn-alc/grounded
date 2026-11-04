@@ -3,7 +3,7 @@ import { Backdrop } from '../components/ui.tsx'
 import { FlavorRadar, FlavSliders } from '../components/charts.tsx'
 import { LandedSlider } from '../components/Landed.tsx'
 import { HistoryList, InspectorEmpty, type RowNumbers } from '../components/History.tsx'
-import { ExtractionInspector } from '../components/ExtractionInspector.tsx'
+import { ExtractionInspector, Untasted } from '../components/ExtractionInspector.tsx'
 import { shortNum, useUnits } from '../hooks/useUnits.ts'
 import Ico from '../components/Ico.tsx'
 import { DEFAULT_WATER_RECIPES } from '../data/waterRecipes.ts'
@@ -11,7 +11,7 @@ import { RPM_OPTIONS } from '../data/grinderRpm.ts'
 import { activeGear, BASKET_KIND, GRINDER_KIND, MACHINE_KIND, withCurrent } from '../data/gear.ts'
 import { beanLabel, daysOffRoast } from '../data/beans.ts'
 import { dayOf, whenText } from '../data/dates.ts'
-import { clampRating, ratioText } from '../data/taste.ts'
+import { clampRating, ratioText, tasteAverage } from '../data/taste.ts'
 import type { Bean, Design, Gear, Route, Shot, ShotInput, Taste, Units } from '../types.ts'
 
 const RADAR_SIZE = 160
@@ -46,7 +46,14 @@ interface ShotEditForm {
   notes: string
   landed: number | null
   bad: boolean
-  rating: string
+  rating: string    // '' on a quick shot: stays untasted unless the taste is changed
+  tasted: boolean   // the taste sliders were moved
+}
+
+/** The typed rating; left empty, the taste average once the sliders were moved, else none (still a quick shot) */
+function editedRating(form: ShotEditForm): number | null {
+  if (form.rating.trim()) return clampRating(parseFloat(form.rating) || 0)
+  return form.tasted ? tasteAverage(form.taste) : null
 }
 
 const rpmLabel = (r: string) => r === 'manual' ? 'Manual' : `${r} RPM`
@@ -88,7 +95,8 @@ export function ShotHistory({ design, shots, brewCount = 0, goTo, beans = [], ge
       notes: shot.notes || '',
       landed: shot.landed,
       bad: shot.bad,
-      rating: String(shot.rating),
+      rating: shot.rating == null ? '' : String(shot.rating),
+      tasted: false,
     })
   }
 
@@ -102,7 +110,7 @@ export function ShotHistory({ design, shots, brewCount = 0, goTo, beans = [], ge
       machine: form.machine || null,
       grinder_model: form.grinder_model || null,
       taste: form.taste,
-      rating: clampRating(parseFloat(form.rating) || 0),
+      rating: editedRating(form),
       dose: parseFloat(form.dose), yield: parseFloat(form.yield),
       time: parseInt(form.time, 10), preinf: parseInt(form.preinf, 10),
       temp: parseFloat(form.temp), grind: parseFloat(form.grind),
@@ -176,14 +184,21 @@ export function ShotHistory({ design, shots, brewCount = 0, goTo, beans = [], ge
           <Kv k="Pre-inf" v={String(selected.preinf ?? 0)} u="s" />
         </div>
         <LandedSlider landed={selected.landed} bad={selected.bad} title="Landed" />
-        <div className="ins-taste">
-          <FlavorRadar taste={selected.taste} size={RADAR_SIZE} />
-          <div>
-            <div className="ins-rating">{selected.rating.toFixed(RATING_DECIMALS)}</div>
-            <div className="micro">rating</div>
+        {selected.rating == null ? (
+          <div className="ins-taste untasted-row">
+            <Untasted onEdit={onUpdateShot && (() => openEdit(selected))} />
             {selected.notes && <div className="ins-quote">“{selected.notes}”</div>}
           </div>
-        </div>
+        ) : (
+          <div className="ins-taste">
+            <FlavorRadar taste={selected.taste} size={RADAR_SIZE} />
+            <div>
+              <div className="ins-rating">{selected.rating.toFixed(RATING_DECIMALS)}</div>
+              <div className="micro">rating</div>
+              {selected.notes && <div className="ins-quote">“{selected.notes}”</div>}
+            </div>
+          </div>
+        )}
         <Setup rows={[
           { k: 'Machine', v: selected.machine },
           { k: 'Grinder', v: selected.grinder_model, extra: rpmText(selected.grinder_rpm) },
@@ -242,14 +257,14 @@ export function ShotHistory({ design, shots, brewCount = 0, goTo, beans = [], ge
                 )}
               </div>
               <div className="taste-wrap">
-                <FlavSliders taste={form.taste} onChange={t => set('taste', t)} />
+                <FlavSliders taste={form.taste} onChange={t => { set('taste', t); set('tasted', true) }} />
                 <div className="desk-only"><FlavorRadar taste={form.taste} size={EDIT_RADAR_SIZE} /></div>
               </div>
               <LandedSlider landed={form.landed} bad={form.bad} onChange={n => set('landed', n)} onBadChange={b => set('bad', b)} />
               <div className="form-grid">
-                <Input label="Rating (0–10)" value={form.rating} step="0.5" onChange={v => set('rating', v)} />
+                <Input label="Rating (0–10)" value={form.rating} step="0.5" placeholder={form.tasted ? String(tasteAverage(form.taste)) : 'not tasted'} onChange={v => set('rating', v)} />
               </div>
-              <textarea value={form.notes} onChange={e => set('notes', e.target.value)} rows={3} placeholder="Notes" aria-label="Notes" />
+              <textarea className="edit-notes" value={form.notes} onChange={e => set('notes', e.target.value)} rows={5} placeholder="Notes" aria-label="Notes" />
               <div className="row" style={{ justifyContent: 'flex-end' }}>
                 <button type="button" className="ghost-btn lg" onClick={() => setEditing(null)}>Cancel</button>
                 <button type="submit" className="primary-btn">Save changes</button>
@@ -280,11 +295,11 @@ export function Kv({ k, v, u }: { k: string; v: string; u?: string }) {
   return <div className="kv"><span className="k">{k}</span><span className="v">{v}{u && <small>{u}</small>}</span></div>
 }
 
-export function Input({ label, value, step, onChange }: { label: string; value: string; step: string; onChange: (v: string) => void }) {
+export function Input({ label, value, step, placeholder, onChange }: { label: string; value: string; step: string; placeholder?: string; onChange: (v: string) => void }) {
   return (
     <div className="dial-input">
       <label>{label}</label>
-      <input type="number" step={step} value={value} onChange={e => onChange(e.target.value)} />
+      <input type="number" step={step} value={value} placeholder={placeholder} onChange={e => onChange(e.target.value)} />
     </div>
   )
 }

@@ -5,9 +5,11 @@ import { PageHead } from '../components/Shell.tsx'
 import { useUnits } from '../hooks/useUnits.ts'
 import Ico from '../components/Ico.tsx'
 import { SampleDataBanner } from '../components/SampleDataBanner.tsx'
+import { CareReminder, type CareReminderProps } from '../components/Care.tsx'
+import { Frost } from '../components/Frost.tsx'
 import { bagStatus, daysOffRoast, usualDose } from '../data/beans.ts'
 import { dayKey, dayOf, isoDaysAgo, timeOf, whenText } from '../data/dates.ts'
-import { LANDED_BALANCED, landedLabel, mmss, ratioText } from '../data/taste.ts'
+import { LANDED_BALANCED, landedLabel, mmss, ratingsOf, ratingText, ratioText } from '../data/taste.ts'
 import type { Bean, Brew, DialinStart, Route, Shot, Units } from '../types.ts'
 
 const TREND_DAYS   = 14
@@ -36,6 +38,7 @@ export interface HomeProps {
   showSampleBanner?: boolean
   onRemoveSampleData?: () => Promise<void>
   onKeepSampleData?:   () => void
+  care?:               CareReminderProps   // a maintenance task that's due
 }
 
 /** The landed label, centered under the bar's mark but never past either end of the bar */
@@ -61,7 +64,7 @@ const fmt1 = (n: number | null): string => n == null ? '–' : n.toFixed(RATING_
 
 type Item = (Shot & { kind: 'shot' }) | (Brew & { kind: 'brew' })
 
-export default function Home({ shots, brews, beans, units, goTo, onRepull, onStartDialin, onAddBag, showSampleBanner, onRemoveSampleData, onKeepSampleData }: HomeProps) {
+export default function Home({ shots, brews, beans, units, goTo, onRepull, onStartDialin, onAddBag, showSampleBanner, onRemoveSampleData, onKeepSampleData, care }: HomeProps) {
   const U = useUnits(units)
   const now = new Date()
   const [page, setPage] = useState(0)
@@ -80,9 +83,9 @@ export default function Home({ shots, brews, beans, units, goTo, onRepull, onSta
   const inPrev = (d: string) => dayKey(d) >= prevStart && dayKey(d) < weekStart
   const weekShots = shots.filter(s => inWeek(s.date))
   const weekBrews = brews.filter(b => inWeek(b.date))
-  const shotAvg = avg(weekShots.map(s => s.rating))
-  const prevShotAvg = avg(shots.filter(s => inPrev(s.date)).map(s => s.rating))
-  const brewAvg = avg(weekBrews.map(b => b.rating))
+  const shotAvg = avg(ratingsOf(weekShots))
+  const prevShotAvg = avg(ratingsOf(shots.filter(s => inPrev(s.date))))
+  const brewAvg = avg(ratingsOf(weekBrews))
   const delta = shotAvg != null && prevShotAvg != null ? shotAvg - prevShotAvg : null
 
   const trend = Array.from({ length: TREND_DAYS }, (_, i) => {
@@ -131,6 +134,8 @@ export default function Home({ shots, brews, beans, units, goTo, onRepull, onSta
         <SampleDataBanner onRemove={onRemoveSampleData} onKeep={onKeepSampleData} />
       )}
 
+      {care && <CareReminder {...care} />}
+
       <div className="home-top">
         <div className="card">
           <div className="card-head"><span className="card-title">Last shot</span>{last && <span>{whenText(last.date, now)}</span>}</div>
@@ -154,7 +159,7 @@ export default function Home({ shots, brews, beans, units, goTo, onRepull, onSta
                   {last.grind > 0 && <div><dt>Grind</dt><dd>{last.grind}</dd></div>}
                 </dl>
                 <div className="hero-land">
-                  <span className="stat">{last.rating.toFixed(RATING_DECIMALS)}</span>
+                  <span className="stat">{ratingText(last.rating, RATING_DECIMALS)}</span>
                   <div className="hero-land-bar">
                     <MiniLanded landed={last.landed} bad={last.bad} />
                     {!last.bad && <MarkLabel at={last.landed ?? LANDED_BALANCED} text={landedLabel(last.landed)} />}
@@ -166,7 +171,7 @@ export default function Home({ shots, brews, beans, units, goTo, onRepull, onSta
                   <button className="ghost-btn lg" onClick={() => goTo('shot-history', last.id)}>Open shot</button>
                 </div>
               </div>
-              <div className="radar"><FlavorRadar taste={last.taste} size={RADAR_SIZE} /></div>
+              {last.rating != null && <div className="radar"><FlavorRadar taste={last.taste} size={RADAR_SIZE} /></div>}
             </div>
           )}
         </div>
@@ -195,7 +200,7 @@ export default function Home({ shots, brews, beans, units, goTo, onRepull, onSta
                 <button key={it.id} className="mini-item" onClick={() => openItem(it)}>
                   <span className="t">{timeOf(it.date)}</span>
                   <span className="d">{itemLine(it)}</span>
-                  <span className="s">{it.rating.toFixed(RATING_DECIMALS)}</span>
+                  <span className="s">{ratingText(it.rating, RATING_DECIMALS)}</span>
                 </button>
               ))}
             </div>
@@ -214,7 +219,8 @@ export default function Home({ shots, brews, beans, units, goTo, onRepull, onSta
           {openBags.map(b => {
             const pct = b.weight > 0 ? Math.min(PERCENT, (b.remaining / b.weight) * PERCENT) : 0
             return (
-              <button key={b.id} className="bag-tile" title="Dial in with this bag" onClick={() => onStartDialin({ mode: 'espresso', beanId: b.id })}>
+              <button key={b.id} className={`bag-tile${b.frozen_at ? ' frozen' : ''}`} title="Dial in with this bag" onClick={() => onStartDialin({ mode: 'espresso', beanId: b.id })}>
+                <Frost bean={b} />
                 <span className="nm">{b.name}</span>
                 <span className="rs">{b.roaster}</span>
                 <span className="stock-bar"><i className={b.stock} style={{ width: `${pct}%` }} /></span>
@@ -243,7 +249,7 @@ export default function Home({ shots, brews, beans, units, goTo, onRepull, onSta
               <button key={it.id} className="mini-item" onClick={() => openItem(it)}>
                 <span className="t">{dayKey(it.date).slice('YYYY-'.length)}</span>
                 <span className="d">{itemLine(it)}</span>
-                <span className="s">{it.rating.toFixed(RATING_DECIMALS)}</span>
+                <span className="s">{ratingText(it.rating, RATING_DECIMALS)}</span>
               </button>
             ))}
           </div>

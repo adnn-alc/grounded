@@ -45,6 +45,24 @@ export function tasteAverage(taste: Taste): number {
   return values.length ? round1(values.reduce((a, b) => a + (b || 0), 0) / values.length) : 0
 }
 
+// A quick shot is saved without tasting it: its rating is null until taste is added
+const ONE_DECIMAL = 1
+const UNRATED_ORDER = -1
+
+/** '8.5', or '–' for a quick shot that hasn't been tasted yet */
+export const ratingText = (rating: number | null, decimals: number = ONE_DECIMAL): string =>
+  rating == null ? '–' : rating.toFixed(decimals)
+
+/** 'rated 8.5', or 'not tasted yet' for a quick shot */
+export const ratedText = (rating: number | null): string => rating == null ? 'not tasted yet' : `rated ${ratingText(rating)}`
+
+/** The ratings that were given, leaving out quick shots that have none yet */
+export const ratingsOf = (list: readonly { rating: number | null }[]): number[] =>
+  list.map(x => x.rating).filter((r): r is number => r != null)
+
+/** For sorting best first: untasted ones go last */
+export const ratingOrder = (rating: number | null): number => rating ?? UNRATED_ORDER
+
 /** Ratings move in half points and stay within 0–10 */
 export const clampRating = (r: number): number => Math.min(RATING_MAX, Math.max(0, Math.round(r / RATING_STEP) * RATING_STEP))
 

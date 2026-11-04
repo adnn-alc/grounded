@@ -1,7 +1,7 @@
 import type {
   Shot, ShotInput, Brew, BrewInput, Bean, BeanInput, Gear, GearInput,
   Recipe, RecipeInput, Tip, TipInput, Settings, OkResponse, ClearSampleDataResponse,
-  ImportRequest, ImportResult,
+  ImportRequest, ImportResult, CareTask, CareTaskInput, CareLogEntry, CareDoneInput, CareChange,
 } from '../types.ts'
 
 const BASE = '/api'
@@ -64,6 +64,15 @@ export const api = {
   createTip:  (t: TipInput)             => req<Tip>('POST',     '/tips', t),
   updateTip:  (id: string, t: TipInput) => req<Tip>('PUT',      `/tips/${id}`, t),
   deleteTip:  (id: string)              => req<OkResponse>('DELETE', `/tips/${id}`),
+
+  // Care: maintenance tasks per gear item, and the log of when they were done
+  getCareTasks:   ()                             => req<CareTask[]>('GET',    '/care-tasks'),
+  createCareTask: (t: CareTaskInput)             => req<CareTask>('POST',     '/care-tasks', t),
+  updateCareTask: (id: string, t: CareTaskInput) => req<CareTask>('PUT',      `/care-tasks/${id}`, t),
+  deleteCareTask: (id: string)                   => req<OkResponse>('DELETE', `/care-tasks/${id}`),
+  careDone:       (id: string, d: CareDoneInput) => req<CareChange>('POST',   `/care-tasks/${id}/done`, d),
+  getCareLog:     ()                             => req<CareLogEntry[]>('GET', '/care-log'),
+  undoCare:       (id: string)                   => req<CareChange>('DELETE', `/care-log/${id}`),
 
   // Settings (partial update — only the keys sent are changed)
   getSettings:    ()                  => req<Settings>('GET', '/settings'),

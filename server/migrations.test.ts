@@ -48,7 +48,7 @@ after(() => {
   tmp.cleanup()
 })
 
-const LATEST_SCHEMA = 4
+const LATEST_SCHEMA = 6
 const columns = (table: string): string[] =>
   db.prepare<[string], { name: string }>('SELECT name FROM pragma_table_info(?)').all(table).map(c => c.name)
 

@@ -3,7 +3,7 @@ import { useUnits, type UnitHelpers } from '../hooks/useUnits.ts'
 import CoffeeMap from '../components/CoffeeMap.tsx'
 import { PageHead } from '../components/Shell.tsx'
 import { daysAgo } from '../data/dates.ts'
-import { LANDED_MAX, landedLabel, mmss } from '../data/taste.ts'
+import { LANDED_MAX, landedLabel, mmss, ratingsOf, ratingText } from '../data/taste.ts'
 import type { Bean, Brew, Gear, Shot, Units } from '../types.ts'
 
 // ── STATS ─────────────────────────────────────────────────────────────
@@ -26,7 +26,7 @@ const OZ_PER_LB = 16
 const OZ = 28.3495        // grams in an ounce
 
 /** What the summary cards read from a shot or a brew */
-interface Entry { date: string; rating: number; dose: number; out: number; time: number; landed: number | null; bad: boolean }
+interface Entry { date: string; rating: number | null; dose: number; out: number; time: number; landed: number | null; bad: boolean }
 
 /** '113' or '12.50' */
 const money = (n: number): string => n % 1 === 0 ? String(n) : n.toFixed(CENTS)
@@ -119,7 +119,7 @@ function SummaryCard({ title, entries, noun, U, outLabel, timeText }: { title: s
       {entries.length === 0 ? <div className="empty">Nothing logged in this period.</div> : (
         <>
           <div className="num-row fit">
-            <div className="kv"><span className="k">Avg rating</span><span className="v accent">{avg(entries.map(e => e.rating)).toFixed(DECIMALS)}</span></div>
+            <div className="kv"><span className="k">Avg rating</span><span className="v accent">{ratingText(ratingsOf(entries).length ? avg(ratingsOf(entries)) : null, DECIMALS)}</span></div>
             <div className="kv"><span className="k">Avg dose</span><span className="v">{U.m(avg(entries.map(e => e.dose)))}<small>{U.mU()}</small></span></div>
             <div className="kv"><span className="k">{outLabel}</span><span className="v">{U.m(avg(entries.map(e => e.out)))}<small>{U.mU()}</small></span></div>
             <div className="kv"><span className="k">Avg time</span><span className="v">{timeText(Math.round(avg(entries.map(e => e.time))))}</span></div>

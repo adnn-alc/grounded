@@ -22,6 +22,8 @@ const TABLE_WORDS: Record<BackupTable, readonly [string, string]> = {
   gear:    ['gear item', 'gear items'],
   recipes: ['recipe', 'recipes'],
   tips:    ['note', 'notes'],
+  care_tasks: ['care task', 'care tasks'],
+  care_log:   ['care log entry', 'care log entries'],
 }
 const TABLES = Object.keys(TABLE_WORDS) as BackupTable[]
 

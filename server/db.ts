@@ -41,6 +41,8 @@ db.exec(`
     doses       TEXT,          -- JSON array of { basket, dose, grind? }
     archived    INTEGER DEFAULT 0,
     archived_at TEXT,
+    frozen_at   TEXT,          -- 'YYYY-MM-DD' it went into the freezer; NULL = not frozen
+    frozen_days INTEGER DEFAULT 0, -- days spent frozen before, so freshness can leave them out
     created_at  TEXT DEFAULT (datetime('now'))
   );
 
@@ -147,6 +149,33 @@ db.exec(`
     created_at   TEXT DEFAULT (datetime('now'))
   );
 
+  -- Care (maintenance): a task repeats every so many shots, days or grams of coffee through a gear item
+  CREATE TABLE IF NOT EXISTS care_tasks (
+    id            TEXT PRIMARY KEY,
+    gear_id       TEXT NOT NULL,   -- gear.id; the task is deleted with its gear
+    name          TEXT NOT NULL,
+    every         REAL NOT NULL,   -- how often, in the unit below
+    unit          TEXT NOT NULL,   -- 'shots' (shots and brews made with it), 'days' or 'grams' (coffee through it)
+    since         TEXT NOT NULL,   -- 'YYYY-MM-DD HH:MM' the count runs from: when it was last done, or added
+    snoozed_until TEXT,            -- 'YYYY-MM-DD': Home doesn't remind about it before then
+    created_at    TEXT DEFAULT (datetime('now'))
+  );
+
+  -- Each time a care task was done, with what had built up since the time before (for stats later)
+  CREATE TABLE IF NOT EXISTS care_log (
+    id         TEXT PRIMARY KEY,
+    task_id    TEXT,               -- care_tasks.id (no foreign key, so the log survives a deleted task)
+    gear_id    TEXT,
+    task       TEXT NOT NULL,      -- the task's and gear's names at the time
+    gear       TEXT,
+    started    TEXT NOT NULL,      -- the count it ended ran from (the task's since), so Undo can put it back
+    done_at    TEXT NOT NULL,      -- 'YYYY-MM-DD HH:MM'
+    shots      INTEGER,            -- shots and brews made with it since the time before
+    grams      REAL,               -- coffee through it since the time before
+    days       INTEGER,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+
   -- App-wide preferences (theme, fonts, units, water recipes, dial-in defaults, brew modes)
   CREATE TABLE IF NOT EXISTS settings (
     key        TEXT PRIMARY KEY,
@@ -244,6 +273,21 @@ const MIGRATIONS: readonly { name: string, up: () => void }[] = [
         db.exec(fillFromVerdictsSql(t))
       }
     },
+  },
+  {
+    // A bag can be put in the freezer: when it went in, and how long earlier stays lasted
+    name: 'freezer tracking for beans',
+    up: () => {
+      addColumn('beans', 'frozen_at', 'TEXT')
+      addColumn('beans', 'frozen_days', 'INTEGER DEFAULT 0')
+    },
+  },
+  {
+    // Care: maintenance tasks per gear item (backflush every 50 shots, …) and a log of each time one was done
+    // The tables come from the CREATE TABLE block above, which runs on every start (IF NOT EXISTS),
+    // so there's nothing to change here: this only records the schema version
+    name: 'care tasks and log',
+    up: () => {},
   },
 ]
 

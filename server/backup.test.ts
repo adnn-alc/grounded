@@ -42,7 +42,7 @@ test('the backup has a header, every table and the settings, but not the sample-
   assert.equal(b.app, 'grounded')
   assert.equal(b.format, 1)
   assert.equal(b.schemaVersion, db.pragma('user_version', { simple: true }))
-  assert.deepEqual(Object.keys(b.tables).sort(), ['beans', 'brews', 'gear', 'recipes', 'shots', 'tips'])
+  assert.deepEqual(Object.keys(b.tables).sort(), ['beans', 'brews', 'care_log', 'care_tasks', 'gear', 'recipes', 'shots', 'tips'])
   assert.ok(b.tables.shots.length > 0 && 'taste_acidity' in b.tables.shots[0]!, 'rows are raw database rows')
   assert.equal(b.settings.sampleData, undefined)
 })
