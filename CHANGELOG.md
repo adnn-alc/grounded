@@ -8,6 +8,10 @@ All notable changes to Grounded are listed here. Versions follow [Semantic Versi
 
 ## [Unreleased]
 
+## [1.5.0] — 2026-11-04
+
+A page for each bag, quick log for the phone, care reminders for your machine and grinder, freezer tracking, and two more Extraction themes. Your database is upgraded automatically on the first start, after a backup copy is saved next to it. Once you've saved a quick shot, don't go back to an older version: it expects every shot to have a rating.
+
 - Extraction has two more themes in Settings → Appearance: **Mocha**, a dark cocoa brown that's easier on the eyes than Roast's near-black, and **Latte**, a muted milky beige that's softer than Crema's near-white
 - Beans can go **in the freezer**: a switch on each bag (and in the bean form, with the day it went in) frosts the bag over on Beans and Home, in both designs, and shows how long it's been frozen. A frozen bag stops aging: its freshness label leaves out the days it spent in the freezer, also after you take it out
 - **A page for each bag**: open it by clicking a bag on Beans (on Extraction, pick the bag on the shelf, then click it again, or use **Open the bag's page** under its name). It shows the bag's freshness, what's left and roughly how many shots that is, what you've made with it and its price; your **best shot so far** with **Start from this shot**; a chart of your grind across the bag (each shot a dot, colored by where it landed, with the trend); your rating by days off roast with the days it tasted best; and every shot and brew with it, newest first. Dial in, Edit and the freezer switch are there too. Each bag has its own address (`#/bean/<id>`), so you can bookmark it
