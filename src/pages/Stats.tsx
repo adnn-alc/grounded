@@ -168,6 +168,9 @@ export function Stats({ shots, brews = [], beans = [], gear = [], units }: Stats
   const gearSpend = pricedGear.reduce((a, g) => a + (g.price ?? 0), 0)
   const openBags  = beans.filter(b => !b.archived)
   const left      = openBags.reduce((a, b) => a + (b.remaining || 0), 0)
+  // Finished bags count at their full weight, whatever was logged from them, so this can differ from coffee used
+  const finished  = beans.filter(b => b.archived && b.weight > 0)
+  const finishedGrams = finished.reduce((a, b) => a + b.weight, 0)
 
   const originsCard = (
     <div className="card">
@@ -220,6 +223,7 @@ export function Stats({ shots, brews = [], beans = [], gear = [], units }: Stats
         <div className="kv"><span className="k">On gear</span><span className="v">{gearSpend > 0 ? `€${money(gearSpend)}` : '–'}</span><span className="kv-note">{pricedGear.length} {pricedGear.length === 1 ? 'item' : 'items'}, all time</span></div>
         <div className="kv"><span className="k">Coffee used</span><span className="v">{bigMass(used, units)}</span><span className="kv-note">{usedCount} {usedCount === 1 ? 'shot or brew' : 'shots and brews'}</span></div>
         <div className="kv"><span className="k">Coffee left</span><span className="v">{bigMass(left, units)}</span><span className="kv-note">{openBags.length} open {openBags.length === 1 ? 'bag' : 'bags'}</span></div>
+        <div className="kv"><span className="k">Beans finished</span><span className="v">{finished.length > 0 ? bigMass(finishedGrams, units) : '–'}</span><span className="kv-note">{finished.length} {finished.length === 1 ? 'bag' : 'bags'}, all time</span></div>
       </div>
     </div>
   )

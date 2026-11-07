@@ -598,7 +598,16 @@
 [data-design="extraction"] .stats-sum .num-row .kv:first-child .v { color: var(--crema); }
 [data-design="extraction"] .stats-sum .num-row .kv:nth-child(4) .v { color: var(--cherry); }
 [data-design="extraction"] .stats-spend .num-row .kv .v { font-size: 30px; }
-[data-design="extraction"] .stats-spend .num-row .kv:first-child .v { font-size: 44px; }
+[data-design="extraction"] .stats-spend .num-row .kv:first-child .v { font-size: clamp(30px, 6.2cqi, 44px); }
+/* The total can be long (€1444.50): its column takes the room it needs, so it never runs into the next one.
+   When the card is too narrow for that, two by two. */
+@container (min-width: 681px) {
+  [data-design="extraction"] .stats-spend .num-row.fit { grid-template-columns: max-content repeat(3, minmax(0, 1fr)); }
+}
+@container (max-width: 680px) {
+  [data-design="extraction"] .stats-spend .num-row.fit { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  [data-design="extraction"] .stats-spend :is(.num-row.fit, .spend-foot) > .kv:nth-child(3) { padding-left: 0; border-left: 0; }
+}
 [data-design="extraction"] .stats-page .hist { gap: 10px; margin-top: 22px; }
 [data-design="extraction"] .stats-page .hist .bars { gap: 5px; }
 [data-design="extraction"] .stats-page .hist .bars i { border-radius: 6px 6px 3px 3px; }
