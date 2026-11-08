@@ -8,9 +8,14 @@ All notable changes to Grounded are listed here. Versions follow [Semantic Versi
 
 ## [Unreleased]
 
+## [1.5.1] — 2026-11-08
+
+Finished bags are back on Stats, a long Spending total fits on Extraction, and the Docker setup works without changes. Nothing changes in your database.
+
 - Stats → Spending shows **Beans finished** again: how much coffee your finished bags held, and how many there were (it went missing in the 1.4.0 redesign)
 - On Extraction, the big Spending total no longer runs into the next number when it's long
 - `docker-compose.yml` no longer joins a `media_net` network, so it works as it is. The README's quick start now uses the ready-made image from GitHub Container Registry
+- For development, `npm run dev` now uses concurrently 10
 
 ## [1.5.0] — 2026-11-04
 
