@@ -13,16 +13,16 @@ This is a short version of the [Contributor Covenant 2.1](https://www.contributo
 Not okay:
 
 - Harassment, insults, or personal or political attacks
-- Sexualised language or imagery
+- Sexualized language or imagery
 - Publishing someone's private information without their permission
 - Anything you wouldn't say to someone's face in a coffee shop
 
 ## Reporting
 
-If someone's behaviour bothers you, please report it privately to the maintainer at **CONTACT_EMAIL_PLACEHOLDER**. Reports are kept confidential.
+If someone's behavior bothers you, open the **⋯** menu on their comment, issue or pull request, choose **Report content**, then **Report to repository admins**. Only the maintainer sees the report.
 
 Security problems go through [SECURITY.md](SECURITY.md) instead.
 
 ## What happens
 
-The maintainer will look at every report and decide what's fair: a note asking someone to change their behaviour, a warning, or a temporary or permanent ban from the project. Comments, commits, issues and other contributions that break this code may be edited or removed.
+The maintainer will look at every report and decide what's fair: a note asking someone to change their behavior, a warning, or a temporary or permanent ban from the project. Comments, commits, issues and other contributions that break this code may be edited or removed.

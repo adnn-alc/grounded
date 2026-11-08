@@ -9,9 +9,5 @@ services:
     environment:
       - NODE_ENV=production
       - DB_PATH=/app/data/grounded.db
+      # - ALLOWED_HOSTS=nas.local,192.168.1.20 # optional, see the README
     restart: unless-stopped
-    networks: # remove this block (and the one at the bottom) if you don't have a "media_net" network
-      - media_net
-networks: # remove this block too, or create the network first: docker network create media_net
-  media_net:
-    external: true

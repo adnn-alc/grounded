@@ -6,7 +6,7 @@ import type { AddressInfo } from 'node:net'
 import { createTempDatabase } from './test-helpers.ts'
 
 const tmp = createTempDatabase()
-process.env.ALLOWED_HOSTS = 'grounded.example, LegoNAS'
+process.env.ALLOWED_HOSTS = 'grounded.example, MyNAS'
 const { app } = await import('./app.ts')
 const { default: db } = await import('./db.ts')
 const server = await new Promise<http.Server>(resolve => { const s = app.listen(0, () => resolve(s)) })
@@ -31,7 +31,7 @@ const statusFor = (host: string): Promise<number> => new Promise((resolve, rejec
 
 test('answers the listed hosts, case-insensitively', async () => {
   assert.equal(await statusFor('grounded.example'), OK)
-  assert.equal(await statusFor('legonas'), OK)
+  assert.equal(await statusFor('mynas'), OK)
 })
 
 test('always answers localhost, for the Docker health check', async () => {

@@ -8,6 +8,10 @@ All notable changes to Grounded are listed here. Versions follow [Semantic Versi
 
 ## [Unreleased]
 
+- Stats → Spending shows **Beans finished** again: how much coffee your finished bags held, and how many there were (it went missing in the 1.4.0 redesign)
+- On Extraction, the big Spending total no longer runs into the next number when it's long
+- `docker-compose.yml` no longer joins a `media_net` network, so it works as it is. The README's quick start now uses the ready-made image from GitHub Container Registry
+
 ## [1.5.0] — 2026-11-04
 
 A page for each bag, quick log for the phone, care reminders for your machine and grinder, freezer tracking, and two more Extraction themes. Your database is upgraded automatically on the first start, after a backup copy is saved next to it. Once you've saved a quick shot, don't go back to an older version: it expects every shot to have a rating.

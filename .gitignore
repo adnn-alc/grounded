@@ -12,3 +12,6 @@ dist/
 # Env files
 .env
 .env.*
+
+# Local Docker Compose additions (e.g. your own networks), merged into docker-compose.yml
+docker-compose.override.yml

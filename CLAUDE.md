@@ -97,7 +97,7 @@ There are two designs, set by the `design` setting (missing = `refined`, the def
 - Vite proxies `/api/*` → `http://localhost:3001` in dev so there are no CORS issues locally.
 - The Dockerfile builds everything in the first stage, prunes dev dependencies there, and copies `node_modules` into a runtime stage that has no compilers. Both stages must use the same base image, because `better-sqlite3` is a native module.
 - The app runs as `node` (uid 1000), not root. `docker-entrypoint.sh` starts as root, `chown`s the data folder (the `DB_PATH` directory) to node, then `exec su-exec node …`. A compose `user:` override skips the chown and runs as that user. CI checks this with a root-owned bind mount. Keep `docker-entrypoint.sh` LF-only (`.gitattributes`).
-- `docker-compose.yml` joins the author's external `media_net` network. Leave that as is.
+- `docker-compose.yml` is the generic one users get. The author's install joins its external `media_net` network through a git-ignored `docker-compose.override.yml` next to it, which Docker Compose merges in automatically. Leave that file as is, and don't add `media_net` back to `docker-compose.yml`.
 
 ### ESM
 

@@ -34,7 +34,7 @@ npm run build
 And please:
 
 - **Keep it focused:** one change per pull request, without unrelated reformatting.
-- **Follow the existing style:** TypeScript with strict mode; plain CSS with the theme variables in `src/styles/global.css` (use `var(--font-mono)` and friends, never a hard-coded font or colour); no new UI libraries without discussing it first.
+- **Follow the existing style:** TypeScript with strict mode; plain CSS with the theme variables in `src/styles/global.css` (use `var(--font-mono)` and friends, never a hard-coded font or color); no new UI libraries without discussing it first.
 - **Database changes** need a new numbered migration in `server/db.ts`, plus the matching change in the `CREATE TABLE` block and in `src/types.ts`. Never edit an existing migration. A test in `server/migrations.test.ts` is very welcome.
 - **API changes** need validation in `server/validation.ts` and, ideally, a test in `server/api.test.ts`.
 - **User-facing changes** get a line under `## [Unreleased]` in [CHANGELOG.md](CHANGELOG.md).
