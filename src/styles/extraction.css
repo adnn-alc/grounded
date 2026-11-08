@@ -339,9 +339,12 @@
 }
 .tdial-center input.mmss { font-size: 52px; }
 .tdial-center span { font-size: 14px; color: var(--text-3); margin-top: 4px; }
-.tdial-steps { display: flex; align-items: center; justify-content: center; gap: 14px; margin-top: -26px; width: 100%; max-width: 300px; }
+/* The − / + row tucks up into the dial's open bottom. It has to sit above the dial (which is positioned),
+   or a click on − / + lands on the dial and snaps the time to 0 or the max. Only the buttons take clicks,
+   so the rest of the row still lets you drag the dial. */
+.tdial-steps { display: flex; align-items: center; justify-content: center; gap: 14px; margin-top: -26px; width: 100%; max-width: 300px; position: relative; pointer-events: none; }
 .tdial-steps span { flex: 1; text-align: center; font-size: 12.5px; color: var(--text-3); line-height: 1.35; }
-.tdial-steps .icon-btn { width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--border-strong); background: transparent; font-size: 18px; }
+.tdial-steps .icon-btn { width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--border-strong); background: transparent; font-size: 18px; pointer-events: auto; }
 .tdial-steps span:empty { visibility: hidden; }
 
 /* ── Dial-in: bag and recipe | time dial | taste and Save ── */

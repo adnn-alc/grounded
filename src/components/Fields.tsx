@@ -132,6 +132,8 @@ const WHEEL_NOTCH = 40         // pixels of trackpad scroll per step
 const WHEEL_CLICK = 50         // a scroll this big at once is from a mouse wheel, not a trackpad
 const CLICK_PIXELS = 100       // one wheel click, in pixels (Chrome, Safari)
 const CLICK_LINES  = 3         // one wheel click, in lines (Firefox)
+const GRAB_BAND   = 34         // a press grabs the dial this far either side of the ring (dial units, the ring's radius is DIAL_R)
+const END_GRACE   = 10         // degrees past either end of the ring that still grab it, so the knob at 0 or the max can be picked up
 
 const C = DIAL_SIZE / HALF
 const polar = (r: number, deg: number): [number, number] => [C + r * Math.cos(deg * DEG), C + r * Math.sin(deg * DEG)]
@@ -191,16 +193,32 @@ export function TimeDial({ value, onChange, minutes = false, max, step, last, he
     return () => face.removeEventListener('wheel', onWheel)
   }, [])
 
-  const place = (clientX: number, clientY: number) => {
+  // Where a pointer is on the dial: its distance from the center and its angle along the ring (0 = the start)
+  const locate = (clientX: number, clientY: number) => {
     const rect = svgRef.current?.getBoundingClientRect()
-    if (!rect) return
+    if (!rect) return null
     const scale = DIAL_SIZE / rect.width
-    const deg = Math.atan2((clientY - rect.top) * scale - C, (clientX - rect.left) * scale - C) / DEG
-    const rel = (deg - DIAL_START + FULL_TURN * HALF) % FULL_TURN
-    const frac = rel <= DIAL_SWEEP ? rel / DIAL_SWEEP : Number(rel < GAP_MIDDLE)
+    const dx = (clientX - rect.left) * scale - C
+    const dy = (clientY - rect.top) * scale - C
+    const deg = Math.atan2(dy, dx) / DEG
+    return { r: Math.hypot(dx, dy), rel: (deg - DIAL_START + FULL_TURN * HALF) % FULL_TURN }
+  }
+  const place = (clientX: number, clientY: number) => {
+    const spot = locate(clientX, clientY)
+    if (!spot) return
+    const frac = spot.rel <= DIAL_SWEEP ? spot.rel / DIAL_SWEEP : Number(spot.rel < GAP_MIDDLE)
     onChange(show(Math.round((frac * max) / step) * step))
   }
+  // Only a press on the ring grabs the dial. One in the middle, a corner or the open bottom (around
+  // the − / + buttons) does nothing, so a near miss on a button can't throw the time to 0 or the max.
+  // Once grabbed, the drag follows the pointer anywhere.
+  const dragging = useRef(false)
   const onPointerDown = (e: ReactPointerEvent<SVGSVGElement>) => {
+    const spot = locate(e.clientX, e.clientY)
+    const onRing = spot != null && Math.abs(spot.r - DIAL_R) <= GRAB_BAND
+      && (spot.rel <= DIAL_SWEEP + END_GRACE || spot.rel >= FULL_TURN - END_GRACE)
+    dragging.current = onRing
+    if (!onRing) return
     e.preventDefault()
     e.currentTarget.setPointerCapture(e.pointerId)
     place(e.clientX, e.clientY)
@@ -214,7 +232,8 @@ export function TimeDial({ value, onChange, minutes = false, max, step, last, he
     <div className="tdial">
       <div className="tdial-face" ref={faceRef}>
         <svg ref={svgRef} viewBox={`0 0 ${DIAL_SIZE} ${DIAL_SIZE}`} role="img" aria-label={`${minutes ? 'Total' : 'Shot'} time, drag to set`}
-          onPointerDown={onPointerDown} onPointerMove={e => { if (e.buttons) place(e.clientX, e.clientY) }}>
+          onPointerDown={onPointerDown} onPointerMove={e => { if (e.buttons && dragging.current) place(e.clientX, e.clientY) }}
+          onPointerUp={() => { dragging.current = false }} onPointerCancel={() => { dragging.current = false }}>
           <path className="tdial-track" d={arcPath(1)} strokeWidth={DIAL_STROKE} />
           {secs > 0 && <path className="tdial-fill" d={arcPath(secs / max)} strokeWidth={DIAL_STROKE} />}
           {ticks.map(t => {
