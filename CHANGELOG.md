@@ -8,6 +8,12 @@ All notable changes to Grounded are listed here. Versions follow [Semantic Versi
 
 ## [Unreleased]
 
+## [1.5.2] — 2026-11-08
+
+A fix for the time dial on Extraction. Nothing changes in your database.
+
+- On Extraction's Dial-in, − and + under the time dial no longer throw the time to 0 or the max: they add or take off one step, as they should. The dial also only moves when you press on its ring, so a tap in the middle or just next to − / + leaves the time alone
+
 ## [1.5.1] — 2026-11-08
 
 Finished bags are back on Stats, a long Spending total fits on Extraction, and the Docker setup works without changes. Nothing changes in your database.
