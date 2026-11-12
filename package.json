@@ -1,6 +1,6 @@
 {
   "name": "grounded",
-  "version": "1.5.2",
+  "version": "1.6.0",
   "description": "Self-hosted espresso & filter coffee tracker: dial-in log, beans, gear and stats in one Docker container",
   "keywords": [
     "coffee",
