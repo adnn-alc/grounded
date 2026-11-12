@@ -8,6 +8,8 @@ All notable changes to Grounded are listed here. Versions follow [Semantic Versi
 
 ## [Unreleased]
 
+- For development, the UI is now built with Vite 8 (was 5), which clears two security warnings in the dev server. The app itself is unchanged
+
 ## [1.5.2] — 2026-11-08
 
 A fix for the time dial on Extraction. Nothing changes in your database.

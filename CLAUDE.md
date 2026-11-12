@@ -4,9 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-Grounded is a self-hosted espresso & coffee tracking app. TypeScript throughout: React 18 + Vite 5 frontend, Express 4 API, SQLite via `better-sqlite3`, Node 24 (Node 22.18+ for local dev). No cloud dependencies, fully self-contained — fonts are bundled too, nothing is loaded from a CDN. Deployed via Docker.
-
-**This folder is also the author's live deployment** (`docker-compose.yml` on the NAS, database in `data/grounded.db`). Never touch `data/`, and never rebuild or restart the container — the author does that.
+Grounded is a self-hosted espresso & coffee tracking app. TypeScript throughout: React 18 + Vite 8 frontend, Express 4 API, SQLite via `better-sqlite3`, Node 24 (Node 22.18+ for local dev). No cloud dependencies, fully self-contained — fonts are bundled too, nothing is loaded from a CDN. Deployed via Docker.
 
 ## Commands
 
@@ -59,8 +57,6 @@ Care: `care_tasks` (per gear item: `name`, `every`, `unit` = `shots` | `days` | 
 
 Schema: the `CREATE TABLE IF NOT EXISTS` block in `db.ts` is the full current schema, so a fresh database is complete at once (and is stamped with the latest version). Existing databases are upgraded by the numbered `MIGRATIONS` list: `PRAGMA user_version` stores how many have run, each pending one runs once in its own transaction, and a failure stops startup. Before migrating an existing database, the server writes a snapshot next to it (`grounded.db.backup-v<old version>-<timestamp>`, via `VACUUM INTO`). To change the schema: update the `CREATE TABLE` block **and** append a migration (use `addColumn()`, which checks first); never edit or reorder a released migration. Also update the row and API types in `src/types.ts`.
 
-The author's live database has a few leftovers that the code doesn't create or use (`brews.filter_type`, `brews.time_target`, a `grinder_log` table). Fresh installs don't have them; don't rely on them.
-
 ### Backups
 
 `GET /api/export` downloads a `Backup` (`src/types.ts`): a header (`app`, `format`, `version`, `schemaVersion`, `exportedAt`), raw `SELECT *` rows for `beans`, `shots`, `brews`, `gear`, `recipes`, `tips`, `care_tasks` and `care_log`, and the settings (except `sampleData`). `POST /api/import` takes `{ mode, dryRun?, backup }`: `replace` deletes those tables and the settings and loads the backup; `merge` only inserts rows whose id isn't there yet and settings that aren't set. It refuses non-Grounded files and backups with a newer `schemaVersion`, inserts only the columns the table has (an older backup's missing columns get their defaults), writes a `grounded.db.backup-import-…` snapshot first (deleted again if the import fails) and runs in one transaction. A dry run rolls the transaction back and returns the same counts; the UI uses it as the preview. That route alone accepts bodies up to 50 MB. Stock isn't recounted on import. When you add a table, add it to `BACKUP_TABLES` in `backup.ts`, the `BackupTable` type, `importSchema` in `validation.ts` (with a default, so older backups still import) and `TABLE_WORDS` in `DataSettings.tsx`. `GET /api/export/shots.csv` / `brews.csv` export a fixed column list; text that starts like a formula gets a leading `'`. The UI is `src/components/DataSettings.tsx` (Settings → Backup and data).
@@ -91,13 +87,13 @@ There are two designs, set by the `design` setting (missing = `refined`, the def
 - `PORT` — API port (default `3001`; host port is `5555` per `docker-compose.yml`)
 - `DB_PATH` — SQLite file path (default `data/grounded.db`; in Docker the volume `./data` is mounted at `/app/data`)
 - `ALLOWED_HOSTS` — optional, comma-separated host names/IPs. When set, requests for any other `Host` get 403 (DNS-rebinding protection); `localhost`/`127.0.0.1` always work for the health check. Unset = off.
-- No `X-Frame-Options`/`frame-ancestors` header on purpose: the author embeds Grounded in a home dashboard.
+- No `X-Frame-Options`/`frame-ancestors` header on purpose, so Grounded can be embedded in a home dashboard.
 - The Dockerfile pins `node:24-alpine` by digest; Dependabot bumps it.
 - In production (`NODE_ENV=production`) the Express server serves `dist/` as static files and handles `*` with the SPA index.
 - Vite proxies `/api/*` → `http://localhost:3001` in dev so there are no CORS issues locally.
 - The Dockerfile builds everything in the first stage, prunes dev dependencies there, and copies `node_modules` into a runtime stage that has no compilers. Both stages must use the same base image, because `better-sqlite3` is a native module.
 - The app runs as `node` (uid 1000), not root. `docker-entrypoint.sh` starts as root, `chown`s the data folder (the `DB_PATH` directory) to node, then `exec su-exec node …`. A compose `user:` override skips the chown and runs as that user. CI checks this with a root-owned bind mount. Keep `docker-entrypoint.sh` LF-only (`.gitattributes`).
-- `docker-compose.yml` is the generic one users get. The author's install joins its external `media_net` network through a git-ignored `docker-compose.override.yml` next to it, which Docker Compose merges in automatically. Leave that file as is, and don't add `media_net` back to `docker-compose.yml`.
+- `docker-compose.yml` is the generic one users get. Local additions (your own networks, for example) go in a git-ignored `docker-compose.override.yml` next to it, which Docker Compose merges in automatically; keep them out of `docker-compose.yml`.
 
 ### ESM
 

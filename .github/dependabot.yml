@@ -10,8 +10,17 @@ updates:
     groups:
       fonts:
         patterns: ["@fontsource*"]
+      # These only work when they move together
+      react:
+        patterns: ["react", "react-dom", "@types/react", "@types/react-dom"]
+      vite:
+        patterns: ["vite", "@vitejs/*"]
       minor-and-patch:
         update-types: [minor, patch]
+    ignore:
+      # The Node types follow the Node version the app runs on (24)
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: github-actions
     directory: /
