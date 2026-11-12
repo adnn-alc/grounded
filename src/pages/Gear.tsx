@@ -4,7 +4,8 @@ import Ico from '../components/Ico.tsx'
 import { Field } from '../components/Fields.tsx'
 import { PageHead } from '../components/Shell.tsx'
 import { CarePanel, type CarePanelProps } from '../components/Care.tsx'
-import type { Gear, GearInput } from '../types.ts'
+import { CURRENCY_SIGNS } from '../hooks/useUnits.ts'
+import type { Gear, GearInput, Units } from '../types.ts'
 
 // ── GEAR ──────────────────────────────────────────────────────────────
 const STATUS_OPTIONS = ['Primary', 'In use', 'Active', 'Travel', 'Retired']
@@ -30,12 +31,14 @@ interface GearPageProps {
   onSaveGear:   (g: GearInput) => Promise<Gear>
   onUpdateGear: (id: string, g: GearInput) => Promise<Gear>
   onDeleteGear: (id: string) => Promise<void>
+  units:        Units
   care:         Omit<CarePanelProps, 'gear'>   // the Care tab
   startOnCare?: boolean                         // Home's reminder opens the Care tab
   onStartConsumed?: () => void
 }
 
-export function GearPage({ gear = [], onSaveGear, onUpdateGear, onDeleteGear, care, startOnCare = false, onStartConsumed }: GearPageProps) {
+export function GearPage({ gear = [], units, onSaveGear, onUpdateGear, onDeleteGear, care, startOnCare = false, onStartConsumed }: GearPageProps) {
+  const sign = CURRENCY_SIGNS[units.currency]
   const [tab, setTab] = useState<'gear' | 'care'>(startOnCare ? 'care' : 'gear')
   useEffect(() => { onStartConsumed?.() }, []) // eslint-disable-line react-hooks/exhaustive-deps
   const anyDue = care.statuses.some(s => s.due && s.gear)
@@ -107,7 +110,7 @@ export function GearPage({ gear = [], onSaveGear, onUpdateGear, onDeleteGear, ca
                     {g.owned && <div className="gi-meta">Since {g.owned}</div>}
                   </div>
                   {/* No price means free or included with another item */}
-                  <span className="gi-price">€{money(g.price ?? 0)}</span>
+                  <span className="gi-price">{sign}{money(g.price ?? 0)}</span>
                   <span className={`status-pill${ACTIVE_STATUSES.has(g.status) ? ' on' : ''}${g.status === 'Primary' ? ' primary' : ''}`}>{g.status}</span>
                   <button className="icon-btn plain sm" aria-label={`Edit ${g.name}`} title="Edit" onClick={() => openEdit(g)}><Ico name="pencil" size={ICON} /></button>
                   <button className="icon-btn plain sm danger" aria-label={`Remove ${g.name}`} title="Remove" onClick={() => handleDelete(g)}><Ico name="trash" size={ICON} /></button>
@@ -146,7 +149,7 @@ export function GearPage({ gear = [], onSaveGear, onUpdateGear, onDeleteGear, ca
                 <Field label="Owned since">
                   <input className="text-input" placeholder="2024-03" value={form.owned} onChange={e => set('owned', e.target.value)} />
                 </Field>
-                <Field label="Price (€)">
+                <Field label={`Price (${sign})`}>
                   <input className="text-input mono" type="number" min="0" step="0.01" placeholder="0" value={form.price} onChange={e => set('price', e.target.value)} />
                 </Field>
               </div>

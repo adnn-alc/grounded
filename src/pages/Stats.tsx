@@ -55,7 +55,7 @@ function Bars({ rows }: { rows: [string, number][] }) {
 }
 
 /** Bean spending per month for the last few months, by when each bag was added */
-function MonthBars({ beans }: { beans: Bean[] }) {
+function MonthBars({ beans, sign }: { beans: Bean[]; sign: string }) {
   const [now] = useState(() => new Date())
   const months = Array.from({ length: MONTHS }, (_, i) => {
     const d = new Date(now.getFullYear(), now.getMonth() - (MONTHS - 1 - i), 1)
@@ -67,8 +67,8 @@ function MonthBars({ beans }: { beans: Bean[] }) {
   return (
     <div className="month-bars">
       {months.map(m => (
-        <div key={m.key} className="mb-col" title={`€${money(m.total)}`}>
-          <span className="mb-v">{m.total > 0 ? `€${Math.round(m.total)}` : ''}</span>
+        <div key={m.key} className="mb-col" title={`${sign}${money(m.total)}`}>
+          <span className="mb-v">{m.total > 0 ? `${sign}${Math.round(m.total)}` : ''}</span>
           <i style={{ height: `${(m.total / max) * PERCENT}%` }} />
           <span className="mb-l">{m.label}</span>
         </div>
@@ -196,10 +196,10 @@ export function Stats({ shots, brews = [], beans = [], gear = [], units }: Stats
       {priced.length === 0 ? <div className="empty">No bags with a price {periodText}.</div> : (
         <>
           <div className="num-row fit">
-            <div className="kv"><span className="k">On beans</span><span className="v accent">€{money(beanSpend)}</span></div>
+            <div className="kv"><span className="k">On beans</span><span className="v accent">{U.cur()}{money(beanSpend)}</span></div>
             <div className="kv"><span className="k">Bags</span><span className="v">{priced.length}</span></div>
-            <div className="kv"><span className="k">Per bag</span><span className="v">€{perBag.toFixed(CENTS)}</span></div>
-            <div className="kv"><span className="k">{perMass.label}</span><span className="v">{perMassPrice > 0 ? `€${Math.round(perMassPrice)}` : '–'}</span></div>
+            <div className="kv"><span className="k">Per bag</span><span className="v">{U.cur()}{perBag.toFixed(CENTS)}</span></div>
+            <div className="kv"><span className="k">{perMass.label}</span><span className="v">{perMassPrice > 0 ? `${U.cur()}${Math.round(perMassPrice)}` : '–'}</span></div>
           </div>
           {priciest && (
             <div className="stats-sub">
@@ -209,7 +209,7 @@ export function Stats({ shots, brews = [], beans = [], gear = [], units }: Stats
                   <div className="pr-name">{priciest.name}</div>
                   <div className="pr-sub">{[priciest.roaster, priciest.weight > 0 && `${U.m(priciest.weight)} ${U.mU()}`].filter(Boolean).join(', ')}</div>
                 </div>
-                <span className="pr-price">€{money(priciest.price)}</span>
+                <span className="pr-price">{U.cur()}{money(priciest.price)}</span>
               </div>
             </div>
           )}
@@ -217,10 +217,10 @@ export function Stats({ shots, brews = [], beans = [], gear = [], units }: Stats
       )}
       <div className="stats-sub">
         <div className="stats-sub-k">Beans, last {MONTHS} months</div>
-        <MonthBars beans={beans} />
+        <MonthBars beans={beans} sign={U.cur()} />
       </div>
       <div className="stats-sub spend-foot">
-        <div className="kv"><span className="k">On gear</span><span className="v">{gearSpend > 0 ? `€${money(gearSpend)}` : '–'}</span><span className="kv-note">{pricedGear.length} {pricedGear.length === 1 ? 'item' : 'items'}, all time</span></div>
+        <div className="kv"><span className="k">On gear</span><span className="v">{gearSpend > 0 ? `${U.cur()}${money(gearSpend)}` : '–'}</span><span className="kv-note">{pricedGear.length} {pricedGear.length === 1 ? 'item' : 'items'}, all time</span></div>
         <div className="kv"><span className="k">Coffee used</span><span className="v">{bigMass(used, units)}</span><span className="kv-note">{usedCount} {usedCount === 1 ? 'shot or brew' : 'shots and brews'}</span></div>
         <div className="kv"><span className="k">Coffee left</span><span className="v">{bigMass(left, units)}</span><span className="kv-note">{openBags.length} open {openBags.length === 1 ? 'bag' : 'bags'}</span></div>
         <div className="kv"><span className="k">Beans finished</span><span className="v">{finished.length > 0 ? bigMass(finishedGrams, units) : '–'}</span><span className="kv-note">{finished.length} {finished.length === 1 ? 'bag' : 'bags'}, all time</span></div>

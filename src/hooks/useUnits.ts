@@ -5,7 +5,10 @@ export interface UnitHelpers {
   mU: () => string
   t:  (c: number | string) => string   // °C → display temperature
   tU: () => string
+  cur: () => string                    // the currency sign: €, $ or £
 }
+
+export const CURRENCY_SIGNS: Record<Units['currency'], string> = { EUR: '€', USD: '$', GBP: '£' }
 
 export function useUnits(units: Units): UnitHelpers {
   return {
@@ -13,6 +16,7 @@ export function useUnits(units: Units): UnitHelpers {
     mU: ()  => units.mass === 'g' ? 'g' : 'oz',
     t:  (c) => units.temp === 'C' ? parseFloat(String(c)).toFixed(1) : (Number(c) * 9 / 5 + 32).toFixed(1),
     tU: ()  => units.temp === 'C' ? '°C' : '°F',
+    cur: () => CURRENCY_SIGNS[units.currency] ?? CURRENCY_SIGNS.EUR,
   }
 }
 

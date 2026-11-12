@@ -3,7 +3,8 @@ import { Backdrop } from './ui.tsx'
 import Ico from './Ico.tsx'
 import { freezerFields } from '../data/beans.ts'
 import { isoDaysAgo } from '../data/dates.ts'
-import type { Bean, BeanInput, StockLevel } from '../types.ts'
+import { CURRENCY_SIGNS } from '../hooks/useUnits.ts'
+import type { Bean, BeanInput, StockLevel, Units } from '../types.ts'
 
 // Adding a bag, or editing one (Beans, and a bag's own page)
 
@@ -46,12 +47,13 @@ function stockOf(pctLeft: number): StockLevel {
 
 interface BeanModalProps {
   bean:          Bean | null   // null: a new bag
+  units:         Units
   onSaveBean?:   (bean: BeanInput) => Promise<Bean>
   onUpdateBean:  (id: string, data: BeanInput) => Promise<Bean>
   onClose:       () => void
 }
 
-export function BeanModal({ bean, onSaveBean, onUpdateBean, onClose }: BeanModalProps) {
+export function BeanModal({ bean, units, onSaveBean, onUpdateBean, onClose }: BeanModalProps) {
   const [form, setForm]     = useState<BeanForm>(() => bean ? formOf(bean) : EMPTY_BEAN)
   const [saving, setSaving] = useState(false)
   const isEditing = !!bean
@@ -180,7 +182,7 @@ export function BeanModal({ bean, onSaveBean, onUpdateBean, onClose }: BeanModal
                 </div>
               )}
               <div className="dial-input">
-                <label>Price (€)</label>
+                <label>Price ({CURRENCY_SIGNS[units.currency]})</label>
                 <input type="number" step="0.01" style={{ fontSize: 14, width: '100%' }} placeholder="24.00"
                   value={form.price} onChange={e => setField('price', e.target.value)} />
               </div>

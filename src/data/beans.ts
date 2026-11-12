@@ -22,8 +22,8 @@ export const bagColor = (id: string): string =>
 /** 'Roasted 20 Oct', for the bag's tags */
 export const roastedText = (date: string): string => `Roasted ${dayOf(date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`
 
-/** '€24' or '€12.50' */
-export const priceText = (price: number): string => `€${price % 1 === 0 ? price : price.toFixed(CENTS)}`
+/** '€24' or '€12.50', with the currency sign from the units */
+export const priceText = (price: number, sign: string): string => `${sign}${price % 1 === 0 ? price : price.toFixed(CENTS)}`
 
 /** Whole days since the roast date, or null without a usable date */
 export function daysOffRoast(bean: Bean, now: Date = new Date()): number | null {

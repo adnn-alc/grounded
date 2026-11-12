@@ -170,7 +170,7 @@ export const settingsSchema = z.strictObject({
   theme:          text(LEN.short).optional(),
   fonts:          z.object({ sans: fontId, mono: fontId, serif: fontId }).optional(),
   extraction:     z.object({ theme: text(LEN.short).optional(), fonts: z.object({ sans: fontId, serif: fontId }).optional() }).optional(),
-  units:          z.object({ mass: z.enum(['g', 'oz']).optional(), temp: z.enum(['C', 'F']).optional() }).optional(),
+  units:          z.object({ mass: z.enum(['g', 'oz']).optional(), temp: z.enum(['C', 'F']).optional(), currency: z.enum(['EUR', 'USD', 'GBP']).optional() }).optional(),
   waterRecipes:   z.array(text().min(1)).max(MAX_ITEMS).optional(),
   dialinDefaults: z.record(z.string().max(LEN.short), z.record(z.string().max(LEN.short), z.union([z.string().max(LEN.name), z.number(), z.null()]))).optional(),
   brewModes:      z.array(text(LEN.short).trim().min(1)).max(MAX_ITEMS).optional(),

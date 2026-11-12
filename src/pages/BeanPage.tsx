@@ -169,7 +169,7 @@ function BagPills({ bean, shots, brews, U, onFreeze }: { bean: Bean; shots: Coff
       {freshText && <span className={fresh ? PILL_TONE[fresh] : ''}>{freshText}</span>}
       {!bean.archived && <span>{whole(bean.remaining)} {U.mU()} left</span>}
       {made && <span>{made}</span>}
-      {bean.price > 0 && <span>{priceText(bean.price)}{bean.weight > 0 && ` for ${whole(bean.weight)} ${U.mU()}`}</span>}
+      {bean.price > 0 && <span>{priceText(bean.price, U.cur())}{bean.weight > 0 && ` for ${whole(bean.weight)} ${U.mU()}`}</span>}
       {onFreeze && <FreezerSwitch bean={bean} onChange={on => onFreeze(bean, on)} />}
     </div>
   )

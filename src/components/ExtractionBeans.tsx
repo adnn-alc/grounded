@@ -112,7 +112,7 @@ function BagDetails({ bean, shots, brews, U, whole, num, onEdit, onDoses, onArch
   const doses = bean.doses || []
   const from = [bean.roaster, bean.origin?.replace(' · ', ', '), bean.altitude].filter(Boolean).join(', ')
   const pills = [bean.process, bean.roast && roastText(bean.roast), bean.variety, bean.roast_date && roastedText(bean.roast_date)].filter(Boolean)
-  const bagLine = [bean.weight > 0 && `${whole(bean.weight)} ${U.mU()} bag`, bean.price > 0 && priceText(bean.price)].filter(Boolean).join(', ')
+  const bagLine = [bean.weight > 0 && `${whole(bean.weight)} ${U.mU()} bag`, bean.price > 0 && priceText(bean.price, U.cur())].filter(Boolean).join(', ')
 
   // The bag's coffees, best rated first, newest first on a tie
   const best: Coffee[] = [

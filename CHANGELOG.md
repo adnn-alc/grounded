@@ -8,7 +8,9 @@ All notable changes to Grounded are listed here. Versions follow [Semantic Versi
 
 ## [Unreleased]
 
-- For development, the UI is now built with Vite 8 (was 5), which clears two security warnings in the dev server. The app itself is unchanged
+- Settings → Units has a **Currency** choice: € (as before), $ or £. It changes the sign shown with bean and gear prices on Beans, Finished bags, Gear and Stats; amounts aren't converted
+- For development, the UI is now built with Vite 8 (was 5), which clears two security warnings in the dev server
+- The README has screenshots of both designs
 
 ## [1.5.2] — 2026-11-08
 

@@ -275,6 +275,14 @@ export default function Settings({ open, onClose, design, setDesign, extraction,
                     <button className={units.temp === 'F' ? 'on' : ''} onClick={() => setUnits({ ...units, temp: 'F' })}>Fahrenheit</button>
                   </div>
                 </div>
+                <div className="settings-row">
+                  <div><div className="label">Currency</div><div className="desc">The sign shown with bean and gear prices. Amounts aren't converted.</div></div>
+                  <div className="unit-toggle">
+                    <button className={units.currency === 'EUR' ? 'on' : ''} onClick={() => setUnits({ ...units, currency: 'EUR' })}>€ Euro</button>
+                    <button className={units.currency === 'USD' ? 'on' : ''} onClick={() => setUnits({ ...units, currency: 'USD' })}>$ Dollar</button>
+                    <button className={units.currency === 'GBP' ? 'on' : ''} onClick={() => setUnits({ ...units, currency: 'GBP' })}>£ Pound</button>
+                  </div>
+                </div>
               </div>
             )}
 

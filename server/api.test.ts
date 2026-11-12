@@ -183,9 +183,9 @@ test('bad input, unknown ids and duplicates get a clear JSON error', async () =>
 })
 
 test('settings update only the keys sent and reject unknown ones', async () => {
-  await api.call('PUT', '/api/settings', { units: { mass: 'oz', temp: 'F' } })
+  await api.call('PUT', '/api/settings', { units: { mass: 'oz', temp: 'F', currency: 'GBP' } })
   const res = await api.call<Settings>('PUT', '/api/settings', { brewModes: ['Button 1'] })
-  assert.deepEqual(res.body.units, { mass: 'oz', temp: 'F' })
+  assert.deepEqual(res.body.units, { mass: 'oz', temp: 'F', currency: 'GBP' })
   assert.deepEqual(res.body.brewModes, ['Button 1'])
   assert.equal((await api.call('PUT', '/api/settings', { bogus: true })).status, BAD_REQUEST)
 })

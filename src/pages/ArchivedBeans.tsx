@@ -69,7 +69,7 @@ export function ArchivedBeans({ beans, openCount, units, goTo, onUnarchive, onDe
               <Meta k="Variety"  v={b.variety || '–'} />
               <Meta k="Altitude" v={b.altitude || '–'} />
               <Meta k="Roasted"  v={b.roast_date ? longDate(b.roast_date) : '–'} />
-              <Meta k="Price"    v={b.price ? `€${b.price % 1 === 0 ? b.price : b.price.toFixed(CENTS)}` : '–'} />
+              <Meta k="Price"    v={b.price ? `${U.cur()}${b.price % 1 === 0 ? b.price : b.price.toFixed(CENTS)}` : '–'} />
             </div>
 
             {b.notes?.length > 0 && (

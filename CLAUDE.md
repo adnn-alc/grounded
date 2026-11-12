@@ -73,7 +73,7 @@ Older versions kept theme, water recipes and dial-in defaults in `localStorage`.
 
 ### Units, designs, themes & fonts
 
-`useUnits.ts` provides g↔oz and °C↔°F helpers. Units are passed as props; there is no unit context.
+`useUnits.ts` provides g↔oz and °C↔°F helpers and the currency sign (`units.currency`: `EUR`, `USD` or `GBP`; it only changes the sign shown with prices, nothing is converted). Units are passed as props; there is no unit context.
 
 There are two designs, set by the `design` setting (missing = `refined`, the default for fresh installs) and applied as `data-design` on `<html>`:
 

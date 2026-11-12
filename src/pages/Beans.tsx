@@ -125,7 +125,7 @@ export function Beans({ beans, shots = [], brews = [], design, gear = [], archiv
                   {b.price > 0 && (
                     <div className="kv">
                       <span className="k">Price</span>
-                      <span className="v">€{b.price % 1 === 0 ? b.price : b.price.toFixed(CENTS)}</span>
+                      <span className="v">{U.cur()}{b.price % 1 === 0 ? b.price : b.price.toFixed(CENTS)}</span>
                     </div>
                   )}
                 </div>
@@ -145,7 +145,7 @@ export function Beans({ beans, shots = [], brews = [], design, gear = [], archiv
       </div>}
 
       {showModal && (
-        <BeanModal bean={editing} onSaveBean={onSaveBean} onUpdateBean={onUpdateBean} onClose={closeModal} />
+        <BeanModal bean={editing} units={units} onSaveBean={onSaveBean} onUpdateBean={onUpdateBean} onClose={closeModal} />
       )}
 
       {dosesFor && (

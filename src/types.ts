@@ -251,6 +251,7 @@ export interface ExtractionLook {
 export interface Units {
   mass: 'g' | 'oz'
   temp: 'C' | 'F'
+  currency: 'EUR' | 'USD' | 'GBP'   // only the sign shown with prices; nothing is converted
 }
 
 /** Values are kept as typed in the Settings form */

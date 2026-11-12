@@ -54,7 +54,7 @@ function fromHash(): { route: Route; beanId: string | null } {
   return { route, beanId: route === 'bean' && id ? decodeURIComponent(id) : null }
 }
 
-const DEFAULT_UNITS: Units = { mass: 'g', temp: 'C' }
+const DEFAULT_UNITS: Units = { mass: 'g', temp: 'C', currency: 'EUR' }
 
 export default function App() {
   const [route, setRoute] = useState(() => fromHash().route)
@@ -204,7 +204,7 @@ export default function App() {
                 onDialIn={dialInBean} onEdit={setEditingBean} onFreeze={freezeBean} onRepull={onReplicateShot} onRebrew={onReplicateBrew} />,
     'archived-beans': <ArchivedBeans beans={archivedBeans} openCount={beans.length} units={units} goTo={goTo} onUnarchive={unarchiveBean} onDelete={deleteBean} />,
     recipes: <RecipesPage recipes={recipes} units={units} onSaveRecipe={saveRecipe} onUpdateRecipe={updateRecipe} onDeleteRecipe={deleteRecipe} />,
-    gear:    <GearPage gear={gear} onSaveGear={saveGear} onUpdateGear={updateGear} onDeleteGear={deleteGear} care={care}
+    gear:    <GearPage gear={gear} units={units} onSaveGear={saveGear} onUpdateGear={updateGear} onDeleteGear={deleteGear} care={care}
                 startOnCare={careOnOpen} onStartConsumed={() => setCareOnOpen(false)} />,
     stats:   <Stats   shots={shots} brews={brews} beans={[...beans, ...archivedBeans]} gear={gear} units={units} />,
     stock:   <Stock   beans={beans} shots={shots} units={units} onUpdateBean={updateBean} />,
@@ -238,7 +238,7 @@ export default function App() {
         brewModes={brewModes} setBrewModes={m => updateSettings({ brewModes: m })}
         onPreviewBackup={previewBackup} onRestoreBackup={restoreBackup}
       />
-      {editingBean && <BeanModal bean={editingBean} onUpdateBean={updateBean} onClose={() => setEditingBean(null)} />}
+      {editingBean && <BeanModal bean={editingBean} units={units} onUpdateBean={updateBean} onClose={() => setEditingBean(null)} />}
       <Toaster />
     </div>
   )

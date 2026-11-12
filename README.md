@@ -22,7 +22,7 @@ React + Express + SQLite in a single Docker container. No accounts, no cloud, no
 - **Care** — maintenance reminders for each machine, grinder or other gear, every so many shots, days or kg of coffee (backflush, descale, clean burrs…), counted from the shots and brews you log, with a log of every time you did it. Home shows the ones that are due.
 - **Stats** — where your shots landed between sour and bitter, rating per day, espresso per basket, origins (with a world map), spending, how much coffee you've used and have left, and how much you've finished.
 - **Works on a phone** — the same page in your phone's browser, with a tab bar at the bottom.
-- **Settings** — two designs: Refined (a sidebar, serif titles, six themes: Moody, Midnight, Terminal, Parchment, Oat, Ember) and Extraction (an icon rail, big numbers, a time dial, and the Roast, Mocha, Latte and Crema themes), each with its own choice of bundled fonts, g/oz and °C/°F units, default dial-in values and custom water recipes. Settings are stored on the server, so every browser and device sees the same ones.
+- **Settings** — two designs: Refined (a sidebar, serif titles, six themes: Moody, Midnight, Terminal, Parchment, Oat, Ember) and Extraction (an icon rail, big numbers, a time dial, and the Roast, Mocha, Latte and Crema themes), each with its own choice of bundled fonts, g/oz and °C/°F units, € / $ / £ for prices, default dial-in values and custom water recipes. Settings are stored on the server, so every browser and device sees the same ones.
 
 ---
 
