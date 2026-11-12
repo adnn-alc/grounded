@@ -4,6 +4,8 @@ A self-hosted espresso & filter coffee tracker. Log shots and brews while you di
 
 React + Express + SQLite in a single Docker container. No accounts, no cloud, no telemetry — your data stays in one SQLite file on your own machine.
 
+![Grounded's Home page in the Extraction design: the last shot, this week's numbers and the bags on the shelf](docs/screenshots/extraction-home.png)
+
 ---
 
 ## Features
@@ -21,6 +23,26 @@ React + Express + SQLite in a single Docker container. No accounts, no cloud, no
 - **Stats** — where your shots landed between sour and bitter, rating per day, espresso per basket, origins (with a world map), spending, how much coffee you've used and have left, and how much you've finished.
 - **Works on a phone** — the same page in your phone's browser, with a tab bar at the bottom.
 - **Settings** — two designs: Refined (a sidebar, serif titles, six themes: Moody, Midnight, Terminal, Parchment, Oat, Ember) and Extraction (an icon rail, big numbers, a time dial, and the Roast, Mocha, Latte and Crema themes), each with its own choice of bundled fonts, g/oz and °C/°F units, default dial-in values and custom water recipes. Settings are stored on the server, so every browser and device sees the same ones.
+
+---
+
+## Screenshots
+
+Grounded comes in two designs, each with its own themes. You switch between them in Settings.
+
+**Extraction** — an icon rail, big numbers and a time dial (Latte theme shown)
+
+| | |
+|---|---|
+| ![Dial-in with the time dial and taste sliders](docs/screenshots/extraction-dialin.png)<br>Dial-in | ![Shot history grouped by day, with the details of one shot](docs/screenshots/extraction-history.png)<br>History |
+| ![Stats: where shots landed, origins and spending](docs/screenshots/extraction-stats.png)<br>Stats | ![World map of where your coffee comes from](docs/screenshots/extraction-map.png)<br>Origins map |
+
+**Refined** — a sidebar, serif titles and mono numbers (Moody theme shown)
+
+| | |
+|---|---|
+| ![Dial-in on Refined](docs/screenshots/refined-dialin.png)<br>Dial-in | ![Beans, with two bags in the freezer](docs/screenshots/refined-beans.png)<br>Beans, two of them in the freezer |
+| ![Finished bags](docs/screenshots/refined-finished-bags.png)<br>Finished bags | ![Settings: designs, themes and fonts](docs/screenshots/settings-appearance.png)<br>Settings → Appearance |
 
 ---
 
@@ -217,8 +239,10 @@ grounded/
 │   ├── components/         # Shell, charts, settings, world map, basket doses
 │   ├── data/               # Static data and helpers (world map, fonts, beans, care, taste)
 │   └── styles/             # global.css (Refined, themes via CSS custom properties), extraction.css
-└── scripts/
-    └── build-world-map.mjs # Regenerates src/data/worldMap.ts
+├── scripts/
+│   └── build-world-map.mjs # Regenerates src/data/worldMap.ts
+└── docs/
+    └── screenshots/        # The pictures in this README
 ```
 
 ---

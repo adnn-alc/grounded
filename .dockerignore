@@ -3,6 +3,7 @@ dist
 data
 .git
 .DS_Store
+docs
 *.db
 *.db-shm
 *.db-wal
