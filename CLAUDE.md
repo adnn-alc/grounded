@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-Grounded is a self-hosted espresso & coffee tracking app. TypeScript throughout: React 18 + Vite 8 frontend, Express 4 API, SQLite via `better-sqlite3`, Node 24 (Node 22.18+ for local dev). No cloud dependencies, fully self-contained — fonts are bundled too, nothing is loaded from a CDN. Deployed via Docker.
+Grounded is a self-hosted espresso & coffee tracking app. TypeScript throughout: React 19 + Vite 8 frontend, Express 4 API, SQLite via `better-sqlite3`, Node 24 (Node 22.18+ for local dev). No cloud dependencies, fully self-contained — fonts are bundled too, nothing is loaded from a CDN. Deployed via Docker.
 
 ## Commands
 

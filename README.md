@@ -272,7 +272,7 @@ All endpoints are JSON under `/api`.
 | Layer    | Choice                                      |
 |----------|---------------------------------------------|
 | Language | TypeScript (strict)                         |
-| UI       | React 18 + Vite 8                           |
+| UI       | React 19 + Vite 8                           |
 | API      | Express 4                                   |
 | Database | SQLite via better-sqlite3                   |
 | Styling  | Plain CSS with custom properties            |

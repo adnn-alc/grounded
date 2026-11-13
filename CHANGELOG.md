@@ -8,6 +8,8 @@ All notable changes to Grounded are listed here. Versions follow [Semantic Versi
 
 ## [Unreleased]
 
+- The UI now runs on React 19 (was 18). Nothing looks or works differently
+
 ## [1.6.0] — 2026-11-12
 
 Pick your currency: €, $ or £. Nothing changes in your database.
