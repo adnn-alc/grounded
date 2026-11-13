@@ -19,10 +19,12 @@ Not okay:
 
 ## Reporting
 
-If someone's behavior bothers you, open the **⋯** menu on their comment, issue or pull request, choose **Report content**, then **Report to repository admins**. Only the maintainer sees the report.
+If someone's behavior bothers you, open the **⋯** menu on their comment, issue or pull request and choose **Report content**. The report goes to GitHub, not to anyone else in the project.
+
+The maintainer also reads every issue and pull request, and removes anything that breaks this code.
 
 Security problems go through [SECURITY.md](SECURITY.md) instead.
 
 ## What happens
 
-The maintainer will look at every report and decide what's fair: a note asking someone to change their behavior, a warning, or a temporary or permanent ban from the project. Comments, commits, issues and other contributions that break this code may be edited or removed.
+When something breaks this code, the maintainer decides what's fair: a note asking someone to change their behavior, a warning, or a temporary or permanent ban from the project. Comments, commits, issues and other contributions that break this code may be edited or removed.
