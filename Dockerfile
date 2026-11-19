@@ -1,7 +1,7 @@
 # Base image pinned to an exact digest so builds are repeatable; Dependabot
 # opens a PR when a new node:24-alpine is published. Both stages must match.
 # ── Build stage ──────────────────────────────────────────────────────
-FROM node:24-alpine@sha256:8a32c8cf649a49915a66e81e7a609223c708d0adabf288ee3f4077d765542f85 AS builder
+FROM node:24-alpine@sha256:116b800c3754b440ee0aa3ed2f20f5bf3d99a554bfd9adeea09ea8017f6e85f5 AS builder
 WORKDIR /app
 
 # Build tools, only needed if better-sqlite3 has to compile from source
@@ -20,7 +20,7 @@ RUN npm prune --omit=dev
 # ── Runtime stage ─────────────────────────────────────────────────────
 # No compilers here: node_modules (including the compiled better-sqlite3)
 # comes ready-made from the build stage, which uses the same base image.
-FROM node:24-alpine@sha256:8a32c8cf649a49915a66e81e7a609223c708d0adabf288ee3f4077d765542f85
+FROM node:24-alpine@sha256:116b800c3754b440ee0aa3ed2f20f5bf3d99a554bfd9adeea09ea8017f6e85f5
 WORKDIR /app
 
 # su-exec lets the entrypoint drop from root to the unprivileged node user
